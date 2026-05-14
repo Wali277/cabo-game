@@ -238,12 +238,12 @@
 /* ========== Table ========== */
 .table-root {
   flex: 1;
-  display: grid;
-  grid-template-rows: auto auto 1fr auto auto;
-  padding: 12px 18px 24px;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 16px 20px;
   gap: 10px;
   position: relative;
-  max-width: 1400px;
+  max-width: 1500px;
   margin: 0 auto;
   width: 100%;
   min-height: 100vh;
@@ -257,14 +257,86 @@
 }
 .menu-back { color: #f4ebff; padding: 8px 12px; font-size: 14px; }
 .menu-back:hover { color: #ffd86b; }
-.top-spacer { /* mirror of menu-back on the right for visual centering */ }
+.top-spacer { }
+
+/* Two-column layout: left panel + main play area */
+.game-body {
+  display: grid;
+  grid-template-columns: 230px 1fr;
+  gap: 14px;
+  flex: 1;
+  align-items: start;
+}
+
+/* ========== Left Panel ========== */
+.left-panel {
+  background: rgba(13, 22, 56, 0.82);
+  border: 2px solid rgba(168, 123, 255, 0.45);
+  border-radius: 22px;
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.35);
+  position: sticky;
+  top: 16px;
+}
+
+.left-instruction {
+  text-align: center;
+  color: #f4ebff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.left-emoji {
+  font-size: 38px;
+  line-height: 1;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+}
+.left-text {
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1.45;
+  margin: 0;
+  color: #ddd6f4;
+}
+.left-divider {
+  height: 1px;
+  background: rgba(168,123,255,0.3);
+  border-radius: 1px;
+}
+.left-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.left-btn {
+  width: 100%;
+  text-align: left !important;
+  padding: 11px 14px !important;
+  font-size: 14px !important;
+  border-radius: 14px !important;
+  white-space: nowrap;
+}
+
+/* Main play area */
+.main-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
 
 .opponents-row {
   display: flex;
   justify-content: space-around;
   gap: 20px;
   flex-wrap: wrap;
-  padding: 10px 0;
+  padding: 6px 0;
+  width: 100%;
 }
 
 .center-area {
@@ -313,6 +385,36 @@
   border: 3px dashed #fff;
   display: flex; align-items: center; justify-content: center;
   color: #fff; font-weight: 700; opacity: 0.7;
+}
+
+/* Responsive: stack vertically on small screens */
+@media (max-width: 820px) {
+  .game-body {
+    grid-template-columns: 1fr;
+  }
+  .left-panel {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+  }
+  .left-instruction {
+    flex-direction: row;
+    text-align: left;
+    gap: 10px;
+    flex: 1;
+    min-width: 180px;
+  }
+  .left-buttons {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .left-btn {
+    width: auto !important;
+  }
 }
 
 .drawn-slot {

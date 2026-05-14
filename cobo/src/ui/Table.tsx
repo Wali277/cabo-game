@@ -3,7 +3,7 @@ import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 import { useStore } from "../state/store";
 import { PlayerSeat } from "./PlayerSeat";
 import { Center } from "./Center";
-import { Prompt } from "./Prompt";
+import { LeftPanel } from "./LeftPanel";
 import { Scoreboard, RoundEndOverlay } from "./Scoreboard";
 import { ActionBanner } from "./ActionBanner";
 import { ActionLog } from "./ActionLog";
@@ -127,40 +127,46 @@ export function Table() {
   return (
     <LayoutGroup>
       <div className={`table-root players-${game.players.length}`}>
+        {/* Top bar — always full width */}
         <div className="top-bar">
           <button className="btn ghost menu-back" onClick={handleQuit}>← Menu</button>
           <Scoreboard />
           <div className="top-spacer" />
         </div>
 
-        <Prompt />
+        {/* Two-column game body: left panel + main play area */}
+        <div className="game-body">
+          <LeftPanel />
 
-        <div className="opponents-row">
-          {others.map((p) => {
-            const seatIdx = game.players.findIndex((pp) => pp.id === p.id);
-            return (
+          <div className="main-area">
+            <div className="opponents-row">
+              {others.map((p) => {
+                const seatIdx = game.players.findIndex((pp) => pp.id === p.id);
+                return (
+                  <PlayerSeat
+                    key={p.id}
+                    player={p}
+                    seatIndex={seatIdx}
+                    totalSeats={game.players.length}
+                    isCurrent={game.players[game.currentPlayer].id === p.id}
+                    isHuman={false}
+                  />
+                );
+              })}
+            </div>
+
+            <Center />
+
+            <div className="human-row">
               <PlayerSeat
-                key={p.id}
-                player={p}
-                seatIndex={seatIdx}
+                player={human}
+                seatIndex={humanIdx}
                 totalSeats={game.players.length}
-                isCurrent={game.players[game.currentPlayer].id === p.id}
-                isHuman={false}
+                isCurrent={game.players[game.currentPlayer].id === humanId}
+                isHuman={true}
               />
-            );
-          })}
-        </div>
-
-        <Center />
-
-        <div className="human-row">
-          <PlayerSeat
-            player={human}
-            seatIndex={humanIdx}
-            totalSeats={game.players.length}
-            isCurrent={game.players[game.currentPlayer].id === humanId}
-            isHuman={true}
-          />
+            </div>
+          </div>
         </div>
 
         <AnimatePresence>

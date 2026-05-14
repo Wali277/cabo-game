@@ -74,8 +74,9 @@ function CardFace({ card, w, h }: { card?: CardT | null; w: number; h: number })
         className="card-face"
         style={{
           width: w, height: h, position: "absolute", inset: 0,
-          backfaceVisibility: "hidden", background: "#fff",
-          borderRadius: 12, border: "2px solid #ddd",
+          backfaceVisibility: "hidden",
+          background: "#ffd86b",
+          borderRadius: 12, border: "3px solid #1c1d2b",
         }}
       />
     );
@@ -88,10 +89,10 @@ function CardFace({ card, w, h }: { card?: CardT | null; w: number; h: number })
       style={{
         width: w, height: h, position: "absolute", inset: 0,
         backfaceVisibility: "hidden",
-        background: "linear-gradient(155deg, #fffdf6 0%, #ffe9c0 100%)",
+        background: "#ffd86b",
         borderRadius: 12,
-        border: `3px solid ${color}`,
-        boxShadow: "0 6px 14px rgba(0,0,0,0.25), inset 0 0 0 2px #fff",
+        border: `3px solid #1c1d2b`,
+        boxShadow: "0 6px 18px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.5)",
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
@@ -109,7 +110,7 @@ function CardFace({ card, w, h }: { card?: CardT | null; w: number; h: number })
           alignSelf: "center",
           fontSize: w * 0.55,
           lineHeight: 1,
-          textShadow: `2px 2px 0 rgba(0,0,0,0.07)`,
+          textShadow: `1px 2px 0 rgba(0,0,0,0.12)`,
         }}
       >
         {glyph}
@@ -138,29 +139,29 @@ function CardBack({ w, h }: { w: number; h: number }) {
         width: w, height: h, position: "absolute", inset: 0,
         backfaceVisibility: "hidden", transform: "rotateY(180deg)",
         borderRadius: 12,
-        border: "3px solid #fff",
-        background:
-          "repeating-linear-gradient(45deg, #6a4cff 0 10px, #855dff 10px 20px)",
-        boxShadow: "0 6px 14px rgba(0,0,0,0.25), inset 0 0 0 4px #ffd86b",
+        border: "3px solid #ffd86b",
+        background: "#1c1d2b",
+        boxShadow: "0 6px 18px rgba(0,0,0,0.4), inset 0 0 0 6px #2e2f45",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        color: "#fff",
         fontFamily: "'Fredoka', system-ui, sans-serif",
         fontWeight: 900,
         fontSize: w * 0.35,
         letterSpacing: 1,
-        textShadow: "2px 2px 0 rgba(0,0,0,0.25)",
       }}
     >
       <div
         style={{
           background: "#ffd86b",
-          color: "#5b3aff",
-          padding: "4px 8px",
+          color: "#1c1d2b",
+          padding: "4px 10px",
           borderRadius: 8,
           transform: "rotate(-8deg)",
-          boxShadow: "0 3px 0 #c98e00",
+          boxShadow: "0 3px 0 #c98e00, 0 6px 14px rgba(0,0,0,0.3)",
+          fontWeight: 900,
+          fontSize: w * 0.28,
+          letterSpacing: 2,
         }}
       >
         CABO
