@@ -341,9 +341,11 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  align-self: start;  /* stay at top even when game-body stretches */
   position: sticky;
   top: 16px;
+  /* Fill from top to near bottom of viewport so the log can expand */
+  max-height: calc(100vh - 52px);
+  overflow: hidden;
 }
 
 /* ========== Table Grid — players on all four sides ========== */
@@ -605,7 +607,9 @@
   box-shadow: 0 14px 30px rgba(0,0,0,0.45);
   backdrop-filter: blur(6px);
   font-size: 13px;
-  max-height: 340px;
+  /* Grow to fill all remaining sidebar space, then scroll */
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 .log-title {
@@ -623,8 +627,10 @@
   gap: 4px;
   overflow-y: auto;
   padding-right: 4px;
-  max-height: 280px;
   scroll-behavior: smooth;
+  /* Fill the action-log box, only scroll when entries overflow */
+  flex: 1;
+  min-height: 0;
 }
 .log-row {
   padding: 6px 8px;
