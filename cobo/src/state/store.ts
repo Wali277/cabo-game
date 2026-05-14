@@ -76,6 +76,7 @@ interface StoreState {
   setPeekOverlay: (v: StoreState["pendingPeekOverlay"]) => void;
   playAgain: () => void;
   backToMenu: () => void;
+  leaveRoomToLobby: () => void;
   enterLobby: () => void;
   applyMpRoom: (room: MpRoom) => void;
 }
@@ -418,6 +419,16 @@ export const useStore = create<StoreState>((set, get) => ({
     }
     set({
       screen: "menu", mode: "sp", mp: null,
+      game: null, targeting: null, toast: null,
+    });
+  },
+
+  // Leave the current room but stay in the Lobby (choose mode) instead of
+  // going all the way back to the main menu.
+  leaveRoomToLobby() {
+    import("./mp").then((m) => m.leaveRoom());
+    set({
+      screen: "lobby", mode: "mp", mp: null,
       game: null, targeting: null, toast: null,
     });
   },

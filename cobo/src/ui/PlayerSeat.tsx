@@ -109,7 +109,7 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman }: Props) {
                 faceUp={faceUp}
                 highlight={hl}
                 onClick={() => handleClick(idx)}
-                size={isHuman ? "md" : "sm"}
+                size={isHuman ? "lg" : "md"}
               />
               {knownDot && <div className="known-dot" title="You've seen this card" />}
             </div>

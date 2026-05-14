@@ -126,6 +126,7 @@
 }
 .member.empty { color: #b8b3c4; font-style: italic; background: transparent; border: 2px dashed #b8b3c4; }
 .member.offline { opacity: 0.5; }
+.room-nav-row { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
 .mname { flex: 1; }
 .badge { font-size: 10px; padding: 2px 6px; border-radius: 6px; font-weight: 900; letter-spacing: 1px; }
 .badge.host { background: #ffd86b; color: #1c1d2b; }
@@ -243,26 +244,39 @@
   padding: 10px 16px 20px;
   gap: 10px;
   position: relative;
-  max-width: 1500px;
+  max-width: 1600px;
   margin: 0 auto;
   width: 100%;
   min-height: 100vh;
 }
 
+/* Compact top bar — just back button + round label */
 .top-bar {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
+  padding: 2px 0;
 }
-.menu-back { color: #f4ebff; padding: 8px 12px; font-size: 14px; }
+.menu-back {
+  color: #f4ebff;
+  padding: 7px 14px;
+  font-size: 14px;
+  width: auto !important;
+  white-space: nowrap;
+}
 .menu-back:hover { color: #ffd86b; }
-.top-spacer { }
+.top-round-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(168,123,255,0.8);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
 
-/* Two-column layout: left panel + main play area */
+/* Three-column layout: left panel | main area | right sidebar */
 .game-body {
   display: grid;
-  grid-template-columns: 230px 1fr;
+  grid-template-columns: 270px 1fr 260px;
   gap: 14px;
   flex: 1;
   align-items: start;
@@ -270,15 +284,15 @@
 
 /* ========== Left Panel ========== */
 .left-panel {
-  background: rgba(13, 22, 56, 0.82);
-  border: 2px solid rgba(168, 123, 255, 0.45);
+  background: rgba(13, 22, 56, 0.85);
+  border: 2px solid rgba(168, 123, 255, 0.5);
   border-radius: 22px;
-  padding: 20px 16px;
+  padding: 22px 18px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  backdrop-filter: blur(10px);
-  box-shadow: 0 12px 32px rgba(0,0,0,0.35);
+  gap: 16px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 14px 36px rgba(0,0,0,0.4);
   position: sticky;
   top: 16px;
 }
@@ -289,37 +303,47 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  padding-bottom: 4px;
 }
 .left-emoji {
-  font-size: 38px;
+  font-size: 46px;
   line-height: 1;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+  filter: drop-shadow(0 3px 6px rgba(0,0,0,0.35));
 }
 .left-text {
   font-weight: 600;
-  font-size: 14px;
-  line-height: 1.45;
+  font-size: 15px;
+  line-height: 1.5;
   margin: 0;
-  color: #ddd6f4;
+  color: #e8e0ff;
 }
 .left-divider {
   height: 1px;
-  background: rgba(168,123,255,0.3);
+  background: rgba(168,123,255,0.35);
   border-radius: 1px;
 }
 .left-buttons {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 .left-btn {
   width: 100%;
   text-align: left !important;
-  padding: 11px 14px !important;
-  font-size: 14px !important;
+  padding: 13px 16px !important;
+  font-size: 15px !important;
   border-radius: 14px !important;
   white-space: nowrap;
+}
+
+/* ========== Right Sidebar ========== */
+.right-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: sticky;
+  top: 16px;
 }
 
 /* Main play area */
@@ -327,7 +351,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  width: 100%;
 }
 
 .opponents-row {
@@ -350,10 +375,10 @@
 .deck-area {
   display: flex;
   align-items: center;
-  gap: 28px;
+  gap: 36px;
   background: rgba(168,123,255,0.12);
-  padding: 22px 28px;
-  border-radius: 28px;
+  padding: 28px 36px;
+  border-radius: 32px;
   border: 4px dashed rgba(168,123,255,0.55);
   position: relative;
 }
@@ -365,18 +390,18 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   cursor: default;
   position: relative;
 }
 .pile.clickable { cursor: pointer; }
-.pile.clickable:hover .card-wrap { transform: translateY(-4px); }
+.pile.clickable:hover .card-wrap { transform: translateY(-6px); }
 .pile-label {
   background: #0d1638;
   color: #a87bff;
   font-weight: 700;
   font-size: 12px;
-  padding: 3px 10px;
+  padding: 4px 12px;
   border-radius: 10px;
   letter-spacing: 1px;
 }
@@ -387,7 +412,15 @@
   color: #fff; font-weight: 700; opacity: 0.7;
 }
 
-/* Responsive: stack vertically on small screens */
+/* Responsive: collapse to 2 columns at medium, 1 column at small */
+@media (max-width: 1100px) {
+  .game-body {
+    grid-template-columns: 260px 1fr;
+  }
+  .right-sidebar {
+    display: none;
+  }
+}
 @media (max-width: 820px) {
   .game-body {
     grid-template-columns: 1fr;
@@ -545,11 +578,6 @@
 
 /* ========== Action log ========== */
 .action-log {
-  position: fixed;
-  top: 80px;
-  right: 20px;
-  width: 260px;
-  max-height: calc(100vh - 120px);
   background: rgba(13,22,56,0.85);
   color: #f4ebff;
   border: 2px solid rgba(168,123,255,0.55);
@@ -560,17 +588,9 @@
   gap: 8px;
   box-shadow: 0 14px 30px rgba(0,0,0,0.45);
   backdrop-filter: blur(6px);
-  font-size: 14px;
-  z-index: 40;
-}
-.action-log.compact {
-  width: 200px;
-  font-size: 12px;
-  top: auto;
-  bottom: 20px;
-  right: 20px;
-  max-height: 220px;
-  opacity: 0.9;
+  font-size: 13px;
+  max-height: 340px;
+  overflow: hidden;
 }
 .log-title {
   font-size: 11px;
@@ -604,24 +624,7 @@
   font-size: 12px;
 }
 
-@media (max-width: 1180px) {
-  .action-log {
-    width: 200px;
-    font-size: 12px;
-  }
-}
-@media (max-width: 960px) {
-  .action-log {
-    position: fixed;
-    top: auto;
-    bottom: 12px;
-    right: 12px;
-    width: 170px;
-    max-height: 180px;
-    font-size: 11px;
-    opacity: 0.92;
-  }
-}
+/* right-sidebar (and its children) hidden below 1100px — see game-body media query */
 
 /* ========== Action banner ========== */
 .action-banner {

@@ -21,6 +21,7 @@ export function Lobby({ initialCode }: Props) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const backToMenu = useStore((s) => s.backToMenu);
+  const leaveRoomToLobby = useStore((s) => s.leaveRoomToLobby);
 
   async function doCreate() {
     if (!name.trim()) {
@@ -117,7 +118,10 @@ export function Lobby({ initialCode }: Props) {
           ) : (
             <div className="hint">Waiting for host to start…</div>
           )}
-          <button className="btn" onClick={backToMenu}>Leave room</button>
+          <div className="room-nav-row">
+            <button className="btn" onClick={leaveRoomToLobby}>← Back to rooms</button>
+            <button className="btn ghost" onClick={backToMenu}>Main menu</button>
+          </div>
         </div>
       </div>
     );

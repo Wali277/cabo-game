@@ -127,14 +127,13 @@ export function Table() {
   return (
     <LayoutGroup>
       <div className={`table-root players-${game.players.length}`}>
-        {/* Top bar — always full width */}
+        {/* Compact top bar — just the back button */}
         <div className="top-bar">
           <button className="btn ghost menu-back" onClick={handleQuit}>← Menu</button>
-          <Scoreboard />
-          <div className="top-spacer" />
+          <span className="top-round-label">Round {game.roundNumber}</span>
         </div>
 
-        {/* Two-column game body: left panel + main play area */}
+        {/* Three-column game body: left panel | main area | right sidebar */}
         <div className="game-body">
           <LeftPanel />
 
@@ -167,6 +166,12 @@ export function Table() {
               />
             </div>
           </div>
+
+          {/* Right sidebar: scoreboard + action log */}
+          <div className="right-sidebar">
+            <Scoreboard />
+            <ActionLog />
+          </div>
         </div>
 
         <AnimatePresence>
@@ -183,7 +188,6 @@ export function Table() {
           )}
         </AnimatePresence>
 
-        <ActionLog />
         <ActionBanner />
         <RoundEndOverlay />
       </div>
