@@ -273,16 +273,16 @@
   text-transform: uppercase;
 }
 
-/* Three-column layout: left panel | main area | right sidebar */
+/* Three-column layout: left panel | table grid | right sidebar */
 .game-body {
   display: grid;
   grid-template-columns: 270px 1fr 260px;
   gap: 14px;
   flex: 1;
-  align-items: start;
+  align-items: stretch; /* all columns fill full height */
 }
 
-/* ========== Left Panel ========== */
+/* ========== Left Panel — vertically centered ========== */
 .left-panel {
   background: rgba(13, 22, 56, 0.85);
   border: 2px solid rgba(168, 123, 255, 0.5);
@@ -290,11 +290,10 @@
   padding: 22px 18px;
   display: flex;
   flex-direction: column;
+  justify-content: center; /* vertical centering of content */
   gap: 16px;
   backdrop-filter: blur(12px);
   box-shadow: 0 14px 36px rgba(0,0,0,0.4);
-  position: sticky;
-  top: 16px;
 }
 
 .left-instruction {
@@ -342,27 +341,43 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  align-self: start;  /* stay at top even when game-body stretches */
   position: sticky;
   top: 16px;
 }
 
-/* Main play area */
-.main-area {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
+/* ========== Table Grid — players on all four sides ========== */
+.table-grid {
+  display: grid;
+  grid-template-areas:
+    ".    top    ."
+    "left center right"
+    ".    bottom .";
+  grid-template-columns: auto 1fr auto;
+  grid-template-rows: auto 1fr auto;
+  gap: 16px;
   width: 100%;
+  height: 100%;
+  min-height: 0;
 }
 
-.opponents-row {
-  display: flex;
-  justify-content: space-around;
-  gap: 20px;
-  flex-wrap: wrap;
-  padding: 6px 0;
-  width: 100%;
+.tslot { display: flex; align-items: center; justify-content: center; }
+.tslot-top    { grid-area: top;    align-items: flex-end; }
+.tslot-left   { grid-area: left;   justify-content: flex-end; }
+.tslot-center { grid-area: center; }
+.tslot-right  { grid-area: right;  justify-content: flex-start; }
+.tslot-bottom { grid-area: bottom; align-items: flex-start; }
+
+/* Side players: cards in a 2×2 grid so they don't stretch vertically */
+.pos-left .hand-row,
+.pos-right .hand-row {
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  gap: 6px;
 }
+
+/* Unused — kept for compat */
+.opponents-row { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; }
 
 .center-area {
   display: flex;
@@ -370,6 +385,7 @@
   align-items: center;
   justify-content: center;
   gap: 18px;
+  width: 100%;
 }
 
 .deck-area {

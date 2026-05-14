@@ -3,15 +3,20 @@ import type { PlayerState } from "../engine/types";
 import { useStore, PLAYER_COLORS } from "../state/store";
 // setupPeekRevealed removed in favor of per-card setup peeks.
 
+type TablePos = "top" | "left" | "right" | "bottom";
+
 interface Props {
   player: PlayerState;
   seatIndex: number;
   totalSeats: number;
   isCurrent: boolean;
   isHuman: boolean;
+  tablePos?: TablePos;
 }
 
-export function PlayerSeat({ player, seatIndex, isCurrent, isHuman }: Props) {
+export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: Props) {
+  // Card size by position: side players get smaller cards in a 2×2 grid
+  const cardSize = isHuman ? "lg" : (tablePos === "left" || tablePos === "right") ? "sm" : "md";
   const game = useStore((s) => s.game!);
   const targeting = useStore((s) => s.targeting);
   const humanId = useStore((s) => s.humanId);
@@ -83,7 +88,7 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman }: Props) {
   const known = player.knownToSelf;
 
   return (
-    <div className={`player-seat seat-${seatIndex}`}>
+    <div className={`player-seat seat-${seatIndex}${tablePos ? ` pos-${tablePos}` : ""}`}>
       <div
         className="player-tag"
         style={{
@@ -109,7 +114,7 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman }: Props) {
                 faceUp={faceUp}
                 highlight={hl}
                 onClick={() => handleClick(idx)}
-                size={isHuman ? "lg" : "md"}
+                size={cardSize}
               />
               {knownDot && <div className="known-dot" title="You've seen this card" />}
             </div>

@@ -109,60 +109,106 @@ export function Table() {
     return () => clearTimeout(t);
   }, [game.discard.length]);
 
-  // Position other players around the table
+  // Assign opponents to table positions based on count
+  // 1 opp → top | 2 opps → top + right | 3 opps → top + left + right
   const others = game.players.filter((p) => p.id !== humanId);
   const humanIdx = game.players.findIndex((p) => p.id === humanId);
   const human = game.players[humanIdx];
 
+  type SlotName = "top" | "left" | "right";
+  const slotOrder: SlotName[] =
+    others.length === 1 ? ["top"] :
+    others.length === 2 ? ["top", "right"] :
+    ["top", "left", "right"];
+
+  const slotMap: Partial<Record<SlotName, typeof others[0]>> = {};
+  others.forEach((p, i) => { slotMap[slotOrder[i]] = p; });
+
   const backToMenu = useStore((s) => s.backToMenu);
   function handleQuit() {
-    if (game.phase === "round_over") {
-      backToMenu();
-      return;
-    }
+    if (game.phase === "round_over") { backToMenu(); return; }
     const ok = window.confirm("Leave the game and return to the main menu?");
     if (ok) backToMenu();
+  }
+
+  function seatFor(p: typeof others[0]) {
+    return game.players.findIndex((pp) => pp.id === p.id);
   }
 
   return (
     <LayoutGroup>
       <div className={`table-root players-${game.players.length}`}>
-        {/* Compact top bar — just the back button */}
+        {/* Compact top bar */}
         <div className="top-bar">
           <button className="btn ghost menu-back" onClick={handleQuit}>← Menu</button>
           <span className="top-round-label">Round {game.roundNumber}</span>
         </div>
 
-        {/* Three-column game body: left panel | main area | right sidebar */}
+        {/* Three-column game body: left panel | table grid | right sidebar */}
         <div className="game-body">
           <LeftPanel />
 
-          <div className="main-area">
-            <div className="opponents-row">
-              {others.map((p) => {
-                const seatIdx = game.players.findIndex((pp) => pp.id === p.id);
-                return (
-                  <PlayerSeat
-                    key={p.id}
-                    player={p}
-                    seatIndex={seatIdx}
-                    totalSeats={game.players.length}
-                    isCurrent={game.players[game.currentPlayer].id === p.id}
-                    isHuman={false}
-                  />
-                );
-              })}
+          {/* Table grid — players sit on each side of the deck */}
+          <div className="table-grid">
+            {/* Top opponent */}
+            <div className="tslot tslot-top">
+              {slotMap.top && (
+                <PlayerSeat
+                  key={slotMap.top.id}
+                  player={slotMap.top}
+                  seatIndex={seatFor(slotMap.top)}
+                  totalSeats={game.players.length}
+                  isCurrent={game.players[game.currentPlayer].id === slotMap.top.id}
+                  isHuman={false}
+                  tablePos="top"
+                />
+              )}
             </div>
 
-            <Center />
+            {/* Left opponent */}
+            <div className="tslot tslot-left">
+              {slotMap.left && (
+                <PlayerSeat
+                  key={slotMap.left.id}
+                  player={slotMap.left}
+                  seatIndex={seatFor(slotMap.left)}
+                  totalSeats={game.players.length}
+                  isCurrent={game.players[game.currentPlayer].id === slotMap.left.id}
+                  isHuman={false}
+                  tablePos="left"
+                />
+              )}
+            </div>
 
-            <div className="human-row">
+            {/* Centre — deck & discard */}
+            <div className="tslot tslot-center">
+              <Center />
+            </div>
+
+            {/* Right opponent */}
+            <div className="tslot tslot-right">
+              {slotMap.right && (
+                <PlayerSeat
+                  key={slotMap.right.id}
+                  player={slotMap.right}
+                  seatIndex={seatFor(slotMap.right)}
+                  totalSeats={game.players.length}
+                  isCurrent={game.players[game.currentPlayer].id === slotMap.right.id}
+                  isHuman={false}
+                  tablePos="right"
+                />
+              )}
+            </div>
+
+            {/* Bottom — human player */}
+            <div className="tslot tslot-bottom">
               <PlayerSeat
                 player={human}
                 seatIndex={humanIdx}
                 totalSeats={game.players.length}
                 isCurrent={game.players[game.currentPlayer].id === humanId}
                 isHuman={true}
+                tablePos="bottom"
               />
             </div>
           </div>
