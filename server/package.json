@@ -1,0 +1,27 @@
+{
+  "name": "cobo-server",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "node --import tsx src/index.ts",
+    "build:client": "npm --prefix ../cobo run build",
+    "serve": "npm run build:client && npm start",
+    "share": "node scripts/share.mjs"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "localtunnel": "^2.0.2",
+    "socket.io": "^4.8.1",
+    "tsx": "^4.20.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.18",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.0",
+    "socket.io-client": "^4.8.3",
+    "typescript": "^5.7.2"
+  }
+}

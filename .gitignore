@@ -1,0 +1,7 @@
+node_modules/
+cobo/node_modules/
+server/node_modules/
+cobo/dist/
+.env
+*.local
+.DS_Store

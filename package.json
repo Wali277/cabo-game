@@ -1,0 +1,13 @@
+{
+  "name": "cobo-game",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "postinstall": "npm install --prefix cobo && npm install --prefix server",
+    "build": "npm run build --prefix cobo",
+    "start": "npm start --prefix server"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

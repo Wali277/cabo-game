@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:cabo-online.com)",
+      "WebSearch",
+      "Bash(npm --version)",
+      "Bash(npm create *)",
+      "Bash(npm install *)",
+      "Bash(npx tsc *)",
+      "Bash(npm run *)",
+      "Bash(pkill -f \"vite\")",
+      "Bash(lsof -ti:5173)",
+      "Bash(xargs kill -9)",
+      "Bash(mkdir -p \"/Users/wali/Downloads/Cobo game Claude/cobo/.claude\")",
+      "Bash(mkdir -p \"/Users/wali/Downloads/Cobo game Claude/.claude\")",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(curl -s http://localhost:8787/health)",
+      "Bash(node test-2p.mjs)",
+      "WebFetch(domain:en.wikipedia.org)",
+      "Bash(echo \"PID: $!\")"
+    ]
+  }
+}
