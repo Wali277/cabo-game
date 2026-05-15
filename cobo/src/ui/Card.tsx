@@ -91,7 +91,7 @@ function CardFace({ card, w, h }: { card?: CardT | null; w: number; h: number })
     // Font size chosen so 5 stacked letters fit within half the card height,
     // leaving clean room at top and bottom. Absolute positioning means the
     // jester sits in the true centre without being squeezed by the text.
-    const letterFs = w * 0.155;
+    const letterFs = w * 0.11;
     const letterLh = 1.05;
     const letterStyle: React.CSSProperties = {
       fontSize: letterFs,

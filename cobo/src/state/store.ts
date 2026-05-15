@@ -49,6 +49,11 @@ export interface MpRoom {
   started: boolean;
   members: MpMember[];
   game: GameState | null;
+  coinToss: {
+    choices: { heads: string | null; tails: string | null };
+    startedAt: number;
+    result: "heads" | "tails" | null;
+  } | null;
 }
 
 export type ActionTargetingMode =
@@ -84,6 +89,7 @@ interface StoreState {
   coinTossBotAutoPick: () => void;
   coinTossResolve: () => void;
   coinTossComplete: () => void;
+  mpCoinTossPick: (side: CoinSide) => void;
   start: () => void;
   setSetupPeekRevealed: (v: boolean) => void;
   draw: () => void;
@@ -228,6 +234,14 @@ export const useStore = create<StoreState>((set, get) => ({
     });
   },
 
+  mpCoinTossPick(side) {
+    const { coinToss } = get();
+    if (!coinToss || coinToss.humanChoice) return;
+    import("./mp").then((m) => (m as any).sendCoinTossPick(side));
+    // Optimistic: mark our own choice locally while server confirms
+    set({ coinToss: { ...coinToss, humanChoice: side } });
+  },
+
   trainingInjectCard(card) {
     const { game, training } = get();
     if (!game || !training) return;
@@ -262,31 +276,80 @@ export const useStore = create<StoreState>((set, get) => ({
       prev.screen !== "coin_toss";
 
     if (freshGameStart && room.game) {
-      const firstPlayer = room.game.players[room.game.currentPlayer];
+      const playerCount = room.game.players.length;
+
+      // Only show the interactive coin toss for 2-player games where
+      // the server sends a coinToss object. For 3+ players, jump straight in.
+      if (playerCount === 2 && room.coinToss) {
+        set({
+          mp: room,
+          humanId: room.viewerId,
+          mode: "mp",
+          game: null,
+          pendingGame: room.game,
+          screen: "coin_toss",
+          coinToss: {
+            humanChoice: null,
+            botChoice: null,
+            result: null,
+            winnerId: null,
+            phase: "choosing",
+            countdownEndsAt: room.coinToss.startedAt + 5000,
+          },
+          targeting: null,
+          setupPeekRevealed: false,
+        });
+      } else {
+        set({
+          mp: room,
+          humanId: room.viewerId,
+          mode: "mp",
+          game: room.game,
+          screen: "game",
+          targeting: null,
+          setupPeekRevealed: false,
+        });
+      }
+      return;
+    }
+
+    // Live coin-toss updates: other player picked / result arrived
+    if (prev.screen === "coin_toss" && prev.coinToss?.phase === "choosing" && room.coinToss) {
+      const ct = room.coinToss;
+      const myId = room.viewerId;
+      const other = room.members.find((m) => m.id !== myId);
+      const myChoice: CoinSide | null =
+        ct.choices.heads === myId ? "heads" : ct.choices.tails === myId ? "tails" : null;
+      const otherChoice: CoinSide | null =
+        ct.choices.heads === other?.id ? "heads" : ct.choices.tails === other?.id ? "tails" : null;
+
+      if (ct.result && prev.pendingGame) {
+        // Both sides assigned and result known → transition to flip
+        const winnerPlayerId = ct.result === "heads" ? ct.choices.heads : ct.choices.tails;
+        set({
+          mp: room,
+          coinToss: {
+            humanChoice: myChoice,
+            botChoice: otherChoice,
+            result: ct.result,
+            winnerId: winnerPlayerId,
+            phase: "flipping",
+            countdownEndsAt: null,
+          },
+        });
+        setTimeout(() => {
+          const st = get();
+          if (st.screen !== "coin_toss" || !st.coinToss) return;
+          set({ coinToss: { ...st.coinToss, phase: "done" } });
+        }, 900);
+        return;
+      }
+
+      // Partial update: other player just picked but result not yet set
       set({
         mp: room,
-        humanId: room.viewerId,
-        mode: "mp",
-        game: null,
-        pendingGame: room.game,
-        screen: "coin_toss",
-        coinToss: {
-          humanChoice: "heads",
-          botChoice: "tails",
-          result: firstPlayer.id === room.viewerId ? "heads" : "tails",
-          winnerId: firstPlayer.id,
-          phase: "flipping",
-          countdownEndsAt: null,
-        },
-        targeting: null,
-        setupPeekRevealed: false,
+        coinToss: { ...prev.coinToss!, humanChoice: myChoice, botChoice: otherChoice },
       });
-      // After flip animation completes (≈900 ms), move to "done"
-      setTimeout(() => {
-        const st = get();
-        if (st.screen !== "coin_toss" || !st.coinToss) return;
-        set({ coinToss: { ...st.coinToss, phase: "done" } });
-      }, 900);
       return;
     }
 

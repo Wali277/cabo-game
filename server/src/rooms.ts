@@ -13,6 +13,12 @@ export interface Room {
   members: Member[];
   game: GameState | null;
   createdAt: number;
+  lastStarterIdx: number;
+  coinToss: {
+    choices: { heads: string | null; tails: string | null };
+    startedAt: number;
+    result: "heads" | "tails" | null;
+  } | null;
 }
 
 function randomCode(): string {
@@ -48,6 +54,8 @@ export class Rooms {
       members: [],
       game: null,
       createdAt: Date.now(),
+      lastStarterIdx: 0,
+      coinToss: null,
     };
     this.map.set(code, room);
     return room;

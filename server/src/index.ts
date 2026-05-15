@@ -90,6 +90,7 @@ function publicView(room: ReturnType<Rooms["get"]> & {}, viewerId: string) {
       isHost: m.playerId === room.hostId,
     })),
     game: room.game,
+    coinToss: room.coinToss,
   };
 }
 
@@ -221,7 +222,39 @@ io.on("connection", (socket) => {
     if (room.game) return cb({ ok: false, error: "Already started" });
     const players = room.members.map((m) => ({ id: m.playerId, name: m.name, isBot: false }));
     room.game = newGame({ players });
+    // Randomise who goes first; track for subsequent round alternation
+    const startIdx = Math.floor(Math.random() * players.length);
+    room.game.currentPlayer = startIdx;
+    room.lastStarterIdx = startIdx;
+    // For 2-player games, initialise coin-toss choice tracking
+    if (players.length === 2) {
+      room.coinToss = { choices: { heads: null, tails: null }, startedAt: Date.now(), result: null };
+    } else {
+      room.coinToss = null;
+    }
     cb({ ok: true });
+    broadcastRoom(bound.roomCode);
+  });
+
+  socket.on("room:coin_toss_pick", ({ side }: { side: "heads" | "tails" }, cb) => {
+    if (!bound) return cb?.({ ok: false });
+    const room = rooms.get(bound.roomCode);
+    if (!room || !room.coinToss || !room.game) return cb?.({ ok: false, error: "No coin toss" });
+    const ct = room.coinToss;
+    const otherSide: "heads" | "tails" = side === "heads" ? "tails" : "heads";
+    if (ct.choices[side]) return cb?.({ ok: false, error: "Side already taken" });
+    // Lock this player's pick; auto-assign the other side to the remaining player
+    ct.choices[side] = bound.playerId;
+    if (!ct.choices[otherSide]) {
+      const other = room.members.find((m) => m.playerId !== bound!.playerId);
+      if (other) ct.choices[otherSide] = other.playerId;
+    }
+    // Determine result once both sides are assigned
+    if (ct.choices.heads && ct.choices.tails) {
+      const winner = room.game.players[room.game.currentPlayer];
+      ct.result = ct.choices.heads === winner.id ? "heads" : "tails";
+    }
+    cb?.({ ok: true });
     broadcastRoom(bound.roomCode);
   });
 
@@ -231,11 +264,16 @@ io.on("connection", (socket) => {
     if (!room || !room.game) return cb({ ok: false, error: "No game" });
     if (room.hostId !== bound.playerId) return cb({ ok: false, error: "Only host" });
     const players = room.game.players.map((p) => ({ id: p.id, name: p.name, isBot: false }));
+    // Alternate starting player: whoever didn't start last round starts this one
+    const nextStarter = (room.lastStarterIdx + 1) % players.length;
     room.game = newGame({
       players,
       roundNumber: room.game.roundNumber + 1,
       scores: room.game.scores,
     });
+    room.game.currentPlayer = nextStarter;
+    room.lastStarterIdx = nextStarter;
+    room.coinToss = null; // No coin toss from round 2 onward
     cb({ ok: true });
     broadcastRoom(bound.roomCode);
   });

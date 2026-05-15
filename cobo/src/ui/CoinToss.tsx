@@ -1,46 +1,54 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useStore } from "../state/store";
+import type { CoinSide } from "../state/store";
 import { Audio } from "../audio/sounds";
 
-/**
- * Coin-toss intro: human picks heads or tails. After 5s if they haven't picked,
- * the bot picks first and the human gets whatever's left. Then the coin flips
- * dramatically and reveals who starts.
- */
 export function CoinToss() {
   const coinToss = useStore((s) => s.coinToss);
   const pendingGame = useStore((s) => s.pendingGame);
   const humanId = useStore((s) => s.humanId);
+  const mode = useStore((s) => s.mode);
+
+  // SP actions
   const choose = useStore((s) => s.coinTossChoose);
   const botAutoPick = useStore((s) => s.coinTossBotAutoPick);
   const complete = useStore((s) => s.coinTossComplete);
 
-  const [secondsLeft, setSecondsLeft] = useState(5);
+  // MP action
+  const mpPick = useStore((s) => s.mpCoinTossPick);
 
-  // 5-second countdown while in "choosing" phase
+  const [timeLeft, setTimeLeft] = useState(5);
+
+  // Countdown while in "choosing" phase
   useEffect(() => {
     if (!coinToss || coinToss.phase !== "choosing" || !coinToss.countdownEndsAt) return;
     const tick = () => {
       const ms = Math.max(0, coinToss.countdownEndsAt! - Date.now());
-      const s = Math.ceil(ms / 1000);
-      setSecondsLeft(s);
-      if (ms <= 0) {
-        botAutoPick();
+      setTimeLeft(Math.ceil(ms / 1000));
+      if (ms <= 0 && !coinToss.humanChoice) {
+        // Timer expired — auto-pick for this player
+        if (mode === "mp") {
+          // Pick whichever side the other player hasn't taken
+          const remaining: CoinSide = coinToss.botChoice === "heads" ? "tails" : "heads";
+          mpPick(remaining);
+        } else {
+          botAutoPick();
+        }
       }
     };
     tick();
-    const id = setInterval(tick, 200);
+    const id = setInterval(tick, 100);
     return () => clearInterval(id);
-  }, [coinToss?.phase, coinToss?.countdownEndsAt, botAutoPick]);
+  }, [coinToss?.phase, coinToss?.countdownEndsAt, coinToss?.humanChoice, mode, botAutoPick, mpPick]);
 
-  // Play coin SFX on phase changes
+  // SFX on phase changes
   useEffect(() => {
     if (coinToss?.phase === "flipping") Audio.playSfx("coin_flip");
     if (coinToss?.phase === "done") Audio.playSfx("coin_land");
   }, [coinToss?.phase]);
 
-  // Auto-finish 2s after the result is shown
+  // Auto-finish 2.4s after result shown
   useEffect(() => {
     if (coinToss?.phase !== "done") return;
     const id = setTimeout(() => complete(), 2400);
@@ -50,10 +58,29 @@ export function CoinToss() {
   if (!coinToss || !pendingGame) return null;
 
   const humanName = pendingGame.players.find((p) => p.id === humanId)?.name ?? "You";
+  const otherPlayer = pendingGame.players.find((p) => p.id !== humanId);
+  const otherName = otherPlayer?.name ?? (mode === "mp" ? "Opponent" : "Bot");
   const winnerName = coinToss.winnerId
     ? pendingGame.players.find((p) => p.id === coinToss.winnerId)?.name
     : null;
   const winnerIsHuman = coinToss.winnerId === humanId;
+
+  // Who occupies each side button
+  function whoHas(side: CoinSide): "human" | "other" | null {
+    if (coinToss!.humanChoice === side) return "human";
+    if (coinToss!.botChoice === side) return "other";
+    return null;
+  }
+
+  function handlePick(side: CoinSide) {
+    if (coinToss!.humanChoice) return; // already picked
+    if (mode === "mp") mpPick(side);
+    else { Audio.playSfx("click"); choose(side); }
+  }
+
+  const pct = coinToss.countdownEndsAt
+    ? Math.max(0, Math.min(100, ((coinToss.countdownEndsAt - Date.now()) / 5000) * 100))
+    : 0;
 
   return (
     <div className="coin-toss-screen">
@@ -65,12 +92,27 @@ export function CoinToss() {
       >
         <h1 className="coin-toss-title">Coin Toss</h1>
         <p className="coin-toss-sub">
-          {coinToss.phase === "choosing" &&
-            `${humanName}, pick a side — auto-pick in ${secondsLeft}s`}
+          {coinToss.phase === "choosing" && (coinToss.humanChoice
+            ? "Waiting for the other player…"
+            : "Pick a side before time runs out!")}
           {coinToss.phase === "flipping" && "Tossing the coin…"}
           {coinToss.phase === "done" &&
-            `${coinToss.result?.toUpperCase()} — ${winnerName} starts first!`}
+            `${coinToss.result?.toUpperCase()} — ${winnerName} goes first!`}
         </p>
+
+        {/* Countdown timer bar */}
+        {coinToss.phase === "choosing" && coinToss.countdownEndsAt && (
+          <div className="coin-timer-track">
+            <motion.div
+              className="coin-timer-bar"
+              initial={{ width: "100%" }}
+              animate={{ width: `${pct}%` }}
+              transition={{ duration: 0.1, ease: "linear" }}
+              style={{ background: timeLeft <= 2 ? "#ff5b6e" : "#ffd86b" }}
+            />
+            <span className="coin-timer-label">{timeLeft}s</span>
+          </div>
+        )}
 
         {/* The coin */}
         <div className="coin-3d-wrap">
@@ -105,27 +147,34 @@ export function CoinToss() {
           </motion.div>
         </div>
 
-        {/* Choice buttons during "choosing" phase */}
+        {/* Choice buttons — shown during "choosing" phase */}
         {coinToss.phase === "choosing" && (
           <div className="coin-choice-row">
-            <button
-              className="coin-choice-btn heads"
-              onClick={() => { Audio.playSfx("click"); choose("heads"); }}
-            >
-              <span className="coin-choice-glyph">H</span>
-              <span>HEADS</span>
-            </button>
-            <button
-              className="coin-choice-btn tails"
-              onClick={() => { Audio.playSfx("click"); choose("tails"); }}
-            >
-              <span className="coin-choice-glyph">T</span>
-              <span>TAILS</span>
-            </button>
+            {(["heads", "tails"] as CoinSide[]).map((side) => {
+              const owner = whoHas(side);
+              const label = side === "heads" ? "HEADS" : "TAILS";
+              const ownerName = owner === "human" ? humanName : owner === "other" ? otherName : null;
+              return (
+                <button
+                  key={side}
+                  className={`coin-choice-btn ${side}${owner ? " taken" : ""}`}
+                  disabled={!!owner}
+                  onClick={() => handlePick(side)}
+                >
+                  <span className="coin-choice-glyph">{side === "heads" ? "H" : "T"}</span>
+                  <span>{ownerName ? ownerName : label}</span>
+                  {ownerName && (
+                    <span className="coin-choice-lock">
+                      {owner === "human" ? "✓ your pick" : "locked"}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         )}
 
-        {/* During flipping or done, show who picked what */}
+        {/* After picking — show who has which side */}
         <AnimatePresence>
           {coinToss.phase !== "choosing" && coinToss.humanChoice && coinToss.botChoice && (
             <motion.div
@@ -139,15 +188,10 @@ export function CoinToss() {
                 <span className="coin-pick-name">{humanName}</span>
                 <span className="coin-pick-side">{coinToss.humanChoice.toUpperCase()}</span>
               </div>
-              {pendingGame.players.filter((p) => p.isBot).slice(0, 1).map((bot) => (
-                <div
-                  key={bot.id}
-                  className={`coin-pick-row ${!winnerIsHuman && coinToss.phase === "done" ? "won" : ""}`}
-                >
-                  <span className="coin-pick-name">{bot.name}</span>
-                  <span className="coin-pick-side">{coinToss.botChoice?.toUpperCase()}</span>
-                </div>
-              ))}
+              <div className={`coin-pick-row ${!winnerIsHuman && coinToss.phase === "done" ? "won" : ""}`}>
+                <span className="coin-pick-name">{otherName}</span>
+                <span className="coin-pick-side">{coinToss.botChoice.toUpperCase()}</span>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>

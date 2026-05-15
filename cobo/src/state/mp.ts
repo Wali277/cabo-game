@@ -158,4 +158,11 @@ export function leaveRoom() {
   socket?.disconnect();
   socket = null;
   listenersBound = false;
+  if (typeof window !== "undefined") {
+    window.history.replaceState({}, "", "/");
+  }
+}
+
+export function sendCoinTossPick(side: "heads" | "tails") {
+  getSocket().emit("room:coin_toss_pick", { side });
 }
