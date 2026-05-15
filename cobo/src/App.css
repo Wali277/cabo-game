@@ -660,9 +660,6 @@
   box-shadow: 0 14px 30px rgba(0,0,0,0.45);
   backdrop-filter: blur(6px);
   font-size: 13px;
-  /* Grow to fill all remaining sidebar space, then scroll */
-  flex: 1;
-  min-height: 0;
   overflow: hidden;
 }
 .log-title {
@@ -681,9 +678,7 @@
   overflow-y: auto;
   padding-right: 4px;
   scroll-behavior: smooth;
-  /* Fill the action-log box, only scroll when entries overflow */
-  flex: 1;
-  min-height: 0;
+  max-height: 200px;
 }
 .log-row {
   padding: 6px 8px;

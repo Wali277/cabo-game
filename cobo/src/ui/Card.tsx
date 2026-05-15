@@ -12,12 +12,13 @@ interface Props {
   layoutId?: string;
 }
 
-const SUIT_GLYPH: Record<string, string> = { S: "♠", H: "♥", D: "♦", C: "♣" };
+const SUIT_GLYPH: Record<string, string> = { S: "♠", H: "♥", D: "♦", C: "♣", W: "★" };
 const SUIT_COLOR: Record<string, string> = {
   S: "#1c1d2b",
   C: "#1c1d2b",
   H: "#e23a5e",
   D: "#e23a5e",
+  W: "#6e4ec9",
 };
 
 export function CardView({
@@ -81,6 +82,34 @@ function CardFace({ card, w, h }: { card?: CardT | null; w: number; h: number })
       />
     );
   }
+
+  // Special Joker face
+  if (card.rank === "Joker") {
+    return (
+      <div
+        className="card-face"
+        style={{
+          width: w, height: h, position: "absolute", inset: 0,
+          backfaceVisibility: "hidden",
+          background: "linear-gradient(135deg, #f4ebff 0%, #e0d0ff 100%)",
+          borderRadius: 12,
+          border: "3px solid #6e4ec9",
+          boxShadow: "0 6px 18px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.7)",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+          alignItems: "center",
+          padding: "5px 6px",
+          fontFamily: "'Fredoka', system-ui, sans-serif",
+        }}
+      >
+        <div style={{ fontSize: w * 0.22, fontWeight: 800, color: "#6e4ec9", lineHeight: 1 }}>0</div>
+        <div style={{ fontSize: w * 0.5, lineHeight: 1 }}>🃏</div>
+        <div style={{ fontSize: w * 0.22, fontWeight: 800, color: "#6e4ec9", lineHeight: 1, transform: "rotate(180deg)" }}>0</div>
+      </div>
+    );
+  }
+
   const color = SUIT_COLOR[card.suit];
   const glyph = SUIT_GLYPH[card.suit];
   return (

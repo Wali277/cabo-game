@@ -13,6 +13,9 @@ export function makeDeck(): Card[] {
       deck.push({ id: `${rank}${suit}`, rank, suit });
     }
   }
+  // Two Jokers — valued at 0, no special action
+  deck.push({ id: "Joker1", rank: "Joker", suit: "W" });
+  deck.push({ id: "Joker2", rank: "Joker", suit: "W" });
   return deck;
 }
 
@@ -42,7 +45,8 @@ export function cardScore(card: Card): number {
     case "A": return 1;
     case "J":
     case "Q": return 10;
-    case "K": return 0;
+    case "K":
+    case "Joker": return 0;
     default: return parseInt(card.rank, 10);
   }
 }
