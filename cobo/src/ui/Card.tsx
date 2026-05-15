@@ -18,7 +18,7 @@ const SUIT_COLOR: Record<string, string> = {
   C: "#1c1d2b",
   H: "#e23a5e",
   D: "#e23a5e",
-  W: "#6e4ec9",
+  W: "#1c1d2b",
 };
 
 export function CardView({
@@ -83,53 +83,49 @@ function CardFace({ card, w, h }: { card?: CardT | null; w: number; h: number })
     );
   }
 
-  // Special Joker face — jester theme, clearly distinct from Jack
+  // Joker face — same yellow/black card design as all other cards,
+  // but with a custom inline SVG jester hat instead of a suit glyph.
   if (card.rank === "Joker") {
+    const hatSize = w * 0.62;
     return (
       <div
         className="card-face"
         style={{
           width: w, height: h, position: "absolute", inset: 0,
           backfaceVisibility: "hidden",
-          background: "linear-gradient(145deg, #2a0a5e 0%, #6e4ec9 55%, #a87bff 100%)",
+          background: "#ffd86b",
           borderRadius: 12,
-          border: "3px solid #ffd86b",
-          boxShadow: "0 6px 18px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.15)",
+          border: "3px solid #1c1d2b",
+          boxShadow: "0 6px 18px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.5)",
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
-          alignItems: "center",
-          padding: "5px 6px",
-          fontFamily: "'Fredoka', system-ui, sans-serif",
-          overflow: "hidden",
+          padding: "6px 8px",
+          fontFamily: "'Fredoka', 'Comic Sans MS', system-ui, sans-serif",
+          color: "#1c1d2b",
         }}
       >
-        {/* Top corner */}
-        <div style={{ alignSelf: "flex-start", lineHeight: 1 }}>
-          <div style={{ fontSize: w * 0.22, fontWeight: 800, color: "#ffd86b" }}>0</div>
-          <div style={{ fontSize: w * 0.17, color: "#ffd86b", opacity: 0.9 }}>🤡</div>
+        {/* Top-left corner: star rank + star suit (matches other card layout) */}
+        <div style={{ fontSize: w * 0.28, lineHeight: 1, fontWeight: 700 }}>
+          ★
+          <div style={{ fontSize: w * 0.22, lineHeight: 1 }}>★</div>
         </div>
 
-        {/* Centre jester */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-          <div style={{ fontSize: w * 0.48, lineHeight: 1 }}>🤡</div>
-          {w >= 70 && (
-            <div style={{
-              fontSize: w * 0.15,
-              fontWeight: 900,
-              color: "#ffd86b",
-              letterSpacing: w * 0.02,
-              textShadow: "0 1px 3px rgba(0,0,0,0.5)",
-            }}>
-              JOKER
-            </div>
-          )}
+        {/* Centre: jester hat SVG */}
+        <div style={{ alignSelf: "center" }}>
+          <JesterHat size={hatSize} color="#1c1d2b" />
         </div>
 
-        {/* Bottom corner (rotated) */}
-        <div style={{ alignSelf: "flex-end", lineHeight: 1, transform: "rotate(180deg)" }}>
-          <div style={{ fontSize: w * 0.22, fontWeight: 800, color: "#ffd86b" }}>0</div>
-          <div style={{ fontSize: w * 0.17, color: "#ffd86b", opacity: 0.9 }}>🤡</div>
+        {/* Bottom-right corner: rotated */}
+        <div style={{
+          alignSelf: "flex-end",
+          transform: "rotate(180deg)",
+          fontSize: w * 0.28,
+          lineHeight: 1,
+          fontWeight: 700,
+        }}>
+          ★
+          <div style={{ fontSize: w * 0.22, lineHeight: 1 }}>★</div>
         </div>
       </div>
     );
@@ -182,6 +178,39 @@ function CardFace({ card, w, h }: { card?: CardT | null; w: number; h: number })
         <div style={{ fontSize: w * 0.22, lineHeight: 1 }}>{glyph}</div>
       </div>
     </div>
+  );
+}
+
+/** Inline SVG jester hat — three rounded peaks (bells) above a hat body + brim. */
+function JesterHat({ size, color }: { size: number; color: string }) {
+  return (
+    <svg
+      viewBox="0 0 100 90"
+      width={size}
+      height={size * 0.9}
+      fill={color}
+      style={{ display: "block" }}
+    >
+      {/*
+        Three overlapping circles form the three rounded bell-peaks of the
+        jester hat, similar to how ♣ uses three circles as its top lobes.
+        Left: (20, 28) r=17  |  Centre: (50, 14) r=17  |  Right: (80, 28) r=17
+        Adjacent circles overlap by ~3px so they connect into one shape.
+      */}
+      <circle cx="20" cy="28" r="17" />
+      <circle cx="50" cy="14" r="17" />
+      <circle cx="80" cy="28" r="17" />
+
+      {/*
+        Hat body — concave-top trapezoid that sits just below the side peaks.
+        The concave curve (dipping to y=57 at centre) leaves the middle peak
+        visibly separate, giving the three-pronged jester silhouette.
+      */}
+      <path d="M 4 44 Q 50 57 96 44 L 93 68 Q 50 80 7 68 Z" />
+
+      {/* Brim ellipse at the bottom of the hat body */}
+      <ellipse cx="50" cy="69" rx="44" ry="12" />
+    </svg>
   );
 }
 
