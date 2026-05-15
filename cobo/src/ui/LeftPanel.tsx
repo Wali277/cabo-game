@@ -1,5 +1,18 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useStore } from "../state/store";
+import { actionOf } from "../engine/game";
+import { Audio } from "../audio/sounds";
+
+/** Maps a card rank to its action label, emoji, and tooltip description. */
+const ACTION_META: Record<string, { label: string; emoji: string; desc: string; color: string }> = {
+  "7":  { label: "Peek Own",    emoji: "👁",  desc: "Look at one of YOUR own cards.",             color: "#67e0a3" },
+  "8":  { label: "Peek Own",    emoji: "👁",  desc: "Look at one of YOUR own cards.",             color: "#67e0a3" },
+  "9":  { label: "Spy",         emoji: "🔍", desc: "Spy on one of an OPPONENT's cards.",         color: "#7aa8ff" },
+  "10": { label: "Spy",         emoji: "🔍", desc: "Spy on one of an OPPONENT's cards.",         color: "#7aa8ff" },
+  "J":  { label: "Blind Swap",  emoji: "🔀", desc: "Swap your card with an opponent's blindly.", color: "#ff8ec0" },
+  "Q":  { label: "Blind Swap",  emoji: "🔀", desc: "Swap your card with an opponent's blindly.", color: "#ff8ec0" },
+  "K":  { label: "Peek & Swap", emoji: "👑", desc: "Peek an opponent's card, then decide swap.", color: "#ffd86b" },
+};
 
 export function LeftPanel() {
   const game = useStore((s) => s.game!);
@@ -10,7 +23,8 @@ export function LeftPanel() {
 
   const draw = useStore((s) => s.draw);
   const drawDiscard = useStore((s) => s.drawDiscard);
-  const discardDrawnAction = useStore((s) => s.discardDrawnAction);
+  const discardNoAction = useStore((s) => s.discardNoAction);
+  const discardAndTrigger = useStore((s) => s.discardAndTrigger);
   const setTargeting = useStore((s) => s.setTargeting);
   const callCaboAction = useStore((s) => s.callCaboAction);
   const peekSwapDecide = useStore((s) => s.peekSwapDecide);
@@ -23,6 +37,11 @@ export function LeftPanel() {
   const isHost = mode === "mp" ? mp?.hostId === mp?.viewerId : true;
   const me = game.players.find((p) => p.id === humanId);
   const peekedCount = me ? me.knownToSelf.filter(Boolean).length : 0;
+
+  // For turn_drawn, detect if the drawn card carries an action ability
+  const drawnCard = game.drawnCard;
+  const drawnAction = drawnCard ? actionOf(drawnCard) : null;
+  const actionMeta = drawnCard ? ACTION_META[drawnCard.rank] : null;
 
   let emoji = "";
   let instruction = "";
@@ -61,7 +80,7 @@ export function LeftPanel() {
             <button
               className="btn primary left-btn"
               disabled={!canDraw}
-              onClick={draw}
+              onClick={() => { Audio.playSfx("card_draw"); draw(); }}
             >
               🂠 Draw from Deck
             </button>
@@ -69,7 +88,7 @@ export function LeftPanel() {
               className="btn left-btn"
               disabled={!canDrawDiscard}
               title={!canDrawDiscard ? "Discard pile is empty" : ""}
-              onClick={drawDiscard}
+              onClick={() => { Audio.playSfx("card_draw"); drawDiscard(); }}
             >
               ♻ Draw from Discard
             </button>
@@ -82,30 +101,75 @@ export function LeftPanel() {
         break;
 
       case "turn_drawn":
-        emoji = "✋";
+        emoji = targeting === "swap_hand" ? "🔄" : (actionMeta?.emoji ?? "✋");
         instruction =
           targeting === "swap_hand"
             ? "Tap one of your cards to swap it in."
-            : "Choose what to do with your drawn card.";
+            : drawnAction
+            ? "Choose what to do with your drawn card."
+            : "Swap it into your hand or discard it.";
         buttons = (
           <>
+            {/* Always: swap into hand */}
             <button
               className={`btn left-btn ${targeting === "swap_hand" ? "primary" : ""}`}
               onClick={() => setTargeting("swap_hand")}
             >
               🔄 {targeting === "swap_hand" ? "Pick a card to swap…" : "Swap into Hand"}
             </button>
+
+            {/* Only for action cards: use the ability */}
+            {drawnAction && actionMeta && (
+              <button
+                className="btn left-btn action-trigger-btn"
+                style={{ borderColor: actionMeta.color, color: actionMeta.color }}
+                title={actionMeta.desc}
+                disabled={game.drawnFrom === "discard"}
+                onClick={() => { Audio.playSfx("action_trigger"); discardAndTrigger(); }}
+              >
+                {actionMeta.emoji} Use {actionMeta.label}
+              </button>
+            )}
+
+            {/* Always: plain discard (never triggers action) */}
             <button
               className="btn left-btn"
               disabled={game.drawnFrom === "discard"}
               title={
                 game.drawnFrom === "discard"
                   ? "Cards drawn from discard must be swapped."
+                  : drawnAction
+                  ? "Discard without using the ability."
                   : ""
               }
-              onClick={discardDrawnAction}
+              onClick={() => { Audio.playSfx("card_discard"); discardNoAction(); }}
             >
               🗑 Discard
+            </button>
+          </>
+        );
+        break;
+
+      case "pending_action":
+        // Legacy phase — kept for server compatibility. Shouldn't normally appear
+        // in the UI now (SP uses discardDrawnWithAction/discardDrawnSkipAction).
+        // If it does surface (old server), show simple buttons here.
+        emoji = actionMeta?.emoji ?? "⚡";
+        instruction = "Use this card's ability or discard it.";
+        buttons = (
+          <>
+            {actionMeta && (
+              <button
+                className="btn left-btn action-trigger-btn"
+                style={{ borderColor: actionMeta.color, color: actionMeta.color }}
+                title={actionMeta.desc}
+                onClick={() => { Audio.playSfx("action_trigger"); useStore.getState().triggerAction(); }}
+              >
+                {actionMeta.emoji} Use {actionMeta.label}
+              </button>
+            )}
+            <button className="btn left-btn" onClick={() => useStore.getState().skipAction()}>
+              🗑 Just Discard
             </button>
           </>
         );

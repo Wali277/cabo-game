@@ -6,7 +6,8 @@ import {
   actionPeekOther,
   actionPeekOwn,
   callCabo,
-  discardDrawn,
+  discardDrawnSkipAction,
+  discardDrawnWithAction,
   drawFromDeck,
   drawFromDiscard,
   swapDrawnWithHand,
@@ -182,7 +183,7 @@ export function botMove(state: GameState): GameState {
     if (drawnScore <= 4) {
       if (highest && drawnScore < highest.score) return swapDrawnWithHand(state, highest.idx);
       if (unknown !== null) return swapDrawnWithHand(state, unknown);
-      return discardDrawn(state);
+      return discardDrawnSkipAction(state);
     }
 
     // If drawn is action card, sometimes prefer the action
@@ -191,18 +192,18 @@ export function botMove(state: GameState): GameState {
       if (highest && highest.score >= 8 && drawnScore <= 5) {
         return swapDrawnWithHand(state, highest.idx);
       }
-      return discardDrawn(state);
+      // Discard and immediately use the ability (one-step combined call)
+      return discardDrawnWithAction(state);
     }
 
-    // Otherwise compare with highest known
+    // Otherwise compare with highest known; just discard (no ability)
     if (highest && drawnScore < highest.score) {
       return swapDrawnWithHand(state, highest.idx);
     }
-    return discardDrawn(state);
+    return discardDrawnSkipAction(state);
   }
 
-  // After the action-button refactor, bots always trigger their pending action
-  // (they wouldn't have discarded an action card unless they wanted the ability).
+  // Safety net: if server puts bot into pending_action, trigger it immediately.
   if (state.phase === "pending_action") {
     return triggerPendingAction(state);
   }

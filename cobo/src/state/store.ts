@@ -10,7 +10,8 @@ import {
   callCabo,
   clearAnimations,
   clearReveals,
-  discardDrawn,
+  discardDrawnSkipAction,
+  discardDrawnWithAction,
   drawFromDeck,
   drawFromDiscard,
   newGame,
@@ -90,7 +91,8 @@ interface StoreState {
   setTargeting: (m: ActionTargetingMode) => void;
   clickOwnCard: (index: number) => void;
   clickOtherCard: (playerId: string, index: number) => void;
-  discardDrawnAction: () => void;
+  discardNoAction: () => void;
+  discardAndTrigger: () => void;
   callCaboAction: () => void;
   peekSwapDecide: (doSwap: boolean, ownIndex?: number) => void;
   consumeAnimations: () => void;
@@ -248,8 +250,47 @@ export const useStore = create<StoreState>((set, get) => ({
   },
 
   applyMpRoom(room) {
-    const screen: Screen = room.game ? "game" : "lobby";
     const prev = get();
+
+    // When a multiplayer game first starts (lobby → game), route through the
+    // coin-toss screen to reveal who goes first. The server already chose
+    // currentPlayer — we just animate the reveal then switch to "game".
+    const freshGameStart =
+      !!room.game &&
+      !prev.game &&
+      prev.screen !== "game" &&
+      prev.screen !== "coin_toss";
+
+    if (freshGameStart && room.game) {
+      const firstPlayer = room.game.players[room.game.currentPlayer];
+      set({
+        mp: room,
+        humanId: room.viewerId,
+        mode: "mp",
+        game: null,
+        pendingGame: room.game,
+        screen: "coin_toss",
+        coinToss: {
+          humanChoice: "heads",
+          botChoice: "tails",
+          result: firstPlayer.id === room.viewerId ? "heads" : "tails",
+          winnerId: firstPlayer.id,
+          phase: "flipping",
+          countdownEndsAt: null,
+        },
+        targeting: null,
+        setupPeekRevealed: false,
+      });
+      // After flip animation completes (≈900 ms), move to "done"
+      setTimeout(() => {
+        const st = get();
+        if (st.screen !== "coin_toss" || !st.coinToss) return;
+        set({ coinToss: { ...st.coinToss, phase: "done" } });
+      }, 900);
+      return;
+    }
+
+    const screen: Screen = room.game ? "game" : "lobby";
     const prevRoundNumber = prev.game?.roundNumber;
     const nextRoundNumber = room.game?.roundNumber;
     const isFreshRound =
@@ -432,16 +473,35 @@ export const useStore = create<StoreState>((set, get) => ({
     }
   },
 
-  discardDrawnAction() {
+  /** Pure discard — no ability triggered, even if the card has one. */
+  discardNoAction() {
     const { mode, game } = get();
     if (mode === "mp") {
-      import("./mp").then((m) => m.sendAction({ type: "discard_drawn" }));
+      import("./mp").then((m) => m.sendAction({ type: "discard_and_skip" }));
       return;
     }
     if (!game) return;
-    // Note: phase now becomes "pending_action" if the card has an ability.
-    // The player must press the Action button to activate it.
-    set({ game: discardDrawn(game), targeting: null });
+    set({ game: discardDrawnSkipAction(game), targeting: null });
+  },
+
+  /** Discard and immediately activate the card's ability. */
+  discardAndTrigger() {
+    const { mode, game } = get();
+    if (mode === "mp") {
+      import("./mp").then((m) => m.sendAction({ type: "discard_and_trigger" }));
+      return;
+    }
+    if (!game) return;
+    const next = discardDrawnWithAction(game);
+    let targeting: ActionTargetingMode = null;
+    switch (next.phase) {
+      case "action_peek_own": targeting = "peek_own"; break;
+      case "action_peek_other": targeting = "peek_other"; break;
+      case "action_blind_swap": targeting = "blind_swap_self"; break;
+      case "action_peek_and_swap_pick": targeting = "peek_and_swap_target_pick"; break;
+      default: break;
+    }
+    set({ game: next, targeting });
   },
 
   triggerAction() {

@@ -49,7 +49,7 @@ export function CardView({
       animate={shake ? { x: [0, -6, 6, -4, 4, 0] } : {}}
       whileHover={onClick ? { y: -6, scale: 1.04 } : {}}
       transition={{
-        layout: { type: "spring", stiffness: 110, damping: 18, mass: 1.1 },
+        layout: { type: "spring", stiffness: 200, damping: 32, mass: 1 },
         default: { type: "spring", stiffness: 300, damping: 24 },
       }}
     >
@@ -110,12 +110,13 @@ function CardFace({ card, w, h }: { card?: CardT | null; w: number; h: number })
       >
         {/* Top-left corner: vertical "JOKER" — letters stacked top-to-bottom */}
         <div style={{
-          fontSize: w * 0.16,
-          lineHeight: 0.95,
+          fontSize: w * 0.17,
+          lineHeight: 1.05,
           fontWeight: 900,
+          letterSpacing: 0,
           display: "flex",
           flexDirection: "column",
-          alignItems: "center",
+          alignItems: "flex-start",
         }}>
           {"JOKER".split("").map((ch, i) => <span key={i}>{ch}</span>)}
         </div>
@@ -125,16 +126,16 @@ function CardFace({ card, w, h }: { card?: CardT | null; w: number; h: number })
           <JesterFace size={jesterSize} color={faceColor} />
         </div>
 
-        {/* Bottom-right corner: rotated 180° so it reads correctly upside-down */}
+        {/* Bottom-right corner: same column, rotated 180° — reads correctly when card is upside-down */}
         <div style={{
           alignSelf: "flex-end",
           transform: "rotate(180deg)",
-          fontSize: w * 0.16,
-          lineHeight: 0.95,
+          fontSize: w * 0.17,
+          lineHeight: 1.05,
           fontWeight: 900,
           display: "flex",
           flexDirection: "column",
-          alignItems: "center",
+          alignItems: "flex-start",
         }}>
           {"JOKER".split("").map((ch, i) => <span key={i}>{ch}</span>)}
         </div>

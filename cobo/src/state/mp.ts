@@ -133,6 +133,8 @@ export type MpActionType =
   | "draw_discard"
   | "swap_drawn"
   | "discard_drawn"
+  | "discard_and_trigger"
+  | "discard_and_skip"
   | "trigger_action"
   | "skip_action"
   | "action_peek_own"

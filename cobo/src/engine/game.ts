@@ -237,6 +237,20 @@ export function skipPendingAction(state: GameState): GameState {
   return advanceTurn(s);
 }
 
+/** Discard the drawn card AND immediately activate its ability (one-step). */
+export function discardDrawnWithAction(state: GameState): GameState {
+  const s = discardDrawn(state);
+  if (s.phase === "pending_action") return triggerPendingAction(s);
+  return s;
+}
+
+/** Discard the drawn card WITHOUT triggering any ability (pure discard). */
+export function discardDrawnSkipAction(state: GameState): GameState {
+  const s = discardDrawn(state);
+  if (s.phase === "pending_action") return skipPendingAction(s);
+  return s;
+}
+
 export function actionPeekOwn(state: GameState, index: number): GameState {
   if (state.phase !== "action_peek_own") return state;
   const s = clone(state);

@@ -16,6 +16,8 @@ import {
   clearAnimations,
   clearReveals,
   discardDrawn,
+  discardDrawnSkipAction,
+  discardDrawnWithAction,
   drawFromDeck,
   drawFromDiscard,
   newGame,
@@ -96,6 +98,8 @@ type ActionMsg =
   | { type: "draw_discard" }
   | { type: "swap_drawn"; handIndex: number }
   | { type: "discard_drawn" }
+  | { type: "discard_and_trigger" }
+  | { type: "discard_and_skip" }
   | { type: "trigger_action" }
   | { type: "skip_action" }
   | { type: "action_peek_own"; index: number }
@@ -131,6 +135,12 @@ function applyAction(game: GameState, playerId: string, action: ActionMsg): Game
     case "discard_drawn":
       if (!requireCurrent()) return null;
       return discardDrawn(game);
+    case "discard_and_trigger":
+      if (!requireCurrent()) return null;
+      return discardDrawnWithAction(game);
+    case "discard_and_skip":
+      if (!requireCurrent()) return null;
+      return discardDrawnSkipAction(game);
     case "trigger_action":
       if (!requireCurrent()) return null;
       return triggerPendingAction(game);
