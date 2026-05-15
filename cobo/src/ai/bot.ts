@@ -244,21 +244,3 @@ export function botMove(state: GameState): GameState {
   return state;
 }
 
-// Bots also attempt snaps when they "know" they hold a matching card (from beliefs)
-export function maybeBotSnap(state: GameState): { playerId: string; handIndex: number } | null {
-  if (state.phase === "round_over" || state.phase === "setup_peek") return null;
-  const top = state.discard[state.discard.length - 1];
-  if (!top) return null;
-  for (const p of state.players.filter((p) => p.isBot)) {
-    const k = getOrInitKnowledge(state, p.id);
-    const arr = k.beliefs.get(p.id)!;
-    // Conservative: snap only if we have ~90% confidence (i.e. we've seen the card)
-    for (let i = 0; i < arr.length; i++) {
-      const b = arr[i];
-      if (b && b.rank === top.rank) {
-        if (Math.random() < 0.5) return { playerId: p.id, handIndex: i };
-      }
-    }
-  }
-  return null;
-}

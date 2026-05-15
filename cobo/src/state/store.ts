@@ -14,7 +14,6 @@ import {
   drawFromDiscard,
   newGame,
   setupPeekCard,
-  snap,
   startPlay,
   swapDrawnWithHand,
 } from "../engine/game";
@@ -69,7 +68,6 @@ interface StoreState {
   discardDrawnAction: () => void;
   callCaboAction: () => void;
   peekSwapDecide: (doSwap: boolean, ownIndex?: number) => void;
-  trySnap: (playerId: string, handIndex: number) => void;
   consumeAnimations: () => void;
   consumeReveals: () => void;
   setToast: (s: string | null) => void;
@@ -359,16 +357,6 @@ export const useStore = create<StoreState>((set, get) => ({
       return;
     }
     set({ game: actionPeekAndSwapDecide(game, doSwap, ownIndex), targeting: null });
-  },
-
-  trySnap(playerId, handIndex) {
-    const { mode, game } = get();
-    if (mode === "mp") {
-      import("./mp").then((m) => m.sendAction({ type: "snap", handIndex }));
-      return;
-    }
-    if (!game) return;
-    set({ game: snap(game, playerId, handIndex) });
   },
 
   consumeAnimations() {

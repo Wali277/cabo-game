@@ -1,7 +1,6 @@
 import { CardView } from "./Card";
 import type { PlayerState } from "../engine/types";
 import { useStore, PLAYER_COLORS } from "../state/store";
-// setupPeekRevealed removed in favor of per-card setup peeks.
 
 type TablePos = "top" | "left" | "right" | "bottom";
 
@@ -22,7 +21,6 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
   const humanId = useStore((s) => s.humanId);
   const clickOwnCard = useStore((s) => s.clickOwnCard);
   const clickOtherCard = useStore((s) => s.clickOtherCard);
-  const trySnap = useStore((s) => s.trySnap);
   const reveals = game.reveals;
 
   const color = PLAYER_COLORS[seatIndex % PLAYER_COLORS.length];
@@ -69,20 +67,21 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
 
   function handleClick(idx: number) {
     if (isHuman) {
-      // Human can also snap from their own hand any time after first discard
-      if (
-        targeting === null &&
-        game.phase !== "setup_peek" &&
-        game.phase !== "round_over" &&
-        game.discard.length > 0
-      ) {
-        trySnap(player.id, idx);
-        return;
-      }
       clickOwnCard(idx);
     } else {
       clickOtherCard(player.id, idx);
     }
+  }
+
+  // Spy glow: show a pulsing glow on any card actively being peeked at
+  // (visible to ALL players so the target knows their card was spied on)
+  function cardIsBeingSpied(idx: number): boolean {
+    return reveals.some(
+      (r) =>
+        r.playerId === player.id &&
+        r.index === idx &&
+        (r.reason === "peek_other" || r.reason === "peek_and_swap"),
+    );
   }
 
   const known = player.knownToSelf;
@@ -106,8 +105,9 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
           const { faceUp, card } = cardFaceUp(idx);
           const hl = cardHighlight(idx);
           const knownDot = isHuman && known[idx] && !faceUp;
+          const spied = cardIsBeingSpied(idx);
           return (
-            <div className="hand-slot" key={c.id}>
+            <div className={`hand-slot${spied ? " spy-glow" : ""}`} key={c.id}>
               <CardView
                 layoutId={c.id}
                 card={card}

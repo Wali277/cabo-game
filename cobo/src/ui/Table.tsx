@@ -7,7 +7,7 @@ import { LeftPanel } from "./LeftPanel";
 import { Scoreboard, RoundEndOverlay } from "./Scoreboard";
 import { ActionBanner } from "./ActionBanner";
 import { ActionLog } from "./ActionLog";
-import { botMove, ingestReveals, maybeBotSnap, resetBotKnowledge } from "../ai/bot";
+import { botMove, ingestReveals, resetBotKnowledge } from "../ai/bot";
 import { clearReveals as clearRevealsEngine } from "../engine/game";
 
 export function Table() {
@@ -16,7 +16,6 @@ export function Table() {
   const mode = useStore((s) => s.mode);
   const toast = useStore((s) => s.toast);
   const setToast = useStore((s) => s.setToast);
-  const trySnap = useStore((s) => s.trySnap);
   const consumeAnimations = useStore((s) => s.consumeAnimations);
 
   const lastRound = useRef(game.roundNumber);
@@ -79,12 +78,6 @@ export function Table() {
     const latest = game.animations[game.animations.length - 1];
     let msg: string | null = null;
     switch (latest.kind) {
-      case "snap_success":
-        msg = `${nameById(game, latest.payload.playerId as string)} snapped!`;
-        break;
-      case "snap_fail":
-        msg = `${nameById(game, latest.payload.playerId as string)} snap failed — penalty card!`;
-        break;
       case "cabo_called":
         msg = `${nameById(game, latest.payload.playerId as string)} called CABO — final round!`;
         break;
@@ -94,20 +87,6 @@ export function Table() {
     const t = setTimeout(() => consumeAnimations(), 500);
     return () => clearTimeout(t);
   }, [game.animations]);
-
-  // Occasional bot snaps — check whenever discard changes
-  useEffect(() => {
-    if (mode === "mp") return;
-    if (game.phase === "round_over" || game.phase === "setup_peek") return;
-    const t = setTimeout(() => {
-      const latest = useStore.getState().game;
-      if (!latest) return;
-      if (latest.phase === "round_over" || latest.phase === "setup_peek") return;
-      const move = maybeBotSnap(latest);
-      if (move) trySnap(move.playerId, move.handIndex);
-    }, 700 + Math.random() * 1100);
-    return () => clearTimeout(t);
-  }, [game.discard.length]);
 
   // Assign opponents to table positions based on count
   // 1 opp → top | 2 opps → top + right | 3 opps → top + left + right

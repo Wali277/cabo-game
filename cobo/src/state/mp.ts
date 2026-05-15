@@ -139,7 +139,6 @@ export type MpActionType =
   | "action_peek_and_swap_pick"
   | "action_peek_and_swap_decide"
   | "call_cabo"
-  | "snap"
   | "start_play"
   | "setup_peek_card"
   | "clear_animations"

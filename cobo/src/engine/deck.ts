@@ -59,7 +59,7 @@ export function actionOf(card: Card): "peek_own" | "peek_other" | "blind_swap" |
   if (card.rank === "7" || card.rank === "8") return "peek_own";
   if (card.rank === "9" || card.rank === "10") return "peek_other";
   if (card.rank === "J" || card.rank === "Q") return "blind_swap";
-  if (isBlackKing(card)) return "peek_and_swap";
+  if (card.rank === "K") return "peek_and_swap";
   return null;
 }
 

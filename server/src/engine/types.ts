@@ -54,8 +54,6 @@ export interface AnimationEvent {
     | "reveal"
     | "blind_swap"
     | "peek_and_swap"
-    | "snap_success"
-    | "snap_fail"
     | "cabo_called"
     | "round_end";
   payload: Record<string, unknown>;

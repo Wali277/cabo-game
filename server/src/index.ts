@@ -20,7 +20,6 @@ import {
   drawFromDiscard,
   newGame,
   setupPeekCard,
-  snap,
   startPlay,
   swapDrawnWithHand,
 } from "./engine/game.js";
@@ -101,7 +100,6 @@ type ActionMsg =
   | { type: "action_peek_and_swap_pick"; targetPlayerId: string; index: number }
   | { type: "action_peek_and_swap_decide"; doSwap: boolean; ownIndex?: number }
   | { type: "call_cabo" }
-  | { type: "snap"; handIndex: number }
   | { type: "start_play" }
   | { type: "setup_peek_card"; index: number }
   | { type: "clear_animations" }
@@ -147,8 +145,6 @@ function applyAction(game: GameState, playerId: string, action: ActionMsg): Game
     case "call_cabo":
       if (!requireCurrent()) return null;
       return callCabo(game);
-    case "snap":
-      return snap(game, playerId, action.handIndex);
     case "clear_animations":
       return clearAnimations(game);
     case "clear_reveals":

@@ -329,40 +329,6 @@ export function callCabo(state: GameState): GameState {
   return advanceTurn(s);
 }
 
-// Snap: a player attempts to discard one of their hand cards matching the top discard.
-// If correct, that card leaves their hand (hand can shrink). If wrong, they draw 1 penalty card.
-export function snap(state: GameState, snapperId: string, handIndex: number): GameState {
-  if (state.phase === "round_over" || state.phase === "setup_peek") return state;
-  if (state.discard.length === 0) return state;
-  const snapper = state.players.find((p) => p.id === snapperId);
-  if (!snapper) return state;
-  if (handIndex < 0 || handIndex >= snapper.hand.length) return state;
-  const s = clone(state);
-  const realSnapper = s.players.find((p) => p.id === snapperId)!;
-  const card = realSnapper.hand[handIndex];
-  const top = s.discard[s.discard.length - 1];
-  if (card.rank === top.rank) {
-    realSnapper.hand.splice(handIndex, 1);
-    realSnapper.knownToSelf.splice(handIndex, 1);
-    s.discard.push(card);
-    pushAnim(s, "snap_success", { playerId: realSnapper.id, handIndex, card });
-    pushLog(s, `${realSnapper.name} snapped a ${card.rank}!`);
-    if (realSnapper.hand.length === 0) {
-      // Player out of cards — round ends
-      return endRound(s);
-    }
-  } else {
-    reshuffleDiscardIntoDeck(s);
-    if (s.deck.length > 0) {
-      const penalty = s.deck.shift()!;
-      realSnapper.hand.push(penalty);
-      realSnapper.knownToSelf.push(false);
-    }
-    pushAnim(s, "snap_fail", { playerId: realSnapper.id, handIndex, attempted: card, top });
-    pushLog(s, `${realSnapper.name} snap failed!`);
-  }
-  return s;
-}
 
 function advanceTurn(state: GameState): GameState {
   if (state.phase === "round_over") return state;
