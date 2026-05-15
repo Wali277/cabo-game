@@ -403,4 +403,26 @@ function clone(state: GameState): GameState {
   };
 }
 
+/** DEV-only: force a specific card into the drawn-card slot.
+ *  Pulls the card out of the deck if it's still there; otherwise creates a
+ *  virtual copy so the same rank can be injected multiple times in a row.
+ *  Only fires during turn_start (the human's normal draw phase). */
+export function trainingInjectCard(state: GameState, card: import("./types").Card): GameState {
+  if (state.phase !== "turn_start") return state;
+  const s = clone(state);
+  const deckIdx = s.deck.findIndex((c) => c.rank === card.rank && c.suit === card.suit);
+  let drawn: import("./types").Card;
+  if (deckIdx >= 0) {
+    drawn = s.deck.splice(deckIdx, 1)[0];
+  } else {
+    drawn = { ...card }; // virtual copy — card already played, recreate for testing
+  }
+  s.drawnCard = drawn;
+  s.drawnFrom = "deck";
+  s.phase = "turn_drawn";
+  pushAnim(s, "draw_deck", { playerId: s.players[s.currentPlayer].id, card: drawn });
+  pushLog(s, `[DEV] Injected ${drawn.rank} for testing.`);
+  return s;
+}
+
 export { cardScore, handScore, isBlackKing, actionOf };

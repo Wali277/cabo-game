@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { GameState } from "../engine/types";
+import type { Card } from "../engine/types";
 import {
   actionBlindSwap,
   actionPeekAndSwapDecide,
@@ -16,6 +17,7 @@ import {
   setupPeekCard,
   startPlay,
   swapDrawnWithHand,
+  trainingInjectCard as engineTrainingInject,
 } from "../engine/game";
 
 export type Screen = "menu" | "lobby" | "game" | "scoring";
@@ -49,6 +51,7 @@ export type ActionTargetingMode =
 interface StoreState {
   screen: Screen;
   mode: GameMode;
+  training: boolean;
   mp: MpRoom | null;
   game: GameState | null;
   humanId: string;
@@ -58,6 +61,8 @@ interface StoreState {
   toast: string | null;
   pendingPeekOverlay: { playerId: string; index: number; rank: string; suit: string } | null;
   init: (numBots: number) => void;
+  trainInit: () => void;
+  trainingInjectCard: (card: Card) => void;
   start: () => void;
   setSetupPeekRevealed: (v: boolean) => void;
   draw: () => void;
@@ -96,6 +101,7 @@ export { PLAYER_COLORS };
 export const useStore = create<StoreState>((set, get) => ({
   screen: "menu",
   mode: "sp",
+  training: false,
   mp: null,
   game: null,
   humanId: "p_human",
@@ -108,10 +114,26 @@ export const useStore = create<StoreState>((set, get) => ({
   init(numBots) {
     const game = newGame({ players: makePlayers(numBots) });
     set({
-      mode: "sp", mp: null, game, screen: "game",
+      mode: "sp", training: false, mp: null, game, screen: "game",
       humanId: "p_human",
       setupPeekRevealed: false, targeting: null, toast: null,
     });
+  },
+
+  trainInit() {
+    // Training Chamber: 1 bot so swap/spy actions have a target to work with
+    const game = newGame({ players: makePlayers(1) });
+    set({
+      mode: "sp", training: true, mp: null, game, screen: "game",
+      humanId: "p_human",
+      setupPeekRevealed: false, targeting: null, toast: null,
+    });
+  },
+
+  trainingInjectCard(card) {
+    const { game, training } = get();
+    if (!game || !training) return;
+    set({ game: engineTrainingInject(game, card) });
   },
 
   start() {
@@ -406,7 +428,7 @@ export const useStore = create<StoreState>((set, get) => ({
       import("./mp").then((m) => m.leaveRoom());
     }
     set({
-      screen: "menu", mode: "sp", mp: null,
+      screen: "menu", mode: "sp", training: false, mp: null,
       game: null, targeting: null, toast: null,
     });
   },

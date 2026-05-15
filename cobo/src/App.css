@@ -838,4 +838,106 @@
 .modal-row.win { background: #a87bff; color: #0d1638; font-weight: 800; }
 .modal-row.worst { background: #f5d3e6; }
 .modal-row .rank { font-weight: 900; color: #6e4ec9; min-width: 28px; }
+
+/* ========== Training Chamber ========== */
+
+/* Menu button */
+.btn.training-btn {
+  background: linear-gradient(135deg, #2a1a5e 0%, #1a2a5e 100%);
+  color: #a87bff;
+  border: 2px dashed #a87bff;
+  box-shadow: none;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 10px 16px;
+  border-radius: 12px;
+  transition: background 0.15s, color 0.15s, transform 0.15s;
+}
+.btn.training-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #3d2a7a 0%, #2a3d7a 100%);
+  color: #c9a9ff;
+  transform: translateY(-2px);
+}
+
+/* Push table content up so the fixed panel doesn't cover the bottom player */
+.table-root.training-active {
+  padding-bottom: 140px;
+}
+
+/* Fixed dev-panel bar */
+.training-panel {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 55;
+  background: rgba(10, 10, 28, 0.93);
+  backdrop-filter: blur(10px);
+  border-top: 2px solid rgba(168, 123, 255, 0.5);
+  padding: 8px 14px 10px;
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.6);
+}
+
+.training-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 7px;
+}
+
+.training-badge {
+  background: #a87bff;
+  color: #0d1638;
+  font-size: 10px;
+  font-weight: 900;
+  padding: 2px 8px;
+  border-radius: 6px;
+  letter-spacing: 1.5px;
+}
+
+.training-panel-label {
+  color: rgba(168, 123, 255, 0.7);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.training-cards-row {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  align-items: flex-end;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(168,123,255,0.4) transparent;
+}
+
+.training-card-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: transform 0.15s;
+  flex-shrink: 0;
+}
+.training-card-btn:hover:not(:disabled) {
+  transform: translateY(-5px);
+}
+.training-card-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.training-card-label {
+  font-size: 9px;
+  color: rgba(200, 175, 255, 0.8);
+  font-weight: 700;
+  white-space: nowrap;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
 .modal-row .cum { font-size: 13px; color: #4a4356; }

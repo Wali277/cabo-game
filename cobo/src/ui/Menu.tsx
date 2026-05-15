@@ -5,6 +5,7 @@ import { Tutorial } from "./Tutorial";
 
 export function Menu() {
   const init = useStore((s) => s.init);
+  const trainInit = useStore((s) => s.trainInit);
   const [bots, setBots] = useState(1);
   const [showTutorial, setShowTutorial] = useState(false);
 
@@ -62,6 +63,13 @@ export function Menu() {
           onClick={() => setShowTutorial(true)}
         >
           ? How to play
+        </button>
+        <div className="divider"><span>dev</span></div>
+        <button
+          className="btn training-btn"
+          onClick={() => trainInit()}
+        >
+          🧪 Training Chamber
         </button>
         <div className="hint">
           Multiplayer creates a room with a shareable URL. Up to 4 players.

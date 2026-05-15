@@ -7,6 +7,7 @@ import { LeftPanel } from "./LeftPanel";
 import { Scoreboard, RoundEndOverlay } from "./Scoreboard";
 import { ActionBanner } from "./ActionBanner";
 import { ActionLog } from "./ActionLog";
+import { TrainingPanel } from "./TrainingPanel";
 import { botMove, ingestReveals, resetBotKnowledge } from "../ai/bot";
 import { clearReveals as clearRevealsEngine } from "../engine/game";
 
@@ -109,6 +110,7 @@ export function Table() {
   const slotMap: Partial<Record<SlotName, typeof others[0]>> = {};
   others.forEach((p, i) => { slotMap[slotOrder[i]] = p; });
 
+  const training = useStore((s) => s.training);
   const backToMenu = useStore((s) => s.backToMenu);
   function handleQuit() {
     if (game.phase === "round_over") { backToMenu(); return; }
@@ -122,7 +124,7 @@ export function Table() {
 
   return (
     <LayoutGroup>
-      <div className={`table-root players-${game.players.length}`}>
+      <div className={`table-root players-${game.players.length}${training ? " training-active" : ""}`}>
         {/* Compact top bar */}
         <div className="top-bar">
           <button className="btn ghost menu-back" onClick={handleQuit}>← Menu</button>
@@ -239,6 +241,9 @@ export function Table() {
           />
         )}
       </div>
+
+      {/* Training Chamber dev panel — fixed bar at the bottom of the screen */}
+      <TrainingPanel />
     </LayoutGroup>
   );
 }
