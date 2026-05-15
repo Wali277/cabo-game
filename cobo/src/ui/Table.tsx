@@ -18,6 +18,12 @@ export function Table() {
   const setToast = useStore((s) => s.setToast);
   const consumeAnimations = useStore((s) => s.consumeAnimations);
 
+  // Reveals that the human can tap-anywhere to dismiss early
+  // (peek_own / peek_other only — peek_and_swap stays until user decides)
+  const hasDismissableReveal =
+    game.reveals.some((r) => r.reason === "peek_own" || r.reason === "peek_other") &&
+    game.phase !== "action_peek_and_swap_decide";
+
   const lastRound = useRef(game.roundNumber);
   useEffect(() => {
     if (lastRound.current !== game.roundNumber) {
@@ -215,6 +221,23 @@ export function Table() {
 
         <ActionBanner />
         <RoundEndOverlay />
+
+        {/* Tap-anywhere overlay to dismiss peek/spy reveals early */}
+        {hasDismissableReveal && (
+          <div
+            className="reveal-dismiss-overlay"
+            onClick={() => {
+              const latest = useStore.getState().game;
+              if (!latest) return;
+              useStore.setState({ game: clearRevealsEngine(latest) });
+              if (mode === "mp") {
+                import("../state/mp").then((m) =>
+                  m.sendAction({ type: "clear_reveals" }),
+                );
+              }
+            }}
+          />
+        )}
       </div>
     </LayoutGroup>
   );

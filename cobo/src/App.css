@@ -733,6 +733,30 @@
   100% { transform: scale(1) rotate(0); }
 }
 
+/* ========== Peek dismiss overlay ========== */
+/* Invisible full-screen catch — tap anywhere to close the peeked card early */
+.reveal-dismiss-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  cursor: pointer;
+}
+.reveal-dismiss-overlay::after {
+  content: "Tap anywhere to close";
+  position: fixed;
+  bottom: 26px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  pointer-events: none;
+  background: rgba(13,22,56,0.6);
+  padding: 5px 14px;
+  border-radius: 20px;
+}
+
 /* ========== Toast ========== */
 .toast {
   position: fixed;

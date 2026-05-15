@@ -83,7 +83,7 @@ function CardFace({ card, w, h }: { card?: CardT | null; w: number; h: number })
     );
   }
 
-  // Special Joker face
+  // Special Joker face — jester theme, clearly distinct from Jack
   if (card.rank === "Joker") {
     return (
       <div
@@ -91,21 +91,46 @@ function CardFace({ card, w, h }: { card?: CardT | null; w: number; h: number })
         style={{
           width: w, height: h, position: "absolute", inset: 0,
           backfaceVisibility: "hidden",
-          background: "linear-gradient(135deg, #f4ebff 0%, #e0d0ff 100%)",
+          background: "linear-gradient(145deg, #2a0a5e 0%, #6e4ec9 55%, #a87bff 100%)",
           borderRadius: 12,
-          border: "3px solid #6e4ec9",
-          boxShadow: "0 6px 18px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.7)",
+          border: "3px solid #ffd86b",
+          boxShadow: "0 6px 18px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.15)",
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
           alignItems: "center",
           padding: "5px 6px",
           fontFamily: "'Fredoka', system-ui, sans-serif",
+          overflow: "hidden",
         }}
       >
-        <div style={{ fontSize: w * 0.22, fontWeight: 800, color: "#6e4ec9", lineHeight: 1 }}>0</div>
-        <div style={{ fontSize: w * 0.5, lineHeight: 1 }}>🃏</div>
-        <div style={{ fontSize: w * 0.22, fontWeight: 800, color: "#6e4ec9", lineHeight: 1, transform: "rotate(180deg)" }}>0</div>
+        {/* Top corner */}
+        <div style={{ alignSelf: "flex-start", lineHeight: 1 }}>
+          <div style={{ fontSize: w * 0.22, fontWeight: 800, color: "#ffd86b" }}>0</div>
+          <div style={{ fontSize: w * 0.17, color: "#ffd86b", opacity: 0.9 }}>🤡</div>
+        </div>
+
+        {/* Centre jester */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+          <div style={{ fontSize: w * 0.48, lineHeight: 1 }}>🤡</div>
+          {w >= 70 && (
+            <div style={{
+              fontSize: w * 0.15,
+              fontWeight: 900,
+              color: "#ffd86b",
+              letterSpacing: w * 0.02,
+              textShadow: "0 1px 3px rgba(0,0,0,0.5)",
+            }}>
+              JOKER
+            </div>
+          )}
+        </div>
+
+        {/* Bottom corner (rotated) */}
+        <div style={{ alignSelf: "flex-end", lineHeight: 1, transform: "rotate(180deg)" }}>
+          <div style={{ fontSize: w * 0.22, fontWeight: 800, color: "#ffd86b" }}>0</div>
+          <div style={{ fontSize: w * 0.17, color: "#ffd86b", opacity: 0.9 }}>🤡</div>
+        </div>
       </div>
     );
   }

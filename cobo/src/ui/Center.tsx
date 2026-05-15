@@ -40,7 +40,7 @@ export function Center() {
                 exit={{ y: 30, opacity: 0, scale: 0.9 }}
                 transition={{ type: "spring", stiffness: 220, damping: 22 }}
               >
-                <CardView card={drawn} faceUp={true} size="lg" layoutId={drawn.id} />
+                <CardView card={drawn} faceUp={isHumanTurn} size="lg" layoutId={drawn.id} />
               </motion.div>
             )}
           </AnimatePresence>
