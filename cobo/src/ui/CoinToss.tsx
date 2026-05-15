@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useStore } from "../state/store";
-import type { CoinSide } from "../state/store";
 import { Audio } from "../audio/sounds";
 
 /**

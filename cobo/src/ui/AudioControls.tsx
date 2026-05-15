@@ -15,7 +15,10 @@ export function AudioControls() {
   const panelRef = useRef<HTMLDivElement>(null);
 
   // Subscribe to audio engine changes so the UI mirrors saved state
-  useEffect(() => Audio.subscribe(() => force((n) => n + 1)), []);
+  useEffect(() => {
+    const unsub = Audio.subscribe(() => force((n) => n + 1));
+    return () => { unsub(); };
+  }, []);
 
   // Start music on first interaction (a real click, not just hover)
   useEffect(() => {
