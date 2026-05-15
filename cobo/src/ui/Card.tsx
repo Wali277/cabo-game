@@ -12,13 +12,12 @@ interface Props {
   layoutId?: string;
 }
 
-const SUIT_GLYPH: Record<string, string> = { S: "♠", H: "♥", D: "♦", C: "♣", W: "★" };
+const SUIT_GLYPH: Record<string, string> = { S: "♠", H: "♥", D: "♦", C: "♣" };
 const SUIT_COLOR: Record<string, string> = {
   S: "#1c1d2b",
   C: "#1c1d2b",
   H: "#e23a5e",
   D: "#e23a5e",
-  W: "#1c1d2b",
 };
 
 export function CardView({
@@ -83,10 +82,11 @@ function CardFace({ card, w, h }: { card?: CardT | null; w: number; h: number })
     );
   }
 
-  // Joker face — same yellow/black card design as all other cards,
-  // but with a custom inline SVG jester hat instead of a suit glyph.
+  // Joker — same yellow/black card design, jester face SVG in centre
   if (card.rank === "Joker") {
-    const hatSize = w * 0.62;
+    const isRed = card.suit === "H" || card.suit === "D";
+    const faceColor = isRed ? "#e23a5e" : "#1c1d2b";
+    const jesterSize = w * 0.48;
     return (
       <div
         className="card-face"
@@ -101,31 +101,32 @@ function CardFace({ card, w, h }: { card?: CardT | null; w: number; h: number })
           flexDirection: "column",
           justifyContent: "space-between",
           padding: "6px 8px",
+          overflow: "hidden",
           fontFamily: "'Fredoka', 'Comic Sans MS', system-ui, sans-serif",
-          color: "#1c1d2b",
+          color: faceColor,
         }}
       >
-        {/* Top-left corner: star rank + star suit (matches other card layout) */}
-        <div style={{ fontSize: w * 0.28, lineHeight: 1, fontWeight: 700 }}>
-          ★
-          <div style={{ fontSize: w * 0.22, lineHeight: 1 }}>★</div>
+        {/* Top-left corner: rank "J" + star suit marker */}
+        <div style={{ fontSize: w * 0.22, lineHeight: 1, fontWeight: 700 }}>
+          J
+          <div style={{ fontSize: w * 0.17, lineHeight: 1 }}>★</div>
         </div>
 
-        {/* Centre: jester hat SVG */}
+        {/* Centre: jester face */}
         <div style={{ alignSelf: "center" }}>
-          <JesterHat size={hatSize} color="#1c1d2b" />
+          <JesterFace size={jesterSize} color={faceColor} />
         </div>
 
         {/* Bottom-right corner: rotated */}
         <div style={{
           alignSelf: "flex-end",
           transform: "rotate(180deg)",
-          fontSize: w * 0.28,
+          fontSize: w * 0.22,
           lineHeight: 1,
           fontWeight: 700,
         }}>
-          ★
-          <div style={{ fontSize: w * 0.22, lineHeight: 1 }}>★</div>
+          J
+          <div style={{ fontSize: w * 0.17, lineHeight: 1 }}>★</div>
         </div>
       </div>
     );
@@ -147,69 +148,98 @@ function CardFace({ card, w, h }: { card?: CardT | null; w: number; h: number })
         flexDirection: "column",
         justifyContent: "space-between",
         padding: "6px 8px",
+        overflow: "hidden",
         fontFamily: "'Fredoka', 'Comic Sans MS', system-ui, sans-serif",
         color,
       }}
     >
-      <div style={{ fontSize: w * 0.28, lineHeight: 1, fontWeight: 700 }}>
+      {/* Top-left corner */}
+      <div style={{ fontSize: w * 0.22, lineHeight: 1, fontWeight: 700 }}>
         {card.rank}
-        <div style={{ fontSize: w * 0.22, lineHeight: 1 }}>{glyph}</div>
+        <div style={{ fontSize: w * 0.17, lineHeight: 1 }}>{glyph}</div>
       </div>
+
+      {/* Centre suit glyph */}
       <div
         style={{
           alignSelf: "center",
-          fontSize: w * 0.55,
+          fontSize: w * 0.48,
           lineHeight: 1,
           textShadow: `1px 2px 0 rgba(0,0,0,0.12)`,
         }}
       >
         {glyph}
       </div>
+
+      {/* Bottom-right corner: rotated */}
       <div
         style={{
           alignSelf: "flex-end",
           transform: "rotate(180deg)",
-          fontSize: w * 0.28,
+          fontSize: w * 0.22,
           lineHeight: 1,
           fontWeight: 700,
         }}
       >
         {card.rank}
-        <div style={{ fontSize: w * 0.22, lineHeight: 1 }}>{glyph}</div>
+        <div style={{ fontSize: w * 0.17, lineHeight: 1 }}>{glyph}</div>
       </div>
     </div>
   );
 }
 
-/** Inline SVG jester hat — three rounded peaks (bells) above a hat body + brim. */
-function JesterHat({ size, color }: { size: number; color: string }) {
+/**
+ * Inline SVG jester face:
+ *   – Three rounded hat bells at the top
+ *   – Hat body + brim
+ *   – Round face (yellow "cutout" circle) with eyes and a smile
+ *   – 8-point ruffled collar just below the face
+ */
+function JesterFace({ size, color }: { size: number; color: string }) {
+  const bg = "#ffd86b"; // card background — used to punch out the face circle
   return (
     <svg
-      viewBox="0 0 100 90"
+      viewBox="0 0 100 110"
       width={size}
-      height={size * 0.9}
-      fill={color}
+      height={size * 1.1}
       style={{ display: "block" }}
     >
-      {/*
-        Three overlapping circles form the three rounded bell-peaks of the
-        jester hat, similar to how ♣ uses three circles as its top lobes.
-        Left: (20, 28) r=17  |  Centre: (50, 14) r=17  |  Right: (80, 28) r=17
-        Adjacent circles overlap by ~3px so they connect into one shape.
-      */}
-      <circle cx="20" cy="28" r="17" />
-      <circle cx="50" cy="14" r="17" />
-      <circle cx="80" cy="28" r="17" />
+      {/* ── Hat bells (3 rounded peaks) ── */}
+      <circle cx="22" cy="20" r="11" fill={color} />
+      <circle cx="50" cy="9"  r="11" fill={color} />
+      <circle cx="78" cy="20" r="11" fill={color} />
 
-      {/*
-        Hat body — concave-top trapezoid that sits just below the side peaks.
-        The concave curve (dipping to y=57 at centre) leaves the middle peak
-        visibly separate, giving the three-pronged jester silhouette.
-      */}
-      <path d="M 4 44 Q 50 57 96 44 L 93 68 Q 50 80 7 68 Z" />
+      {/* Hat body — concave-topped trapezoid joining the three bells */}
+      <path d="M 11 29 Q 50 39 89 29 L 87 46 Q 50 53 13 46 Z" fill={color} />
 
-      {/* Brim ellipse at the bottom of the hat body */}
-      <ellipse cx="50" cy="69" rx="44" ry="12" />
+      {/* Hat brim */}
+      <ellipse cx="50" cy="46" rx="39" ry="7" fill={color} />
+
+      {/* ── Ruffled collar — 8-pointed star drawn BEFORE the face so face sits on top ── */}
+      {/*
+        Center (50, 98), outer radius 11, inner radius 6, 8 points (16 polygon vertices).
+        The top tips of the star peek out from behind the face circle for the "ruffled" look.
+      */}
+      <polygon
+        points="50,87 52,93 58,90 56,96 61,98 56,100 58,106 52,104 50,109 48,104 42,106 44,100 39,98 44,96 42,90 48,93"
+        fill={color}
+      />
+
+      {/* ── Face circle (yellow) — covers the collar centre, acts as the face ── */}
+      <circle cx="50" cy="71" r="20" fill={bg} />
+
+      {/* Eyes */}
+      <circle cx="42" cy="66" r="2.5" fill={color} />
+      <circle cx="58" cy="66" r="2.5" fill={color} />
+
+      {/* Smile arc */}
+      <path
+        d="M 41 75 Q 50 84 59 75"
+        stroke={color}
+        strokeWidth="2.5"
+        fill="none"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }

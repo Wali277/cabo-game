@@ -13,9 +13,11 @@ export function makeDeck(): Card[] {
       deck.push({ id: `${rank}${suit}`, rank, suit });
     }
   }
-  // Two Jokers — valued at 0, no special action
-  deck.push({ id: "Joker1", rank: "Joker", suit: "W" });
-  deck.push({ id: "Joker2", rank: "Joker", suit: "W" });
+  // Four Jokers — valued at 0, no special action (2 red, 2 black)
+  deck.push({ id: "JokerR1", rank: "Joker", suit: "H" });
+  deck.push({ id: "JokerR2", rank: "Joker", suit: "H" });
+  deck.push({ id: "JokerB1", rank: "Joker", suit: "S" });
+  deck.push({ id: "JokerB2", rank: "Joker", suit: "S" });
   return deck;
 }
 
