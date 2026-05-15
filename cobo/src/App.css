@@ -414,6 +414,24 @@
 }
 .pile.clickable { cursor: pointer; }
 .pile.clickable:hover .card-wrap { transform: translateY(-6px); }
+.pile.clickable .card-wrap {
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+/* Soft pulsing glow around the deck/discard when interactable */
+.pile.clickable .card-wrap::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border-radius: 18px;
+  pointer-events: none;
+  box-shadow: 0 0 0 0 rgba(255, 216, 107, 0.5);
+  animation: pilePulse 2.2s ease-in-out infinite;
+  z-index: -1;
+}
+@keyframes pilePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 216, 107, 0.45), 0 0 30px 8px rgba(255, 216, 107, 0.0); }
+  50%      { box-shadow: 0 0 0 4px rgba(255, 216, 107, 0.25), 0 0 30px 8px rgba(255, 216, 107, 0.35); }
+}
 .pile-label {
   background: #0d1638;
   color: #a87bff;
@@ -733,6 +751,99 @@
   100% { transform: scale(1) rotate(0); }
 }
 
+/* ========== Action choice row (Use / Skip) ========== */
+.action-choice-row {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  z-index: 140;
+}
+.action-confirm-btn {
+  font-weight: 900;
+  font-size: 20px;
+  padding: 14px 28px;
+  border: 4px solid #1c1d2b;
+  border-radius: 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow:
+    0 8px 0 rgba(0,0,0,0.25),
+    0 14px 32px rgba(0,0,0,0.4),
+    inset 0 -4px 0 rgba(0,0,0,0.15);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.action-confirm-btn:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 11px 0 rgba(0,0,0,0.25),
+    0 18px 40px rgba(0,0,0,0.45),
+    inset 0 -4px 0 rgba(0,0,0,0.15);
+}
+.action-confirm-btn:active {
+  transform: translateY(1px);
+  box-shadow:
+    0 4px 0 rgba(0,0,0,0.25),
+    0 6px 14px rgba(0,0,0,0.4),
+    inset 0 -2px 0 rgba(0,0,0,0.15);
+}
+.action-confirm-btn .action-emoji { font-size: 28px; animation: none; }
+.action-skip-btn {
+  background: rgba(13,22,56,0.85);
+  color: #f4ebff;
+  border: 2px solid rgba(168,123,255,0.5);
+  font-weight: 700;
+  padding: 11px 18px;
+  border-radius: 14px;
+  backdrop-filter: blur(8px);
+}
+.action-skip-btn:hover { background: rgba(30,40,90,0.95); border-color: #a87bff; }
+
+/* Hover tooltip on the Action button */
+.action-btn-wrap { position: relative; }
+.action-btn-wrap::before,
+.action-btn-wrap::after {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  left: 50%;
+  transform: translateX(-50%) translateY(6px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.action-btn-wrap::before {
+  content: attr(data-tip);
+  white-space: nowrap;
+  background: #1c1d2b;
+  color: #f4ebff;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 2px solid rgba(168,123,255,0.6);
+  box-shadow: 0 8px 22px rgba(0,0,0,0.5);
+  max-width: 320px;
+  white-space: normal;
+  text-align: center;
+}
+.action-btn-wrap::after {
+  content: "";
+  width: 0;
+  height: 0;
+  border: 7px solid transparent;
+  border-top-color: #1c1d2b;
+  bottom: calc(100% + 6px);
+}
+.action-btn-wrap:hover::before,
+.action-btn-wrap:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
 /* ========== Peek dismiss overlay ========== */
 /* Invisible full-screen catch — tap anywhere to close the peeked card early */
 .reveal-dismiss-overlay {
@@ -839,6 +950,291 @@
 .modal-row.worst { background: #f5d3e6; }
 .modal-row .rank { font-weight: 900; color: #6e4ec9; min-width: 28px; }
 
+/* ========== Audio Controls (bottom-right floating widget) ========== */
+.audio-controls {
+  position: fixed;
+  bottom: 18px;
+  right: 18px;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  pointer-events: none; /* children re-enable */
+}
+.audio-controls > * { pointer-events: auto; }
+
+.audio-fab {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 3px solid #1c1d2b;
+  background: linear-gradient(135deg, #a87bff, #6e4ec9);
+  color: #fff;
+  font-size: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    0 8px 20px rgba(0,0,0,0.4),
+    inset 0 -3px 0 rgba(0,0,0,0.2),
+    inset 0 2px 0 rgba(255,255,255,0.2);
+  cursor: pointer;
+  user-select: none;
+}
+.audio-fab:hover { box-shadow: 0 10px 26px rgba(0,0,0,0.5), inset 0 -3px 0 rgba(0,0,0,0.2), inset 0 2px 0 rgba(255,255,255,0.25); }
+
+.audio-panel {
+  background: rgba(13,22,56,0.95);
+  backdrop-filter: blur(12px);
+  border: 2px solid rgba(168,123,255,0.5);
+  border-radius: 14px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 220px;
+  box-shadow: 0 14px 30px rgba(0,0,0,0.55);
+}
+.audio-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.audio-mute-btn {
+  background: rgba(168,123,255,0.15);
+  border: 2px solid rgba(168,123,255,0.45);
+  border-radius: 10px;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: #f4ebff;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+.audio-mute-btn:hover { background: rgba(168,123,255,0.3); }
+.audio-slider-wrap { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.audio-label {
+  color: rgba(244,235,255,0.7);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.audio-slider {
+  width: 100%;
+  appearance: none;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(168,123,255,0.25);
+  outline: none;
+  cursor: pointer;
+}
+.audio-slider:disabled { opacity: 0.4; cursor: not-allowed; }
+.audio-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffd86b;
+  border: 2px solid #1c1d2b;
+  cursor: pointer;
+}
+.audio-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffd86b;
+  border: 2px solid #1c1d2b;
+  cursor: pointer;
+}
+
+/* Move the training panel above the audio FAB so they don't overlap */
+.training-panel { padding-right: 92px; }
+
+/* ========== Coin Toss screen ========== */
+.coin-toss-screen {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  position: relative;
+  overflow: hidden;
+}
+.coin-toss-screen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 20% 30%, rgba(255, 216, 107, 0.18) 0 8px, transparent 9px) 0 0/180px 180px,
+    radial-gradient(circle at 70% 60%, rgba(168, 123, 255, 0.18) 0 6px, transparent 7px) 0 0/220px 220px;
+  pointer-events: none;
+  animation: starsDrift 30s linear infinite;
+}
+@keyframes starsDrift {
+  to { background-position: 180px 180px, 220px 220px; }
+}
+
+.coin-toss-card {
+  background: rgba(255,255,255,0.97);
+  color: #0d1638;
+  padding: 32px 36px 26px;
+  border-radius: 26px;
+  box-shadow:
+    0 24px 50px rgba(0,0,0,0.5),
+    inset 0 0 0 4px #a87bff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  min-width: 380px;
+  position: relative;
+  z-index: 1;
+}
+.coin-toss-title {
+  font-size: 44px;
+  font-weight: 900;
+  margin: 0;
+  letter-spacing: -1px;
+  text-shadow: 3px 3px 0 #ffd86b;
+  transform: rotate(-3deg);
+}
+.coin-toss-sub {
+  color: #4a4356;
+  font-weight: 600;
+  font-size: 16px;
+  margin: 0 0 4px;
+  text-align: center;
+}
+
+/* 3D coin */
+.coin-3d-wrap {
+  perspective: 1200px;
+  padding: 16px 0 6px;
+}
+.coin-3d {
+  width: 140px;
+  height: 140px;
+  position: relative;
+  transform-style: preserve-3d;
+}
+.coin-face {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 78px;
+  font-weight: 900;
+  color: #5a3a0a;
+  font-family: 'Fredoka', system-ui, sans-serif;
+  background:
+    radial-gradient(circle at 35% 30%, #fff3a0 0%, #ffd86b 40%, #c98e00 100%);
+  border: 4px solid #5a3a0a;
+  box-shadow:
+    inset 0 0 0 6px rgba(255,255,255,0.4),
+    inset 0 -8px 16px rgba(90,58,10,0.5),
+    0 16px 28px rgba(0,0,0,0.5);
+  backface-visibility: hidden;
+}
+.coin-face.heads {
+  transform: rotateX(0deg);
+}
+.coin-face.tails {
+  transform: rotateX(180deg);
+}
+.coin-edge {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: linear-gradient(
+    90deg,
+    #5a3a0a 0%, #8a5a0a 25%, #c98e00 50%, #8a5a0a 75%, #5a3a0a 100%
+  );
+  transform: rotateX(90deg) translateZ(0);
+  /* Edge thickness simulation - thin strip via scale */
+  height: 12px;
+  top: 50%;
+  margin-top: -6px;
+}
+
+.coin-choice-row {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+}
+.coin-choice-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 22px;
+  border-radius: 16px;
+  border: 4px solid #1c1d2b;
+  font-family: 'Fredoka', system-ui, sans-serif;
+  font-weight: 900;
+  font-size: 15px;
+  letter-spacing: 1.5px;
+  cursor: pointer;
+  background: linear-gradient(135deg, #ffe79a, #ffd86b);
+  color: #5a3a0a;
+  box-shadow:
+    0 6px 0 #c98e00,
+    0 12px 24px rgba(0,0,0,0.35),
+    inset 0 -3px 0 rgba(0,0,0,0.15);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.coin-choice-btn:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 9px 0 #c98e00,
+    0 16px 30px rgba(0,0,0,0.4),
+    inset 0 -3px 0 rgba(0,0,0,0.15);
+}
+.coin-choice-btn:active {
+  transform: translateY(2px);
+  box-shadow:
+    0 3px 0 #c98e00,
+    0 6px 14px rgba(0,0,0,0.35),
+    inset 0 -2px 0 rgba(0,0,0,0.15);
+}
+.coin-choice-glyph {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.coin-picks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  margin-top: 4px;
+}
+.coin-pick-row {
+  display: flex;
+  justify-content: space-between;
+  background: #f4ebff;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-weight: 600;
+  color: #4a4356;
+  transition: background 0.3s, color 0.3s;
+}
+.coin-pick-row.won {
+  background: #ffd86b;
+  color: #5a3a0a;
+  font-weight: 900;
+  box-shadow: 0 4px 0 #c98e00;
+}
+.coin-pick-name { font-weight: 700; }
+.coin-pick-side { letter-spacing: 1.5px; font-weight: 800; }
+
 /* ========== Training Chamber ========== */
 
 /* Menu button */
@@ -941,3 +1337,108 @@
   text-transform: uppercase;
 }
 .modal-row .cum { font-size: 13px; color: #4a4356; }
+
+/* ============================================================
+ * PREMIUM ANIMATIONS — final polish layer
+ * ============================================================ */
+
+/* Card wrap: refined hover, soft gradient halo */
+.card-wrap {
+  transition: transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1),
+              filter 0.25s ease;
+  will-change: transform;
+}
+.card-wrap:hover {
+  filter: drop-shadow(0 12px 28px rgba(0,0,0,0.45))
+          drop-shadow(0 0 18px rgba(255,216,107,0.18));
+}
+
+/* Selectable card: gentle bobbing animation */
+.card-wrap.hl {
+  animation: cardLift 1.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+@keyframes cardLift {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-9px); }
+}
+
+/* Buttons: shimmering sheen on .primary and .big */
+.btn.primary, .btn.big {
+  position: relative;
+  overflow: hidden;
+}
+.btn.primary::before, .btn.big::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    rgba(255,255,255,0.25) 50%,
+    transparent 100%
+  );
+  transform: skewX(-20deg);
+  animation: btnShimmer 3.6s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes btnShimmer {
+  0%, 60%, 100% { left: -100%; }
+  80%           { left: 130%; }
+}
+
+/* Spy-glow refinement — softer, larger halo */
+.hand-slot.spy-glow::before {
+  box-shadow:
+    0 0 0 4px rgba(255, 91, 110, 0.85),
+    0 0 20px 6px rgba(255, 91, 110, 0.55),
+    0 0 50px 12px rgba(255, 91, 110, 0.25);
+}
+
+/* Round-end winner card celebration */
+.card-wrap.winner {
+  animation: winnerDance 1.2s ease-in-out infinite alternate;
+  filter: drop-shadow(0 0 22px rgba(255,216,107,0.7))
+          drop-shadow(0 0 40px rgba(255,216,107,0.3));
+}
+@keyframes winnerDance {
+  0%   { transform: translateY(-3px) rotate(-2deg); }
+  100% { transform: translateY(-9px) rotate(2deg); }
+}
+
+/* Animated stars-overlay for the menu / coin-toss screen */
+.menu::after,
+.coin-toss-screen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(2px 2px at 12% 18%, rgba(255,255,255,0.9), transparent),
+    radial-gradient(1.5px 1.5px at 78% 32%, rgba(255,255,255,0.7), transparent),
+    radial-gradient(2px 2px at 30% 70%, rgba(255,216,107,0.7), transparent),
+    radial-gradient(1px 1px at 60% 50%, rgba(168,123,255,0.9), transparent),
+    radial-gradient(1.5px 1.5px at 85% 80%, rgba(255,255,255,0.6), transparent);
+  animation: twinkle 4.5s ease-in-out infinite;
+}
+@keyframes twinkle {
+  0%, 100% { opacity: 0.5; }
+  50%      { opacity: 1; }
+}
+
+/* Toast premium feel */
+.toast {
+  backdrop-filter: blur(8px);
+  background: linear-gradient(135deg, rgba(28,29,43,0.92), rgba(60,40,120,0.92)) !important;
+  border: 2px solid rgba(255,216,107,0.6);
+  box-shadow:
+    0 16px 36px rgba(0,0,0,0.55),
+    0 0 22px rgba(255,216,107,0.25);
+}
+
+/* Action banner glow */
+.action-banner {
+  filter: drop-shadow(0 0 26px rgba(255,255,255,0.35));
+}

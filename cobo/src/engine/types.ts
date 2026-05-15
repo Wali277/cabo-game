@@ -28,6 +28,7 @@ export type Phase =
   | "setup_peek"
   | "turn_start"
   | "turn_drawn"
+  | "pending_action"
   | "action_peek_own"
   | "action_peek_other"
   | "action_blind_swap"

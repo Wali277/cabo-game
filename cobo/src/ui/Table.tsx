@@ -10,6 +10,7 @@ import { ActionLog } from "./ActionLog";
 import { TrainingPanel } from "./TrainingPanel";
 import { botMove, ingestReveals, resetBotKnowledge } from "../ai/bot";
 import { clearReveals as clearRevealsEngine } from "../engine/game";
+import { Audio } from "../audio/sounds";
 
 export function Table() {
   const game = useStore((s) => s.game!);
@@ -79,7 +80,7 @@ export function Table() {
     return () => clearTimeout(t);
   }, [game.reveals, game.phase]);
 
-  // Show toasts from latest animations
+  // Show toasts AND play sound effects for latest animations
   useEffect(() => {
     if (game.animations.length === 0) return;
     const latest = game.animations[game.animations.length - 1];
@@ -87,10 +88,34 @@ export function Table() {
     switch (latest.kind) {
       case "cabo_called":
         msg = `${nameById(game, latest.payload.playerId as string)} called CABO — final round!`;
+        Audio.playSfx("cabo");
         break;
+      case "deal":          Audio.playSfx("card_deal"); break;
+      case "draw_deck":     Audio.playSfx("card_draw"); break;
+      case "draw_discard":  Audio.playSfx("card_draw"); break;
+      case "discard_drawn": Audio.playSfx("card_discard"); break;
+      case "swap_hand":     Audio.playSfx("card_swap"); break;
+      case "blind_swap":    Audio.playSfx("card_swap"); break;
+      case "peek_and_swap": Audio.playSfx("card_swap"); break;
+      case "reveal": {
+        // Use spy SFX when an opponent is shown a card; otherwise peek SFX
+        const toIds = (latest.payload.toPlayerIds as string[]) || [];
+        const ownerId = latest.payload.playerId as string;
+        if (toIds.length && !toIds.includes(ownerId)) {
+          Audio.playSfx("spy");
+        } else {
+          Audio.playSfx("peek");
+        }
+        break;
+      }
+      case "round_end": {
+        // Determine if the human won; play win or lose
+        const winnerId = (latest.payload as any).winnerId as string | undefined;
+        Audio.playSfx(winnerId === humanId ? "win" : "lose");
+        break;
+      }
     }
     if (msg) setToast(msg);
-    // Clear animations queue after a moment (so layout transitions complete)
     const t = setTimeout(() => consumeAnimations(), 500);
     return () => clearTimeout(t);
   }, [game.animations]);

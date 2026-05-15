@@ -202,7 +202,21 @@ export function discardDrawn(state: GameState): GameState {
     return advanceTurn(s);
   }
   s.pendingActionSource = drawn;
-  pushLog(s, `${s.players[s.currentPlayer].name} plays ${drawn.rank}'s action.`);
+  s.phase = "pending_action";
+  pushLog(s, `${s.players[s.currentPlayer].name} discarded a ${drawn.rank}.`);
+  return s;
+}
+
+export function triggerPendingAction(state: GameState): GameState {
+  if (state.phase !== "pending_action" || !state.pendingActionSource) return state;
+  const s = clone(state);
+  const src = s.pendingActionSource!;
+  const action = actionOf(src);
+  if (!action) {
+    s.pendingActionSource = null;
+    return advanceTurn(s);
+  }
+  pushLog(s, `${s.players[s.currentPlayer].name} plays ${src.rank}'s action.`);
   switch (action) {
     case "peek_own": s.phase = "action_peek_own"; break;
     case "peek_other": s.phase = "action_peek_other"; break;
@@ -210,6 +224,14 @@ export function discardDrawn(state: GameState): GameState {
     case "peek_and_swap": s.phase = "action_peek_and_swap_pick"; break;
   }
   return s;
+}
+
+export function skipPendingAction(state: GameState): GameState {
+  if (state.phase !== "pending_action") return state;
+  const s = clone(state);
+  pushLog(s, `${s.players[s.currentPlayer].name} declined the action.`);
+  s.pendingActionSource = null;
+  return advanceTurn(s);
 }
 
 export function actionPeekOwn(state: GameState, index: number): GameState {

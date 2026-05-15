@@ -15,13 +15,25 @@ import {
   drawFromDiscard,
   newGame,
   setupPeekCard,
+  skipPendingAction,
   startPlay,
   swapDrawnWithHand,
   trainingInjectCard as engineTrainingInject,
+  triggerPendingAction,
 } from "../engine/game";
 
-export type Screen = "menu" | "lobby" | "game" | "scoring";
+export type Screen = "menu" | "lobby" | "coin_toss" | "game" | "scoring";
 export type GameMode = "sp" | "mp";
+
+export type CoinSide = "heads" | "tails";
+export interface CoinTossState {
+  humanChoice: CoinSide | null;
+  botChoice: CoinSide | null;
+  result: CoinSide | null;  // randomly set when both have chosen / countdown ends
+  winnerId: string | null;  // player id of whoever won the toss
+  phase: "choosing" | "flipping" | "done";
+  countdownEndsAt: number | null; // ms timestamp for 5s auto-pick
+}
 
 export interface MpMember {
   id: string;
@@ -54,6 +66,8 @@ interface StoreState {
   training: boolean;
   mp: MpRoom | null;
   game: GameState | null;
+  pendingGame: GameState | null;  // game state created during coin toss, applied once toss is done
+  coinToss: CoinTossState | null;
   humanId: string;
   setupPeekRevealed: boolean;
   targeting: ActionTargetingMode;
@@ -63,6 +77,12 @@ interface StoreState {
   init: (numBots: number) => void;
   trainInit: () => void;
   trainingInjectCard: (card: Card) => void;
+  triggerAction: () => void;
+  skipAction: () => void;
+  coinTossChoose: (side: CoinSide) => void;
+  coinTossBotAutoPick: () => void;
+  coinTossResolve: () => void;
+  coinTossComplete: () => void;
   start: () => void;
   setSetupPeekRevealed: (v: boolean) => void;
   draw: () => void;
@@ -104,6 +124,8 @@ export const useStore = create<StoreState>((set, get) => ({
   training: false,
   mp: null,
   game: null,
+  pendingGame: null,
+  coinToss: null,
   humanId: "p_human",
   setupPeekRevealed: false,
   targeting: null,
@@ -113,20 +135,94 @@ export const useStore = create<StoreState>((set, get) => ({
 
   init(numBots) {
     const game = newGame({ players: makePlayers(numBots) });
+    // Start with the coin toss screen — the actual game state is held in
+    // pendingGame until the toss completes and decides the starting player.
     set({
-      mode: "sp", training: false, mp: null, game, screen: "game",
+      mode: "sp", training: false, mp: null,
+      game: null,
+      pendingGame: game,
+      screen: "coin_toss",
+      coinToss: {
+        humanChoice: null,
+        botChoice: null,
+        result: null,
+        winnerId: null,
+        phase: "choosing",
+        countdownEndsAt: Date.now() + 5000,
+      },
       humanId: "p_human",
       setupPeekRevealed: false, targeting: null, toast: null,
     });
   },
 
   trainInit() {
-    // Training Chamber: 1 bot so swap/spy actions have a target to work with
+    // Training Chamber: 1 bot so swap/spy actions have a target to work with.
+    // Skip the coin toss in training mode — human always starts for predictable testing.
     const game = newGame({ players: makePlayers(1) });
     set({
       mode: "sp", training: true, mp: null, game, screen: "game",
+      pendingGame: null, coinToss: null,
       humanId: "p_human",
       setupPeekRevealed: false, targeting: null, toast: null,
+    });
+  },
+
+  coinTossChoose(side) {
+    const { coinToss, pendingGame } = get();
+    if (!coinToss || !pendingGame) return;
+    if (coinToss.humanChoice) return;
+    const botChoice: CoinSide = side === "heads" ? "tails" : "heads";
+    // Bot's choice is locked in immediately (mirror of human's), but we delay
+    // revealing it slightly for drama. For now just lock it.
+    set({
+      coinToss: { ...coinToss, humanChoice: side, botChoice, phase: "flipping" },
+    });
+    // After a short delay, resolve the coin
+    setTimeout(() => get().coinTossResolve(), 900);
+  },
+
+  coinTossBotAutoPick() {
+    // Called when the 5-second countdown expires and the human hasn't chosen yet.
+    // The bot picks first; the human is then assigned the other side.
+    const { coinToss } = get();
+    if (!coinToss || coinToss.humanChoice) return;
+    const botChoice: CoinSide = Math.random() < 0.5 ? "heads" : "tails";
+    const humanChoice: CoinSide = botChoice === "heads" ? "tails" : "heads";
+    set({
+      coinToss: { ...coinToss, humanChoice, botChoice, phase: "flipping" },
+    });
+    setTimeout(() => get().coinTossResolve(), 900);
+  },
+
+  coinTossResolve() {
+    const { coinToss, pendingGame } = get();
+    if (!coinToss || !pendingGame) return;
+    const result: CoinSide = Math.random() < 0.5 ? "heads" : "tails";
+    // Determine winner: whichever player chose this side
+    let winnerId: string;
+    if (coinToss.humanChoice === result) {
+      winnerId = "p_human";
+    } else {
+      // Pick first bot from the pending game
+      const firstBot = pendingGame.players.find((p) => p.isBot);
+      winnerId = firstBot ? firstBot.id : pendingGame.players[0].id;
+    }
+    set({
+      coinToss: { ...coinToss, result, winnerId, phase: "done" },
+    });
+  },
+
+  coinTossComplete() {
+    const { coinToss, pendingGame } = get();
+    if (!coinToss || !pendingGame || !coinToss.winnerId) return;
+    // Inject the winning player as currentPlayer
+    const startIdx = pendingGame.players.findIndex((p) => p.id === coinToss.winnerId);
+    const game = { ...pendingGame, currentPlayer: startIdx >= 0 ? startIdx : 0 };
+    set({
+      game,
+      pendingGame: null,
+      coinToss: null,
+      screen: "game",
     });
   },
 
@@ -186,6 +282,11 @@ export const useStore = create<StoreState>((set, get) => ({
           case "turn_drawn":
             // Player chooses Swap or Discard via buttons — clear leftover targeting
             if (prev.targeting !== "swap_hand") targeting = null;
+            break;
+          case "pending_action":
+            // Player chooses Action or Skip via buttons — no targeting yet
+            targeting = null;
+            pendingBlindSwapOwnIndex = null;
             break;
           case "turn_start":
           case "round_over":
@@ -338,7 +439,19 @@ export const useStore = create<StoreState>((set, get) => ({
       return;
     }
     if (!game) return;
-    const next = discardDrawn(game);
+    // Note: phase now becomes "pending_action" if the card has an ability.
+    // The player must press the Action button to activate it.
+    set({ game: discardDrawn(game), targeting: null });
+  },
+
+  triggerAction() {
+    const { mode, game } = get();
+    if (mode === "mp") {
+      import("./mp").then((m) => m.sendAction({ type: "trigger_action" } as any));
+      return;
+    }
+    if (!game) return;
+    const next = triggerPendingAction(game);
     let targeting: ActionTargetingMode = null;
     switch (next.phase) {
       case "action_peek_own": targeting = "peek_own"; break;
@@ -348,6 +461,16 @@ export const useStore = create<StoreState>((set, get) => ({
       default: break;
     }
     set({ game: next, targeting });
+  },
+
+  skipAction() {
+    const { mode, game } = get();
+    if (mode === "mp") {
+      import("./mp").then((m) => m.sendAction({ type: "skip_action" } as any));
+      return;
+    }
+    if (!game) return;
+    set({ game: skipPendingAction(game), targeting: null });
   },
 
   callCaboAction() {
@@ -429,7 +552,8 @@ export const useStore = create<StoreState>((set, get) => ({
     }
     set({
       screen: "menu", mode: "sp", training: false, mp: null,
-      game: null, targeting: null, toast: null,
+      game: null, pendingGame: null, coinToss: null,
+      targeting: null, toast: null,
     });
   },
 

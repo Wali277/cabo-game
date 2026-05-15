@@ -86,7 +86,7 @@ function CardFace({ card, w, h }: { card?: CardT | null; w: number; h: number })
   if (card.rank === "Joker") {
     const isRed = card.suit === "H" || card.suit === "D";
     const faceColor = isRed ? "#e23a5e" : "#1c1d2b";
-    const jesterSize = w * 0.72; // larger face
+    const jesterSize = w * 0.48; // matches centre glyph size of other cards
     return (
       <div
         className="card-face"
@@ -108,15 +108,16 @@ function CardFace({ card, w, h }: { card?: CardT | null; w: number; h: number })
           color: faceColor,
         }}
       >
-        {/* Top-left corner: "JOKER" — like a real joker card */}
+        {/* Top-left corner: vertical "JOKER" — letters stacked top-to-bottom */}
         <div style={{
-          fontSize: w * 0.13,
-          lineHeight: 1,
+          fontSize: w * 0.16,
+          lineHeight: 0.95,
           fontWeight: 900,
-          letterSpacing: "0.5px",
-          whiteSpace: "nowrap",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
         }}>
-          JOKER
+          {"JOKER".split("").map((ch, i) => <span key={i}>{ch}</span>)}
         </div>
 
         {/* Centre: jester face */}
@@ -124,17 +125,18 @@ function CardFace({ card, w, h }: { card?: CardT | null; w: number; h: number })
           <JesterFace size={jesterSize} color={faceColor} />
         </div>
 
-        {/* Bottom-right corner: rotated "JOKER" */}
+        {/* Bottom-right corner: rotated 180° so it reads correctly upside-down */}
         <div style={{
           alignSelf: "flex-end",
           transform: "rotate(180deg)",
-          fontSize: w * 0.13,
-          lineHeight: 1,
+          fontSize: w * 0.16,
+          lineHeight: 0.95,
           fontWeight: 900,
-          letterSpacing: "0.5px",
-          whiteSpace: "nowrap",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
         }}>
-          JOKER
+          {"JOKER".split("").map((ch, i) => <span key={i}>{ch}</span>)}
         </div>
       </div>
     );

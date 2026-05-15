@@ -20,8 +20,10 @@ import {
   drawFromDiscard,
   newGame,
   setupPeekCard,
+  skipPendingAction,
   startPlay,
   swapDrawnWithHand,
+  triggerPendingAction,
 } from "./engine/game.js";
 import type { GameState } from "./engine/types.js";
 
@@ -94,6 +96,8 @@ type ActionMsg =
   | { type: "draw_discard" }
   | { type: "swap_drawn"; handIndex: number }
   | { type: "discard_drawn" }
+  | { type: "trigger_action" }
+  | { type: "skip_action" }
   | { type: "action_peek_own"; index: number }
   | { type: "action_peek_other"; targetPlayerId: string; index: number }
   | { type: "action_blind_swap"; ownIndex: number; targetPlayerId: string; targetIndex: number }
@@ -127,6 +131,12 @@ function applyAction(game: GameState, playerId: string, action: ActionMsg): Game
     case "discard_drawn":
       if (!requireCurrent()) return null;
       return discardDrawn(game);
+    case "trigger_action":
+      if (!requireCurrent()) return null;
+      return triggerPendingAction(game);
+    case "skip_action":
+      if (!requireCurrent()) return null;
+      return skipPendingAction(game);
     case "action_peek_own":
       if (!requireCurrent()) return null;
       return actionPeekOwn(game, action.index);

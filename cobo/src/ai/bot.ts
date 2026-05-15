@@ -10,6 +10,7 @@ import {
   drawFromDeck,
   drawFromDiscard,
   swapDrawnWithHand,
+  triggerPendingAction,
 } from "../engine/game";
 import type { GameState, PlayerState } from "../engine/types";
 
@@ -198,6 +199,12 @@ export function botMove(state: GameState): GameState {
       return swapDrawnWithHand(state, highest.idx);
     }
     return discardDrawn(state);
+  }
+
+  // After the action-button refactor, bots always trigger their pending action
+  // (they wouldn't have discarded an action card unless they wanted the ability).
+  if (state.phase === "pending_action") {
+    return triggerPendingAction(state);
   }
 
   if (state.phase === "action_peek_own") {

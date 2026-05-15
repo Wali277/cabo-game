@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { useState } from "react";
 import { useStore } from "../state/store";
 import { Tutorial } from "./Tutorial";
+import { Audio } from "../audio/sounds";
 
 export function Menu() {
   const init = useStore((s) => s.init);
@@ -48,7 +49,7 @@ export function Menu() {
             ))}
           </div>
         </div>
-        <button className="btn primary big" onClick={() => init(bots)}>
+        <button className="btn primary big" onClick={() => { Audio.playSfx("click"); init(bots); }}>
           Play vs bots
         </button>
         <div className="divider"><span>or</span></div>

@@ -4,6 +4,8 @@ import { useStore } from "./state/store";
 import { Menu } from "./ui/Menu";
 import { Table } from "./ui/Table";
 import { Lobby } from "./ui/Lobby";
+import { CoinToss } from "./ui/CoinToss";
+import { AudioControls } from "./ui/AudioControls";
 import { getSocket, loadSession } from "./state/mp";
 
 function getRoomFromPath(): string | null {
@@ -29,9 +31,15 @@ function App() {
   }, [enterLobby]);
 
   if (!hydrated) return null;
-  if (screen === "menu") return <Menu />;
-  if (screen === "lobby") return <Lobby initialCode={initialRoom ?? undefined} />;
-  return <Table />;
+  return (
+    <>
+      {screen === "menu" && <Menu />}
+      {screen === "lobby" && <Lobby initialCode={initialRoom ?? undefined} />}
+      {screen === "coin_toss" && <CoinToss />}
+      {screen === "game" && <Table />}
+      <AudioControls />
+    </>
+  );
 }
 
 export default App;

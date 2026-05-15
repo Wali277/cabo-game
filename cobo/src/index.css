@@ -18,7 +18,13 @@ body {
     radial-gradient(circle at 80% 95%, rgba(168,123,255,0.25) 0 420px, transparent 420px),
     linear-gradient(160deg, #0d1638 0%, #1a1a4a 40%, #3b2473 100%);
   background-attachment: fixed;
+  background-size: 200% 200%;
+  animation: bgDrift 30s ease-in-out infinite alternate;
   overflow-x: hidden;
+}
+@keyframes bgDrift {
+  0%   { background-position: 0% 0%, 100% 0%, 100% 100%, 0% 0%; }
+  100% { background-position: 4% 6%, 96% 4%, 96% 94%, 0% 100%; }
 }
 
 #root {
