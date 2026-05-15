@@ -86,7 +86,7 @@ function CardFace({ card, w, h }: { card?: CardT | null; w: number; h: number })
   if (card.rank === "Joker") {
     const isRed = card.suit === "H" || card.suit === "D";
     const faceColor = isRed ? "#e23a5e" : "#1c1d2b";
-    const jesterSize = w * 0.48;
+    const jesterSize = w * 0.72; // larger face
     return (
       <div
         className="card-face"
@@ -99,6 +99,7 @@ function CardFace({ card, w, h }: { card?: CardT | null; w: number; h: number })
           boxShadow: "0 6px 18px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.5)",
           display: "flex",
           flexDirection: "column",
+          alignItems: "flex-start",   // pins corners to left; centre overrides with alignSelf
           justifyContent: "space-between",
           padding: "6px 8px",
           overflow: "hidden",
@@ -106,9 +107,15 @@ function CardFace({ card, w, h }: { card?: CardT | null; w: number; h: number })
           color: faceColor,
         }}
       >
-        {/* Top-left corner: just the "J" — matches reference */}
-        <div style={{ fontSize: w * 0.26, lineHeight: 1, fontWeight: 800 }}>
-          J
+        {/* Top-left corner: "JOKER" — like a real joker card */}
+        <div style={{
+          fontSize: w * 0.13,
+          lineHeight: 1,
+          fontWeight: 900,
+          letterSpacing: "0.5px",
+          whiteSpace: "nowrap",
+        }}>
+          JOKER
         </div>
 
         {/* Centre: jester face */}
@@ -116,15 +123,17 @@ function CardFace({ card, w, h }: { card?: CardT | null; w: number; h: number })
           <JesterFace size={jesterSize} color={faceColor} />
         </div>
 
-        {/* Bottom-right corner: rotated "J" */}
+        {/* Bottom-right corner: rotated "JOKER" */}
         <div style={{
           alignSelf: "flex-end",
           transform: "rotate(180deg)",
-          fontSize: w * 0.26,
+          fontSize: w * 0.13,
           lineHeight: 1,
-          fontWeight: 800,
+          fontWeight: 900,
+          letterSpacing: "0.5px",
+          whiteSpace: "nowrap",
         }}>
-          J
+          JOKER
         </div>
       </div>
     );
@@ -144,6 +153,7 @@ function CardFace({ card, w, h }: { card?: CardT | null; w: number; h: number })
         boxShadow: "0 6px 18px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.5)",
         display: "flex",
         flexDirection: "column",
+        alignItems: "flex-start",   // pins top-left corner to left; centre/bottom override with alignSelf
         justifyContent: "space-between",
         padding: "6px 8px",
         overflow: "hidden",
@@ -151,8 +161,8 @@ function CardFace({ card, w, h }: { card?: CardT | null; w: number; h: number })
         color,
       }}
     >
-      {/* Top-left corner */}
-      <div style={{ fontSize: w * 0.22, lineHeight: 1, fontWeight: 700 }}>
+      {/* Top-left corner — shrink-wraps to content width so it can't drift centre */}
+      <div style={{ fontSize: w * 0.22, lineHeight: 1, fontWeight: 700, whiteSpace: "nowrap" }}>
         {card.rank}
         <div style={{ fontSize: w * 0.17, lineHeight: 1 }}>{glyph}</div>
       </div>
@@ -169,7 +179,7 @@ function CardFace({ card, w, h }: { card?: CardT | null; w: number; h: number })
         {glyph}
       </div>
 
-      {/* Bottom-right corner: rotated */}
+      {/* Bottom-right corner: rotated — alignSelf:flex-end keeps it to the right */}
       <div
         style={{
           alignSelf: "flex-end",
@@ -177,6 +187,7 @@ function CardFace({ card, w, h }: { card?: CardT | null; w: number; h: number })
           fontSize: w * 0.22,
           lineHeight: 1,
           fontWeight: 700,
+          whiteSpace: "nowrap",
         }}
       >
         {card.rank}
