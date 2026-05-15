@@ -51,7 +51,7 @@ export interface MpRoom {
   game: GameState | null;
   coinToss: {
     choices: { heads: string | null; tails: string | null };
-    startedAt: number;
+    startedAt: number | null;
     result: "heads" | "tails" | null;
   } | null;
 }
@@ -294,7 +294,7 @@ export const useStore = create<StoreState>((set, get) => ({
             result: null,
             winnerId: null,
             phase: "choosing",
-            countdownEndsAt: room.coinToss.startedAt + 5000,
+            countdownEndsAt: room.coinToss.startedAt ? room.coinToss.startedAt + 5000 : null,
           },
           targeting: null,
           setupPeekRevealed: false,
@@ -346,9 +346,12 @@ export const useStore = create<StoreState>((set, get) => ({
       }
 
       // Partial update: other player just picked but result not yet set
+      const countdownEndsAt = ct.startedAt
+        ? ct.startedAt + 5000
+        : prev.coinToss!.countdownEndsAt;
       set({
         mp: room,
-        coinToss: { ...prev.coinToss!, humanChoice: myChoice, botChoice: otherChoice },
+        coinToss: { ...prev.coinToss!, humanChoice: myChoice, botChoice: otherChoice, countdownEndsAt },
       });
       return;
     }

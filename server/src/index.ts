@@ -226,9 +226,10 @@ io.on("connection", (socket) => {
     const startIdx = Math.floor(Math.random() * players.length);
     room.game.currentPlayer = startIdx;
     room.lastStarterIdx = startIdx;
-    // For 2-player games, initialise coin-toss choice tracking
+    // For 2-player games, initialise coin-toss choice tracking.
+    // startedAt stays null until the first player picks — that's when the 5s window opens.
     if (players.length === 2) {
-      room.coinToss = { choices: { heads: null, tails: null }, startedAt: Date.now(), result: null };
+      room.coinToss = { choices: { heads: null, tails: null }, startedAt: null, result: null };
     } else {
       room.coinToss = null;
     }
@@ -243,17 +244,19 @@ io.on("connection", (socket) => {
     const ct = room.coinToss;
     const otherSide: "heads" | "tails" = side === "heads" ? "tails" : "heads";
     if (ct.choices[side]) return cb?.({ ok: false, error: "Side already taken" });
-    // Lock this player's pick; auto-assign the other side to the remaining player
+
     ct.choices[side] = bound.playerId;
+
     if (!ct.choices[otherSide]) {
-      const other = room.members.find((m) => m.playerId !== bound!.playerId);
-      if (other) ct.choices[otherSide] = other.playerId;
-    }
-    // Determine result once both sides are assigned
-    if (ct.choices.heads && ct.choices.tails) {
+      // First pick — start the 5-second window for the other player.
+      // Do NOT auto-assign yet; the other player gets a chance to click.
+      ct.startedAt = Date.now();
+    } else {
+      // Second pick — both sides are now assigned; determine the result.
       const winner = room.game.players[room.game.currentPlayer];
       ct.result = ct.choices.heads === winner.id ? "heads" : "tails";
     }
+
     cb?.({ ok: true });
     broadcastRoom(bound.roomCode);
   });

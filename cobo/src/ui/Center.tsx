@@ -1,6 +1,29 @@
-import { AnimatePresence, motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { CardView } from "./Card";
 import { useStore } from "../state/store";
+import type { GameState } from "../engine/types";
+
+/** Spring shared across all card movement animations. */
+const CARD_SPRING = { type: "spring" as const, stiffness: 300, damping: 26 };
+
+/** Return the entrance initial state for the DRAWN CARD SLOT based on last action. */
+function drawnInitial(g: GameState) {
+  const last = g.animations[g.animations.length - 1];
+  if (last?.kind === "draw_discard") return { x: 100, opacity: 0, scale: 0.88 };
+  return { y: -52, opacity: 0, scale: 0.88 }; // draw_deck or default — drops from above
+}
+
+/** Return the entrance initial state for the DISCARD PILE TOP based on last action. */
+function discardInitial(g: GameState) {
+  const last = g.animations[g.animations.length - 1];
+  switch (last?.kind) {
+    case "discard_drawn":   return { x: -80, opacity: 0, scale: 0.88 }; // comes from drawn slot (left)
+    case "swap_hand":       return { y: 90,  opacity: 0, scale: 0.88 }; // displaced card rises from hand (below)
+    case "blind_swap":      return { y: 70,  opacity: 0, scale: 0.88 };
+    case "peek_and_swap":   return { y: 70,  opacity: 0, scale: 0.88 };
+    default:                return { scale: 0.72, opacity: 0 };
+  }
+}
 
 export function Center() {
   const game = useStore((s) => s.game!);
@@ -30,19 +53,18 @@ export function Center() {
           <div className="pile-label">Deck · {game.deck.length}</div>
         </button>
 
-        {/* ── Drawn card slot — fixed size so layout never jumps ── */}
+        {/* ── Drawn card slot ── */}
         <div className="drawn-slot">
-          <AnimatePresence mode="wait">
+          <AnimatePresence mode="popLayout">
             {drawn ? (
               <motion.div
                 key={drawn.id}
-                initial={{ y: -36, opacity: 0, scale: 0.85 }}
-                animate={{ y: 0, opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.85, transition: { duration: 0.18 } }}
-                transition={{ type: "spring", stiffness: 240, damping: 22 }}
+                initial={drawnInitial(game)}
+                animate={{ x: 0, y: 0, opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.85, transition: { duration: 0.15 } }}
+                transition={CARD_SPRING}
               >
-                {/* layoutId lets this card fly to/from hand or discard via shared-element */}
-                <CardView layoutId={drawn.id} card={drawn} faceUp={isHumanTurn} size="lg" />
+                <CardView card={drawn} faceUp={isHumanTurn} size="lg" />
               </motion.div>
             ) : (
               <motion.div
@@ -50,7 +72,7 @@ export function Center() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
+                transition={{ duration: 0.18 }}
               >
                 <div className="drawn-placeholder">Drawn card</div>
               </motion.div>
@@ -65,16 +87,15 @@ export function Center() {
           onClick={drawDiscard}
         >
           <div className="discard-card-area">
-            <AnimatePresence mode="wait">
+            <AnimatePresence mode="popLayout">
               {topDiscard ? (
                 <motion.div
                   key={topDiscard.id}
-                  initial={{ opacity: 0, scale: 0.82 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ type: "spring", stiffness: 260, damping: 22 }}
+                  initial={discardInitial(game)}
+                  animate={{ x: 0, y: 0, opacity: 1, scale: 1 }}
+                  transition={CARD_SPRING}
                 >
-                  {/* layoutId makes displaced hand cards fly into the discard pile */}
-                  <CardView layoutId={topDiscard.id} card={topDiscard} faceUp={true} size="md" />
+                  <CardView card={topDiscard} faceUp={true} size="md" />
                 </motion.div>
               ) : (
                 <motion.div

@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import { CardView } from "./Card";
 import type { PlayerState } from "../engine/types";
 import { useStore, PLAYER_COLORS } from "../state/store";
@@ -13,8 +14,10 @@ interface Props {
   tablePos?: TablePos;
 }
 
+/** Spring for card movement animations. */
+const CARD_SPRING = { type: "spring" as const, stiffness: 300, damping: 26 };
+
 export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: Props) {
-  // Card size by position: side players get smaller cards in a 2×2 grid
   const cardSize = isHuman ? "lg" : (tablePos === "left" || tablePos === "right") ? "sm" : "md";
   const game = useStore((s) => s.game!);
   const targeting = useStore((s) => s.targeting);
@@ -24,28 +27,20 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
   const reveals = game.reveals;
 
   const color = PLAYER_COLORS[seatIndex % PLAYER_COLORS.length];
+  const lastAnim = game.animations[game.animations.length - 1];
 
   function cardFaceUp(idx: number): { faceUp: boolean; card: typeof player.hand[number] | null } {
     const c = player.hand[idx];
     if (!c) return { faceUp: false, card: null };
-
-    // Round end: all face up
     if (game.phase === "round_over") return { faceUp: true, card: c };
-
-    // (Setup peek face-up display is now driven by reveals — see the next check.)
-
-    // Reveals targeting the human
     const r = reveals.find(
       (r) => r.playerId === player.id && r.index === idx && r.toPlayerIds.includes(humanId),
     );
     if (r) return { faceUp: true, card: r.card };
-
-    // Player's own cards they "know" — show subtle indicator only, not face
     return { faceUp: false, card: c };
   }
 
   function cardHighlight(idx: number) {
-    // During setup peek, the human can tap any unrevealed own card up to twice.
     if (game.phase === "setup_peek" && isHuman) {
       const peekedCount = player.knownToSelf.filter(Boolean).length;
       if (!player.knownToSelf[idx] && peekedCount < 2) return "selectable";
@@ -66,15 +61,10 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
   }
 
   function handleClick(idx: number) {
-    if (isHuman) {
-      clickOwnCard(idx);
-    } else {
-      clickOtherCard(player.id, idx);
-    }
+    if (isHuman) clickOwnCard(idx);
+    else clickOtherCard(player.id, idx);
   }
 
-  // Spy glow: show a pulsing glow on any card actively being peeked at
-  // (visible to ALL players so the target knows their card was spied on)
   function cardIsBeingSpied(idx: number): boolean {
     return reveals.some(
       (r) =>
@@ -82,6 +72,49 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
         r.index === idx &&
         (r.reason === "peek_other" || r.reason === "peek_and_swap"),
     );
+  }
+
+  /**
+   * Entrance animation for a card that just arrived in this slot.
+   * Called when key changes (meaning the card ID in this slot just changed).
+   */
+  function slotInitial(idx: number) {
+    if (!lastAnim) return {};
+
+    if (lastAnim.kind === "swap_hand") {
+      const p = lastAnim.payload as { playerId: string; handIndex: number };
+      // The card just swapped in from the drawn slot — drops in from above
+      if (p.playerId === player.id && p.handIndex === idx) {
+        return { y: -70, opacity: 0, scale: 0.88 };
+      }
+    }
+
+    if (lastAnim.kind === "blind_swap") {
+      const p = lastAnim.payload as {
+        fromPlayerId: string; fromIndex: number;
+        toPlayerId: string; toIndex: number;
+      };
+      // Card arrived from another player — slide in from their direction
+      if (p.toPlayerId === player.id && p.toIndex === idx) {
+        return tablePos === "bottom"
+          ? { y: -60, opacity: 0, scale: 0.88 }  // human receives: from above
+          : { y: 60,  opacity: 0, scale: 0.88 }; // opponent receives: from below
+      }
+    }
+
+    if (lastAnim.kind === "peek_and_swap") {
+      const p = lastAnim.payload as { didSwap: boolean; targetPlayerId: string; targetIndex: number };
+      if (p.didSwap) {
+        // Receiving card: slide in from opponent direction
+        if (p.targetPlayerId === player.id && p.targetIndex === idx) {
+          return tablePos === "bottom"
+            ? { y: -60, opacity: 0, scale: 0.88 }
+            : { y: 60,  opacity: 0, scale: 0.88 };
+        }
+      }
+    }
+
+    return {};
   }
 
   const known = player.knownToSelf;
@@ -106,18 +139,26 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
           const hl = cardHighlight(idx);
           const knownDot = isHuman && known[idx] && !faceUp;
           const spied = cardIsBeingSpied(idx);
+          const initial = slotInitial(idx);
+          const hasInitial = Object.keys(initial).length > 0;
           return (
-            <div className={`hand-slot${spied ? " spy-glow" : ""}`} key={c.id}>
+            <motion.div
+              className={`hand-slot${spied ? " spy-glow" : ""}`}
+              key={c.id}
+              initial={hasInitial ? initial : false}
+              animate={hasInitial ? { x: 0, y: 0, opacity: 1, scale: 1 } : undefined}
+              transition={CARD_SPRING}
+            >
               <CardView
-                layoutId={c.id}
                 card={card}
                 faceUp={faceUp}
                 highlight={hl}
                 onClick={() => handleClick(idx)}
                 size={cardSize}
+                layoutId={c.id}
               />
               {knownDot && <div className="known-dot" title="You've seen this card" />}
-            </div>
+            </motion.div>
           );
         })}
       </div>

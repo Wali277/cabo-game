@@ -94,7 +94,9 @@ export function CoinToss() {
         <p className="coin-toss-sub">
           {coinToss.phase === "choosing" && (coinToss.humanChoice
             ? "Waiting for the other player…"
-            : "Pick a side before time runs out!")}
+            : coinToss.countdownEndsAt
+            ? "Your turn — pick before time runs out!"
+            : "Pick a side!")}
           {coinToss.phase === "flipping" && "Tossing the coin…"}
           {coinToss.phase === "done" &&
             `${coinToss.result?.toUpperCase()} — ${winnerName} goes first!`}

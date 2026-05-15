@@ -16,7 +16,7 @@ export interface Room {
   lastStarterIdx: number;
   coinToss: {
     choices: { heads: string | null; tails: string | null };
-    startedAt: number;
+    startedAt: number | null; // null until first pick (that's when the 5s window opens)
     result: "heads" | "tails" | null;
   } | null;
 }
