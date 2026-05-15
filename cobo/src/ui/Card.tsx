@@ -106,10 +106,9 @@ function CardFace({ card, w, h }: { card?: CardT | null; w: number; h: number })
           color: faceColor,
         }}
       >
-        {/* Top-left corner: rank "J" + star suit marker */}
-        <div style={{ fontSize: w * 0.22, lineHeight: 1, fontWeight: 700 }}>
+        {/* Top-left corner: just the "J" — matches reference */}
+        <div style={{ fontSize: w * 0.26, lineHeight: 1, fontWeight: 800 }}>
           J
-          <div style={{ fontSize: w * 0.17, lineHeight: 1 }}>★</div>
         </div>
 
         {/* Centre: jester face */}
@@ -117,16 +116,15 @@ function CardFace({ card, w, h }: { card?: CardT | null; w: number; h: number })
           <JesterFace size={jesterSize} color={faceColor} />
         </div>
 
-        {/* Bottom-right corner: rotated */}
+        {/* Bottom-right corner: rotated "J" */}
         <div style={{
           alignSelf: "flex-end",
           transform: "rotate(180deg)",
-          fontSize: w * 0.22,
+          fontSize: w * 0.26,
           lineHeight: 1,
-          fontWeight: 700,
+          fontWeight: 800,
         }}>
           J
-          <div style={{ fontSize: w * 0.17, lineHeight: 1 }}>★</div>
         </div>
       </div>
     );
@@ -189,14 +187,20 @@ function CardFace({ card, w, h }: { card?: CardT | null; w: number; h: number })
 }
 
 /**
- * Inline SVG jester face:
- *   – Three rounded hat bells at the top
- *   – Hat body + brim
- *   – Round face (yellow "cutout" circle) with eyes and a smile
- *   – 8-point ruffled collar just below the face
+ * Inline SVG jester face — flat-icon style matching the reference design.
+ *
+ * Construction (drawn back-to-front so later elements layer on top):
+ *   1. Two side "horn" peaks that swoop outward and downward, each ending in
+ *      a bell circle (the floppy jester tendrils).
+ *   2. A balloon-shaped centre peak rising straight up, capped with a bell.
+ *   3. A rounded "cap" dome that ties the three peaks together over the head.
+ *   4. A yellow face circle that "punches out" the face area.
+ *   5. Two closed crescent-shaped smiling eyes.
+ *   6. A wide upturned smile.
+ *   7. A jagged 5-point downward-fanning collar at the chin.
  */
 function JesterFace({ size, color }: { size: number; color: string }) {
-  const bg = "#ffd86b"; // card background — used to punch out the face circle
+  const bg = "#ffd86b"; // card background — yellow cutout for face
   return (
     <svg
       viewBox="0 0 100 110"
@@ -204,41 +208,76 @@ function JesterFace({ size, color }: { size: number; color: string }) {
       height={size * 1.1}
       style={{ display: "block" }}
     >
-      {/* ── Hat bells (3 rounded peaks) ── */}
-      <circle cx="22" cy="20" r="11" fill={color} />
-      <circle cx="50" cy="9"  r="11" fill={color} />
-      <circle cx="78" cy="20" r="11" fill={color} />
+      {/* ── Left horn: sweeps up-and-out from cap, droops down to bell ── */}
+      <path
+        d="M 33 38 Q 4 30 12 58 Q 22 56 33 44 Z"
+        fill={color}
+      />
+      <circle cx="10" cy="58" r="5" fill={color} />
 
-      {/* Hat body — concave-topped trapezoid joining the three bells */}
-      <path d="M 11 29 Q 50 39 89 29 L 87 46 Q 50 53 13 46 Z" fill={color} />
+      {/* ── Right horn: mirror of left ── */}
+      <path
+        d="M 67 38 Q 96 30 88 58 Q 78 56 67 44 Z"
+        fill={color}
+      />
+      <circle cx="90" cy="58" r="5" fill={color} />
 
-      {/* Hat brim */}
-      <ellipse cx="50" cy="46" rx="39" ry="7" fill={color} />
+      {/* ── Centre balloon peak: bulbous teardrop pointing up ── */}
+      <path
+        d="M 42 34 C 36 22 38 6 50 4 C 62 6 64 22 58 34 Z"
+        fill={color}
+      />
+      <circle cx="50" cy="4" r="3.5" fill={color} />
 
-      {/* ── Ruffled collar — 8-pointed star drawn BEFORE the face so face sits on top ── */}
-      {/*
-        Center (50, 98), outer radius 11, inner radius 6, 8 points (16 polygon vertices).
-        The top tips of the star peek out from behind the face circle for the "ruffled" look.
-      */}
-      <polygon
-        points="50,87 52,93 58,90 56,96 61,98 56,100 58,106 52,104 50,109 48,104 42,106 44,100 39,98 44,96 42,90 48,93"
+      {/* ── Cap: rounded dome sitting over the top of the head ── */}
+      <path
+        d="M 28 40 Q 50 50 72 40 L 72 54 Q 50 60 28 54 Z"
         fill={color}
       />
 
-      {/* ── Face circle (yellow) — covers the collar centre, acts as the face ── */}
-      <circle cx="50" cy="71" r="20" fill={bg} />
+      {/* ── Face cutout: yellow circle revealing the face area ── */}
+      <circle cx="50" cy="64" r="14" fill={bg} />
 
-      {/* Eyes */}
-      <circle cx="42" cy="66" r="2.5" fill={color} />
-      <circle cx="58" cy="66" r="2.5" fill={color} />
-
-      {/* Smile arc */}
+      {/* ── Closed smiling eyes (crescent arcs) ── */}
       <path
-        d="M 41 75 Q 50 84 59 75"
+        d="M 42 61 Q 45 65 48 61"
         stroke={color}
-        strokeWidth="2.5"
+        strokeWidth="2.2"
         fill="none"
         strokeLinecap="round"
+      />
+      <path
+        d="M 52 61 Q 55 65 58 61"
+        stroke={color}
+        strokeWidth="2.2"
+        fill="none"
+        strokeLinecap="round"
+      />
+
+      {/* ── Wide upturned smile ── */}
+      <path
+        d="M 43 67 Q 50 74 57 67"
+        stroke={color}
+        strokeWidth="2.4"
+        fill="none"
+        strokeLinecap="round"
+      />
+
+      {/* ── Pointed collar: 5 sharp triangular points fanning downward ── */}
+      <path
+        d="M 40 78
+           L 30 95
+           L 39 92
+           L 35 104
+           L 45 99
+           L 50 107
+           L 55 99
+           L 65 104
+           L 61 92
+           L 70 95
+           L 60 78
+           Z"
+        fill={color}
       />
     </svg>
   );
