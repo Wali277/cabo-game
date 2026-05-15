@@ -118,17 +118,21 @@ export function LeftPanel() {
               🔄 {targeting === "swap_hand" ? "Pick a card to swap…" : "Swap into Hand"}
             </button>
 
-            {/* Only for action cards: use the ability */}
+            {/* Only for action cards: use the ability (with CSS tooltip) */}
             {drawnAction && actionMeta && (
-              <button
-                className="btn left-btn action-trigger-btn"
-                style={{ borderColor: actionMeta.color, color: actionMeta.color }}
-                title={actionMeta.desc}
-                disabled={game.drawnFrom === "discard"}
-                onClick={() => { Audio.playSfx("action_trigger"); discardAndTrigger(); }}
+              <div
+                className="left-tip-wrap"
+                data-tip={actionMeta.desc}
               >
-                {actionMeta.emoji} Use {actionMeta.label}
-              </button>
+                <button
+                  className="btn left-btn action-trigger-btn"
+                  style={{ borderColor: actionMeta.color, color: actionMeta.color }}
+                  disabled={game.drawnFrom === "discard"}
+                  onClick={() => { Audio.playSfx("action_trigger"); discardAndTrigger(); }}
+                >
+                  {actionMeta.emoji} Use {actionMeta.label}
+                </button>
+              </div>
             )}
 
             {/* Always: plain discard (never triggers action) */}
@@ -159,14 +163,15 @@ export function LeftPanel() {
         buttons = (
           <>
             {actionMeta && (
-              <button
-                className="btn left-btn action-trigger-btn"
-                style={{ borderColor: actionMeta.color, color: actionMeta.color }}
-                title={actionMeta.desc}
-                onClick={() => { Audio.playSfx("action_trigger"); useStore.getState().triggerAction(); }}
-              >
-                {actionMeta.emoji} Use {actionMeta.label}
-              </button>
+              <div className="left-tip-wrap" data-tip={actionMeta.desc}>
+                <button
+                  className="btn left-btn action-trigger-btn"
+                  style={{ borderColor: actionMeta.color, color: actionMeta.color }}
+                  onClick={() => { Audio.playSfx("action_trigger"); useStore.getState().triggerAction(); }}
+                >
+                  {actionMeta.emoji} Use {actionMeta.label}
+                </button>
+              </div>
             )}
             <button className="btn left-btn" onClick={() => useStore.getState().skipAction()}>
               🗑 Just Discard

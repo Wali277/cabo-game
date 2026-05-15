@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import type React from "react";
 import type { Card as CardT } from "../engine/types";
 
 interface Props {
@@ -82,60 +83,67 @@ function CardFace({ card, w, h }: { card?: CardT | null; w: number; h: number })
     );
   }
 
-  // Joker — same yellow/black card design, jester face SVG in centre
+  // Joker — yellow card, jester centre, "JOKER" in corners
   if (card.rank === "Joker") {
     const isRed = card.suit === "H" || card.suit === "D";
     const faceColor = isRed ? "#e23a5e" : "#1c1d2b";
-    const jesterSize = w * 0.48; // matches centre glyph size of other cards
+
+    // Font size chosen so 5 stacked letters fit within half the card height,
+    // leaving clean room at top and bottom. Absolute positioning means the
+    // jester sits in the true centre without being squeezed by the text.
+    const letterFs = w * 0.155;
+    const letterLh = 1.05;
+    const letterStyle: React.CSSProperties = {
+      fontSize: letterFs,
+      lineHeight: letterLh,
+      fontWeight: 900,
+      color: faceColor,
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "flex-start",
+      userSelect: "none",
+    };
+
+    // Jester fills ~56% of card width; truly centred via absolute + translate
+    const jesterSize = w * 0.56;
+
     return (
       <div
         className="card-face"
         style={{
-          width: w, height: h, position: "absolute", inset: 0,
+          width: w, height: h,
+          position: "absolute", inset: 0,
           backfaceVisibility: "hidden",
           background: "#ffd86b",
           borderRadius: 12,
           border: "3px solid #1c1d2b",
           boxShadow: "0 6px 18px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.5)",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "flex-start",   // pins corners to left; centre overrides with alignSelf
-          justifyContent: "space-between",
-          textAlign: "left",          // resets button UA text-align:center so corner text stays left
-          padding: "6px 8px",
           overflow: "hidden",
           fontFamily: "'Fredoka', 'Comic Sans MS', system-ui, sans-serif",
-          color: faceColor,
         }}
       >
-        {/* Top-left corner: vertical "JOKER" — letters stacked top-to-bottom */}
-        <div style={{
-          fontSize: w * 0.17,
-          lineHeight: 1.05,
-          fontWeight: 900,
-          letterSpacing: 0,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "flex-start",
-        }}>
+        {/* Top-left: JOKER stacked top → bottom */}
+        <div style={{ position: "absolute", top: 6, left: 8, ...letterStyle }}>
           {"JOKER".split("").map((ch, i) => <span key={i}>{ch}</span>)}
         </div>
 
-        {/* Centre: jester face */}
-        <div style={{ alignSelf: "center" }}>
+        {/* Centre: jester — absolutely positioned to always land dead-centre */}
+        <div style={{
+          position: "absolute",
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
+        }}>
           <JesterFace size={jesterSize} color={faceColor} />
         </div>
 
-        {/* Bottom-right corner: same column, rotated 180° — reads correctly when card is upside-down */}
+        {/* Bottom-right: JOKER rotated 180° — reads correctly when card is flipped */}
         <div style={{
-          alignSelf: "flex-end",
+          position: "absolute",
+          bottom: 6,
+          right: 8,
           transform: "rotate(180deg)",
-          fontSize: w * 0.17,
-          lineHeight: 1.05,
-          fontWeight: 900,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "flex-start",
+          ...letterStyle,
         }}>
           {"JOKER".split("").map((ch, i) => <span key={i}>{ch}</span>)}
         </div>

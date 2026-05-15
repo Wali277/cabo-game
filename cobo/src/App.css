@@ -343,8 +343,9 @@
   font-weight: 700 !important;
   position: relative;
   overflow: hidden;
+  width: 100%;
 }
-.action-trigger-btn::after {
+.action-trigger-btn::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -359,6 +360,55 @@
 .action-trigger-btn:disabled {
   opacity: 0.35;
   cursor: not-allowed;
+}
+
+/* ── Left-panel CSS tooltip wrapper ── */
+.left-tip-wrap {
+  position: relative;
+  width: 100%;
+}
+/* Tooltip bubble — appears to the RIGHT of the panel on hover */
+.left-tip-wrap::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: calc(100% + 12px);
+  top: 50%;
+  transform: translateY(-50%) translateX(4px);
+  background: #1c1d2b;
+  color: #f4ebff;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  padding: 8px 13px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(168,123,255,0.55);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  white-space: normal;
+  max-width: 220px;
+  width: max-content;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  z-index: 200;
+}
+/* Arrow pointing left toward the button */
+.left-tip-wrap::before {
+  content: "";
+  position: absolute;
+  left: calc(100% + 5px);
+  top: 50%;
+  transform: translateY(-50%) translateX(4px);
+  border: 6px solid transparent;
+  border-right-color: rgba(168,123,255,0.55);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  z-index: 201;
+}
+.left-tip-wrap:hover::after,
+.left-tip-wrap:hover::before {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
 }
 
 /* ========== Right Sidebar ========== */
@@ -438,9 +488,15 @@
   position: relative;
 }
 .pile.clickable { cursor: pointer; }
-.pile.clickable:hover .card-wrap { transform: translateY(-6px); }
-.pile.clickable .card-wrap {
-  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+/* Lift via CSS only on the wrapper that isn't inside a Framer Motion animation */
+.pile.clickable:hover > .discard-card-area,
+.pile.clickable:hover > .card-wrap {
+  transform: translateY(-5px);
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.pile.clickable > .discard-card-area,
+.pile.clickable > .card-wrap {
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 /* Soft pulsing glow around the deck/discard when interactable */
 .pile.clickable .card-wrap::after {
@@ -512,11 +568,23 @@
 }
 
 .drawn-slot {
-  min-width: 130px;
-  min-height: 170px;
+  /* Fixed size — never expands during card animations */
+  width: 130px;
+  height: 170px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
+}
+/* Wrapper inside discard pile button for AnimatePresence */
+.discard-card-area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 116px;
+  position: relative;
 }
 .drawn-placeholder {
   color: rgba(255,255,255,0.7);
