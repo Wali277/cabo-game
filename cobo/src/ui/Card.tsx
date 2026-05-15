@@ -101,6 +101,7 @@ function CardFace({ card, w, h }: { card?: CardT | null; w: number; h: number })
           flexDirection: "column",
           alignItems: "flex-start",   // pins corners to left; centre overrides with alignSelf
           justifyContent: "space-between",
+          textAlign: "left",          // resets button UA text-align:center so corner text stays left
           padding: "6px 8px",
           overflow: "hidden",
           fontFamily: "'Fredoka', 'Comic Sans MS', system-ui, sans-serif",
@@ -155,6 +156,7 @@ function CardFace({ card, w, h }: { card?: CardT | null; w: number; h: number })
         flexDirection: "column",
         alignItems: "flex-start",   // pins top-left corner to left; centre/bottom override with alignSelf
         justifyContent: "space-between",
+        textAlign: "left",          // resets button UA text-align:center so corner text stays left
         padding: "6px 8px",
         overflow: "hidden",
         fontFamily: "'Fredoka', 'Comic Sans MS', system-ui, sans-serif",
