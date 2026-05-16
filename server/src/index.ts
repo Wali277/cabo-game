@@ -46,6 +46,8 @@ const readyTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const coinTossTimers = new Map<string, ReturnType<typeof setTimeout>>();
 // Per-room timers for the setup_peek → start_play collective ready-up.
 const roundReadyTimers = new Map<string, ReturnType<typeof setTimeout>>();
+// Per-room timers for the straw-draw fallback (10s after first pick).
+const strawDrawTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 function startRoomGame(roomCode: string) {
   const room = rooms.get(roomCode);
@@ -60,11 +62,63 @@ function startRoomGame(roomCode: string) {
   room.lastStarterIdx = startIdx;
   if (players.length === 2) {
     room.coinToss = { choices: { heads: null, tails: null }, startedAt: null, result: null };
+    room.strawDraw = null;
   } else {
     room.coinToss = null;
+    // Build N straws with lengths 0..N-1, then shuffle so positions are random.
+    const lengths = Array.from({ length: players.length }, (_, i) => i);
+    for (let i = lengths.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [lengths[i], lengths[j]] = [lengths[j], lengths[i]];
+    }
+    room.strawDraw = {
+      straws: lengths.map((length) => ({ length, ownerId: null, revealed: false })),
+      startedAt: null,
+      result: null,
+    };
   }
   room.readyVotes = [];
   room.readyStartedAt = null;
+  broadcastRoom(roomCode);
+}
+
+// Finalise a straw draw: assign any unclaimed straws to players who didn't
+// pick, compute the turn order from straw lengths (longest = first), and
+// update game.currentPlayer accordingly.
+function finalizeStrawDraw(roomCode: string) {
+  const r = rooms.get(roomCode);
+  if (!r || !r.game || !r.strawDraw || r.strawDraw.result) return;
+  const sd = r.strawDraw;
+  // Players who haven't yet been assigned a straw
+  const assignedIds = new Set(sd.straws.map((s) => s.ownerId).filter(Boolean) as string[]);
+  const remainingPlayers = r.game.players
+    .map((p) => p.id)
+    .filter((id) => !assignedIds.has(id));
+  // Straws still unclaimed, randomised
+  const remainingStrawIdxs = sd.straws
+    .map((s, i) => ({ s, i }))
+    .filter(({ s }) => s.ownerId === null)
+    .map(({ i }) => i)
+    .sort(() => Math.random() - 0.5);
+  for (let k = 0; k < Math.min(remainingPlayers.length, remainingStrawIdxs.length); k++) {
+    sd.straws[remainingStrawIdxs[k]].ownerId = remainingPlayers[k];
+  }
+  // Determine turn order: longest straw (highest length value) plays first.
+  const order = [...sd.straws]
+    .map((s, i) => ({ s, i }))
+    .filter(({ s }) => s.ownerId !== null)
+    .sort((a, b) => b.s.length - a.s.length)
+    .map(({ s }) => s.ownerId as string);
+  sd.result = order;
+  // Mark all straws as revealed for the reveal animation
+  sd.straws.forEach((s) => { s.revealed = true; });
+  // Set the game's currentPlayer to the first in the new order
+  const firstIdx = r.game.players.findIndex((p) => p.id === order[0]);
+  if (firstIdx >= 0) {
+    r.game.currentPlayer = firstIdx;
+    r.lastStarterIdx = firstIdx;
+  }
+  strawDrawTimers.delete(roomCode);
   broadcastRoom(roomCode);
 }
 
@@ -128,6 +182,7 @@ function publicView(room: ReturnType<Rooms["get"]> & {}, viewerId: string) {
     })),
     game: room.game,
     coinToss: room.coinToss,
+    strawDraw: room.strawDraw,
     playAgainVotes: room.playAgainVotes,
     disconnects,
     readyVotes: room.readyVotes,
@@ -343,6 +398,41 @@ io.on("connection", (socket) => {
     broadcastRoom(bound.roomCode);
   });
 
+  socket.on("room:straw_pick", ({ index }: { index: number }, cb) => {
+    if (!bound) return cb?.({ ok: false });
+    const room = rooms.get(bound.roomCode);
+    if (!room || !room.strawDraw || !room.game) return cb?.({ ok: false, error: "No straw draw" });
+    const sd = room.strawDraw;
+    if (sd.result) return cb?.({ ok: false, error: "Already drawn" });
+    if (index < 0 || index >= sd.straws.length) return cb?.({ ok: false, error: "Bad index" });
+    const straw = sd.straws[index];
+    if (straw.ownerId) return cb?.({ ok: false, error: "Straw already taken" });
+    // A player gets only one straw — silently no-op if they pick a second time.
+    if (sd.straws.some((s) => s.ownerId === bound!.playerId)) return cb?.({ ok: false, error: "Already picked" });
+
+    straw.ownerId = bound.playerId;
+
+    if (!sd.startedAt) {
+      sd.startedAt = Date.now();
+      // Start the 10s window for everyone else
+      const localCode = bound.roomCode;
+      const existing = strawDrawTimers.get(localCode);
+      if (existing) clearTimeout(existing);
+      const timerId = setTimeout(() => finalizeStrawDraw(localCode), 10_000);
+      strawDrawTimers.set(localCode, timerId);
+    }
+
+    // If every straw is now claimed, finalise immediately.
+    if (sd.straws.every((s) => s.ownerId !== null)) {
+      finalizeStrawDraw(bound.roomCode);
+      cb?.({ ok: true });
+      return;
+    }
+
+    cb?.({ ok: true });
+    broadcastRoom(bound.roomCode);
+  });
+
   socket.on("room:play_again", (_payload, cb) => {
     if (!bound) return cb({ ok: false, error: "Not in a room" });
     const room = rooms.get(bound.roomCode);
@@ -381,6 +471,7 @@ io.on("connection", (socket) => {
     room.game.currentPlayer = nextStarter;
     room.lastStarterIdx = nextStarter;
     room.coinToss = null;
+    room.strawDraw = null; // No straw draw from round 2 onward — alternation handles order.
     room.playAgainVotes = [];
     room.readyVotes = [];
     room.readyStartedAt = null;
@@ -442,6 +533,21 @@ io.on("connection", (socket) => {
     room.game = next;
     cb?.({ ok: true });
     broadcastRoom(bound.roomCode);
+  });
+
+  // Chat: ephemeral broadcast — no server-side persistence. Messages exist
+  // only in connected clients' memory, and only while the room exists.
+  socket.on("room:chat", ({ text }: { text: string }, cb) => {
+    if (!bound) return cb?.({ ok: false });
+    const room = rooms.get(bound.roomCode);
+    if (!room) return cb?.({ ok: false });
+    const member = room.members.find((m) => m.playerId === bound!.playerId);
+    if (!member) return cb?.({ ok: false });
+    const trimmed = String(text ?? "").slice(0, 200).trim();
+    if (!trimmed) return cb?.({ ok: false });
+    const msg = { from: bound.playerId, name: member.name, text: trimmed, at: Date.now() };
+    io.to(bound.roomCode).emit("chat:message", msg);
+    cb?.({ ok: true });
   });
 
   // The client calls this when the local player explicitly leaves the room

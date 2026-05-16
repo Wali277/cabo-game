@@ -19,6 +19,13 @@ export interface Room {
     startedAt: number | null; // null until first pick (that's when the 5s window opens)
     result: "heads" | "tails" | null;
   } | null;
+  // Used for 3+ player games instead of coinToss. Each player picks one straw;
+  // the shortest = goes last, the longest = goes first.
+  strawDraw: {
+    straws: { length: number; ownerId: string | null; revealed: boolean }[];
+    startedAt: number | null; // null until first pick
+    result: string[] | null; // player ids in turn order (first → last)
+  } | null;
   playAgainVotes: string[];
   disconnects: Record<string, { startedAt: number; forfeited: boolean }>;
   // Ready-up system: first player to click arms a 10s timer; second click starts immediately.
@@ -64,6 +71,7 @@ export class Rooms {
       createdAt: Date.now(),
       lastStarterIdx: 0,
       coinToss: null,
+      strawDraw: null,
       playAgainVotes: [],
       disconnects: {},
       readyVotes: [],

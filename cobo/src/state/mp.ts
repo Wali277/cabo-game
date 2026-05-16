@@ -33,6 +33,9 @@ export function getSocket(): Socket {
     socket.on("room:state", (state) => {
       useStore.getState().applyMpRoom(state);
     });
+    socket.on("chat:message", (msg: { from: string; name: string; text: string; at: number }) => {
+      useStore.getState().receiveChatMessage(msg);
+    });
     socket.on("connect", () => {
       const sess = loadSession();
       if (sess) {
@@ -170,6 +173,16 @@ export function sendCoinTossPick(side: "heads" | "tails") {
   getSocket().emit("room:coin_toss_pick", { side });
 }
 
+export function sendStrawPick(index: number) {
+  return new Promise<any>((resolve) =>
+    getSocket().emit("room:straw_pick", { index }, resolve),
+  );
+}
+
 export function sendReady() {
   return new Promise<any>((resolve) => getSocket().emit("room:ready", {}, resolve));
+}
+
+export function sendChat(text: string) {
+  return new Promise<any>((resolve) => getSocket().emit("room:chat", { text }, resolve));
 }

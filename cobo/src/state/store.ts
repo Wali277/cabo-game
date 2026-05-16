@@ -22,8 +22,16 @@ import {
   trainingInjectCard as engineTrainingInject,
   triggerPendingAction,
 } from "../engine/game";
+import { Audio } from "../audio/sounds";
 
-export type Screen = "menu" | "lobby" | "coin_toss" | "game" | "scoring";
+export type Screen = "menu" | "lobby" | "coin_toss" | "straw_draw" | "game" | "scoring";
+
+export interface ChatMessage {
+  from: string;
+  name: string;
+  text: string;
+  at: number;
+}
 export type GameMode = "sp" | "mp";
 
 export type CoinSide = "heads" | "tails";
@@ -60,6 +68,11 @@ export interface MpRoom {
   readyStartedAt: number | null;
   roundReadyVotes: string[];
   roundReadyStartedAt: number | null;
+  strawDraw: {
+    straws: { length: number; ownerId: string | null; revealed: boolean }[];
+    startedAt: number | null;
+    result: string[] | null;
+  } | null;
 }
 
 export type ActionTargetingMode =
@@ -86,6 +99,9 @@ interface StoreState {
   pendingBlindSwapOwnIndex: number | null;
   toast: string | null;
   pendingPeekOverlay: { playerId: string; index: number; rank: string; suit: string } | null;
+  chatMessages: ChatMessage[];
+  chatOpen: boolean;
+  chatUnread: number;
   init: (numBots: number) => void;
   trainInit: () => void;
   trainingInjectCard: (card: Card) => void;
@@ -116,6 +132,10 @@ interface StoreState {
   leaveRoomToLobby: () => void;
   enterLobby: () => void;
   applyMpRoom: (room: MpRoom) => void;
+  proceedFromStrawDraw: () => void;
+  receiveChatMessage: (msg: ChatMessage) => void;
+  setChatOpen: (open: boolean) => void;
+  clearChat: () => void;
 }
 
 const PLAYER_COLORS = ["#ff5b6e", "#ffd86b", "#67e0a3", "#7aa8ff"];
@@ -146,6 +166,9 @@ export const useStore = create<StoreState>((set, get) => ({
   pendingBlindSwapOwnIndex: null,
   toast: null,
   pendingPeekOverlay: null,
+  chatMessages: [],
+  chatOpen: false,
+  chatUnread: 0,
 
   init(numBots) {
     const game = newGame({ players: makePlayers(numBots) });
@@ -279,14 +302,15 @@ export const useStore = create<StoreState>((set, get) => ({
       !!room.game &&
       !prev.game &&
       prev.screen !== "game" &&
-      prev.screen !== "coin_toss";
+      prev.screen !== "coin_toss" &&
+      prev.screen !== "straw_draw";
 
     if (freshGameStart && room.game) {
       const playerCount = room.game.players.length;
 
-      // Only show the interactive coin toss for 2-player games where
-      // the server sends a coinToss object AND the result hasn't been decided yet
-      // (result is set means the toss already happened — e.g. rejoining mid-game).
+      // 2 players → interactive coin toss (when not yet resolved).
+      // 3+ players → interactive straw draw (when not yet resolved).
+      // Otherwise (rejoining mid-game) → straight to game.
       if (playerCount === 2 && room.coinToss && !room.coinToss.result) {
         set({
           mp: room,
@@ -306,6 +330,17 @@ export const useStore = create<StoreState>((set, get) => ({
           targeting: null,
           setupPeekRevealed: false,
         });
+      } else if (playerCount >= 3 && room.strawDraw && !room.strawDraw.result) {
+        set({
+          mp: room,
+          humanId: room.viewerId,
+          mode: "mp",
+          game: null,
+          pendingGame: room.game,
+          screen: "straw_draw",
+          targeting: null,
+          setupPeekRevealed: false,
+        });
       } else {
         set({
           mp: room,
@@ -317,6 +352,12 @@ export const useStore = create<StoreState>((set, get) => ({
           setupPeekRevealed: false,
         });
       }
+      return;
+    }
+
+    // Live straw-draw updates: someone picked, or the result just arrived.
+    if (prev.screen === "straw_draw" && room.strawDraw) {
+      set({ mp: room });
       return;
     }
 
@@ -687,6 +728,7 @@ export const useStore = create<StoreState>((set, get) => ({
       screen: "menu", mode: "sp", training: false, mp: null,
       game: null, pendingGame: null, coinToss: null,
       targeting: null, toast: null,
+      chatMessages: [], chatOpen: false, chatUnread: 0,
     });
   },
 
@@ -697,6 +739,37 @@ export const useStore = create<StoreState>((set, get) => ({
     set({
       screen: "lobby", mode: "mp", mp: null,
       game: null, targeting: null, toast: null,
+      chatMessages: [], chatOpen: false, chatUnread: 0,
+    });
+  },
+
+  receiveChatMessage(msg) {
+    const { chatMessages, chatOpen, humanId } = get();
+    const next = [...chatMessages, msg].slice(-100);
+    const isMine = msg.from === humanId;
+    set({
+      chatMessages: next,
+      chatUnread: isMine || chatOpen ? get().chatUnread : get().chatUnread + 1,
+    });
+    if (!isMine) Audio.playSfx("chat");
+  },
+
+  setChatOpen(open) {
+    set({ chatOpen: open, chatUnread: open ? 0 : get().chatUnread });
+  },
+
+  clearChat() {
+    set({ chatMessages: [], chatOpen: false, chatUnread: 0 });
+  },
+  proceedFromStrawDraw() {
+    const st = get();
+    if (st.screen !== "straw_draw") return;
+    set({
+      game: st.mp?.game ?? null,
+      pendingGame: null,
+      screen: "game",
+      targeting: null,
+      setupPeekRevealed: false,
     });
   },
 }));

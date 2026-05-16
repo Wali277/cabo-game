@@ -28,7 +28,10 @@ export type SfxName =
   | "coin_land"
   | "action_trigger"
   | "rejoin"
-  | "leave";
+  | "leave"
+  | "chat"
+  | "straw_pick"
+  | "straw_reveal";
 
 interface AudioSettings {
   musicVol: number;       // 0-1
@@ -250,6 +253,20 @@ class AudioEngine {
         // Soft descending two-tone "someone left" cue
         this.tone(now,       523, 0.12, "sine", 0.18);
         this.tone(now + 0.1, 392, 0.22, "sine", 0.18);
+        break;
+      case "chat":
+        // Soft "ping" — single short bell, friendly notification
+        this.tone(now, 880, 0.06, "sine", 0.16);
+        this.tone(now + 0.06, 1320, 0.14, "sine", 0.14);
+        break;
+      case "straw_pick":
+        // Light wooden tick when a player claims a straw
+        this.tone(now, 660, 0.05, "square", 0.12);
+        break;
+      case "straw_reveal":
+        // Whoosh-into-bell for the reveal animation
+        this.sweep(now, 300, 900, 0.35, "triangle", 0.18);
+        this.bell(now + 0.3, 587, 0.8, 0.22);
         break;
     }
   }

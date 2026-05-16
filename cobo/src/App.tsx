@@ -5,7 +5,9 @@ import { Menu } from "./ui/Menu";
 import { Table } from "./ui/Table";
 import { Lobby } from "./ui/Lobby";
 import { CoinToss } from "./ui/CoinToss";
+import { StrawDraw } from "./ui/StrawDraw";
 import { AudioControls } from "./ui/AudioControls";
+import { ChatPanel } from "./ui/ChatPanel";
 import { getSocket } from "./state/mp";
 
 function getRoomFromPath(): string | null {
@@ -37,8 +39,10 @@ function App() {
       {screen === "menu" && <Menu />}
       {screen === "lobby" && <Lobby initialCode={initialRoom ?? undefined} />}
       {screen === "coin_toss" && <CoinToss />}
+      {screen === "straw_draw" && <StrawDraw />}
       {screen === "game" && <Table />}
       <AudioControls />
+      <ChatPanel />
     </>
   );
 }
