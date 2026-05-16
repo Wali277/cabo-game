@@ -56,6 +56,8 @@ export interface MpRoom {
   } | null;
   playAgainVotes: string[];
   disconnects: Record<string, { startedAt: number; forfeited: boolean }>;
+  readyVotes: string[];
+  readyStartedAt: number | null;
 }
 
 export type ActionTargetingMode =
@@ -281,8 +283,9 @@ export const useStore = create<StoreState>((set, get) => ({
       const playerCount = room.game.players.length;
 
       // Only show the interactive coin toss for 2-player games where
-      // the server sends a coinToss object. For 3+ players, jump straight in.
-      if (playerCount === 2 && room.coinToss) {
+      // the server sends a coinToss object AND the result hasn't been decided yet
+      // (result is set means the toss already happened — e.g. rejoining mid-game).
+      if (playerCount === 2 && room.coinToss && !room.coinToss.result) {
         set({
           mp: room,
           humanId: room.viewerId,

@@ -37,6 +37,31 @@ const io = new Server(server, { cors: { origin: "*" } });
 
 const rooms = new Rooms();
 
+// Per-room timers for the ready-up countdown. Stored outside the Room so they
+// aren't serialised and can be properly cancelled on early start or room cleanup.
+const readyTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function startRoomGame(roomCode: string) {
+  const room = rooms.get(roomCode);
+  if (!room || room.game || room.members.length < 2) return;
+  const timerId = readyTimers.get(roomCode);
+  if (timerId) clearTimeout(timerId);
+  readyTimers.delete(roomCode);
+  const players = room.members.map((m) => ({ id: m.playerId, name: m.name, isBot: false }));
+  room.game = newGame({ players });
+  const startIdx = Math.floor(Math.random() * players.length);
+  room.game.currentPlayer = startIdx;
+  room.lastStarterIdx = startIdx;
+  if (players.length === 2) {
+    room.coinToss = { choices: { heads: null, tails: null }, startedAt: null, result: null };
+  } else {
+    room.coinToss = null;
+  }
+  room.readyVotes = [];
+  room.readyStartedAt = null;
+  broadcastRoom(roomCode);
+}
+
 app.get("/health", (_req, res) => res.json({ ok: true }));
 app.get("/rooms", (_req, res) =>
   res.json({ count: rooms.size(), rooms: rooms.list() })
@@ -99,6 +124,8 @@ function publicView(room: ReturnType<Rooms["get"]> & {}, viewerId: string) {
     coinToss: room.coinToss,
     playAgainVotes: room.playAgainVotes,
     disconnects,
+    readyVotes: room.readyVotes,
+    readyStartedAt: room.readyStartedAt,
   };
 }
 
@@ -213,10 +240,6 @@ io.on("connection", (socket) => {
     if (!room) return cb({ ok: false, error: "Room not found" });
     const member = room.members.find((m) => m.playerId === playerId);
     if (!member) return cb({ ok: false, error: "Not a member" });
-    // If we'd already marked them forfeited, the seat is closed; don't restore.
-    if (room.disconnects[playerId]?.forfeited) {
-      return cb({ ok: false, error: "You forfeited this match" });
-    }
     member.socketId = socket.id;
     member.connected = true;
     // Clear any in-progress disconnect timer for this player
@@ -231,24 +254,35 @@ io.on("connection", (socket) => {
     if (!bound) return cb({ ok: false, error: "Not in a room" });
     const room = rooms.get(bound.roomCode);
     if (!room) return cb({ ok: false, error: "Room not found" });
-    if (room.hostId !== bound.playerId) return cb({ ok: false, error: "Only host can start" });
     if (room.members.length < 2) return cb({ ok: false, error: "Need at least 2 players" });
     if (room.game) return cb({ ok: false, error: "Already started" });
-    const players = room.members.map((m) => ({ id: m.playerId, name: m.name, isBot: false }));
-    room.game = newGame({ players });
-    // Randomise who goes first; track for subsequent round alternation
-    const startIdx = Math.floor(Math.random() * players.length);
-    room.game.currentPlayer = startIdx;
-    room.lastStarterIdx = startIdx;
-    // For 2-player games, initialise coin-toss choice tracking.
-    // startedAt stays null until the first player picks — that's when the 5s window opens.
-    if (players.length === 2) {
-      room.coinToss = { choices: { heads: null, tails: null }, startedAt: null, result: null };
-    } else {
-      room.coinToss = null;
-    }
+    startRoomGame(bound.roomCode);
     cb({ ok: true });
-    broadcastRoom(bound.roomCode);
+  });
+
+  socket.on("room:ready", (_payload, cb) => {
+    if (!bound) return cb?.({ ok: false });
+    const room = rooms.get(bound.roomCode);
+    if (!room || room.game) return cb?.({ ok: false, error: "Already started" });
+    if (room.members.length < 2) return cb?.({ ok: false, error: "Need at least 2 players" });
+
+    if (!room.readyVotes.includes(bound.playerId)) {
+      room.readyVotes.push(bound.playerId);
+    }
+
+    if (!room.readyStartedAt) {
+      // First player to click — arm the 10s countdown.
+      room.readyStartedAt = Date.now();
+      const localCode = bound.roomCode;
+      const timerId = setTimeout(() => { startRoomGame(localCode); }, 10_000);
+      readyTimers.set(bound.roomCode, timerId);
+      cb?.({ ok: true });
+      broadcastRoom(bound.roomCode);
+    } else {
+      // A second player clicked (or timer already running) — start immediately.
+      startRoomGame(bound.roomCode);
+      cb?.({ ok: true });
+    }
   });
 
   socket.on("room:coin_toss_pick", ({ side }: { side: "heads" | "tails" }, cb) => {
@@ -309,8 +343,10 @@ io.on("connection", (socket) => {
     });
     room.game.currentPlayer = nextStarter;
     room.lastStarterIdx = nextStarter;
-    room.coinToss = null; // No coin toss from round 2 onward
-    room.playAgainVotes = []; // reset for next round
+    room.coinToss = null;
+    room.playAgainVotes = [];
+    room.readyVotes = [];
+    room.readyStartedAt = null;
     cb({ ok: true });
     broadcastRoom(bound.roomCode);
   });

@@ -6,7 +6,7 @@ import { Table } from "./ui/Table";
 import { Lobby } from "./ui/Lobby";
 import { CoinToss } from "./ui/CoinToss";
 import { AudioControls } from "./ui/AudioControls";
-import { getSocket, loadSession } from "./state/mp";
+import { getSocket } from "./state/mp";
 
 function getRoomFromPath(): string | null {
   const m = window.location.pathname.match(/\/room\/([A-Za-z0-9]{4,8})/);
@@ -21,9 +21,10 @@ function App() {
 
   useEffect(() => {
     const room = getRoomFromPath();
-    const sess = loadSession();
-    if (room || sess) {
-      // Open the socket; if we have an existing session it will auto-rejoin
+    if (room) {
+      // A room code in the URL means the player followed a share link or is
+      // refreshing mid-game. Open the socket (which auto-rejoins via the stored
+      // session if one exists) and navigate to the lobby/room screen.
       getSocket();
       enterLobby();
     }

@@ -169,3 +169,7 @@ export function leaveRoom() {
 export function sendCoinTossPick(side: "heads" | "tails") {
   getSocket().emit("room:coin_toss_pick", { side });
 }
+
+export function sendReady() {
+  return new Promise<any>((resolve) => getSocket().emit("room:ready", {}, resolve));
+}

@@ -19,12 +19,11 @@ export interface Room {
     startedAt: number | null; // null until first pick (that's when the 5s window opens)
     result: "heads" | "tails" | null;
   } | null;
-  // Set of playerIds that have voted to play again from the current round_over state.
-  // Cleared whenever a fresh round actually starts.
   playAgainVotes: string[];
-  // Per-player disconnect tracking — when a member is disconnected mid-game we
-  // start a forfeit countdown. If they don't return within 20s we forfeit them.
   disconnects: Record<string, { startedAt: number; forfeited: boolean }>;
+  // Ready-up system: first player to click arms a 10s timer; second click starts immediately.
+  readyVotes: string[];
+  readyStartedAt: number | null;
 }
 
 function randomCode(): string {
@@ -64,6 +63,8 @@ export class Rooms {
       coinToss: null,
       playAgainVotes: [],
       disconnects: {},
+      readyVotes: [],
+      readyStartedAt: null,
     };
     this.map.set(code, room);
     return room;

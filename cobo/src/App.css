@@ -131,6 +131,7 @@
 .badge { font-size: 10px; padding: 2px 6px; border-radius: 6px; font-weight: 900; letter-spacing: 1px; }
 .badge.host { background: #ffd86b; color: #1c1d2b; }
 .badge.off { background: #1c1d2b; color: #ff5b6e; }
+.badge.ready { background: #67e0a3; color: #0d1638; }
 .divider {
   display: flex;
   align-items: center;
@@ -950,6 +951,42 @@
   border-radius: 16px;
   border: 4px solid #fff;
   box-shadow: 0 6px 0 #c98e00, 0 14px 30px rgba(0,0,0,0.2);
+}
+
+/* ========== Ready-up system ========== */
+.ready-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ready-notice {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1c1d2b;
+  background: rgba(103, 224, 163, 0.18);
+  border: 1.5px solid #67e0a3;
+  border-radius: 10px;
+  padding: 8px 12px;
+  text-align: center;
+}
+.ready-timer {
+  color: #228a5b;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+.ready-waiting {
+  font-size: 14px;
+  font-weight: 600;
+  color: #555;
+  text-align: center;
+  padding: 8px 0;
+}
+.ready-pulse {
+  animation: readyPulse 1.4s ease-in-out infinite;
+}
+@keyframes readyPulse {
+  0%, 100% { box-shadow: 0 4px 0 #1a1a4a, 0 0 0 0 rgba(103, 224, 163, 0.6); }
+  50% { box-shadow: 0 5px 0 #1a1a4a, 0 0 0 12px rgba(103, 224, 163, 0); }
 }
 
 /* ========== Play Again — rematch request ========== */
