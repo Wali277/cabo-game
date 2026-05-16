@@ -1035,6 +1035,10 @@
 }
 .mp-notice-close:hover { background: rgba(255, 91, 110, 0.2); }
 
+/* Green "player returned" variant — stacks below the leave notice. */
+.mp-notice-success { border-color: #67e0a3; top: auto; bottom: 14px; }
+.mp-notice-success .mp-notice-title { color: #67e0a3; }
+
 /* ========== Forfeit victory overlay ========== */
 .forfeit-modal .modal-burst { color: #ffd86b; }
 

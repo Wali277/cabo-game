@@ -109,32 +109,45 @@ export function Table() {
         }
         break;
       }
-      case "round_end": {
-        // Determine if the human won; play win or lose
-        const winnerId = (latest.payload as any).winnerId as string | undefined;
-        Audio.playSfx(winnerId === humanId ? "win" : "lose");
+      case "round_end":
+        // Win/lose SFX is played by RoundEndOverlay on mount so it fires even
+        // when this animation is consumed before a player reconnects.
         break;
-      }
     }
     if (msg) setToast(msg);
     const t = setTimeout(() => consumeAnimations(), 500);
     return () => clearTimeout(t);
   }, [game.animations]);
 
-  // Assign opponents to table positions based on count
-  // 1 opp → top | 2 opps → top + right | 3 opps → top + left + right
-  const others = game.players.filter((p) => p.id !== humanId);
+  // POV rotation: each viewer sees themselves at the bottom. The other players
+  // are arranged in turn-order, starting with the player who plays next.
+  //  - next player (1 ahead) → top
+  //  - 2 ahead             → right
+  //  - 3 ahead (previous)  → left
+  // This keeps each player's view consistent (the same opponent appears in the
+  // same relative position from every viewer's POV).
   const humanIdx = game.players.findIndex((p) => p.id === humanId);
   const human = game.players[humanIdx];
+  const playerCount = game.players.length;
+
+  const sortedOthers = game.players
+    .filter((p) => p.id !== humanId)
+    .map((p) => ({
+      player: p,
+      dist:
+        (game.players.findIndex((pp) => pp.id === p.id) - humanIdx + playerCount) %
+        playerCount,
+    }))
+    .sort((a, b) => a.dist - b.dist)
+    .map((x) => x.player);
 
   type SlotName = "top" | "left" | "right";
-  const slotOrder: SlotName[] =
-    others.length === 1 ? ["top"] :
-    others.length === 2 ? ["top", "right"] :
-    ["top", "left", "right"];
-
-  const slotMap: Partial<Record<SlotName, typeof others[0]>> = {};
-  others.forEach((p, i) => { slotMap[slotOrder[i]] = p; });
+  const slotByIndex: SlotName[] = ["top", "right", "left"];
+  const slotMap: Partial<Record<SlotName, (typeof game.players)[number]>> = {};
+  sortedOthers.forEach((p, i) => {
+    const slot = slotByIndex[i];
+    if (slot) slotMap[slot] = p;
+  });
 
   const training = useStore((s) => s.training);
   const backToMenu = useStore((s) => s.backToMenu);
@@ -144,7 +157,7 @@ export function Table() {
     if (ok) backToMenu();
   }
 
-  function seatFor(p: typeof others[0]) {
+  function seatFor(p: (typeof game.players)[number]) {
     return game.players.findIndex((pp) => pp.id === p.id);
   }
 

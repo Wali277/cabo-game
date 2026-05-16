@@ -1,5 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
+import { useEffect, useRef } from "react";
 import { useStore } from "../state/store";
+import { Audio } from "../audio/sounds";
 
 export function Scoreboard() {
   const game = useStore((s) => s.game!);
@@ -66,6 +68,16 @@ export function RoundEndOverlay() {
   const humanId = useStore((s) => s.humanId);
   const playAgain = useStore((s) => s.playAgain);
   const backToMenu = useStore((s) => s.backToMenu);
+
+  // Play the win/lose SFX once per round end. Keyed on roundNumber so a fresh
+  // round triggers a fresh sound, and reconnecting mid-overlay still plays it.
+  const playedFor = useRef<number | null>(null);
+  useEffect(() => {
+    if (game.phase !== "round_over") return;
+    if (playedFor.current === game.roundNumber) return;
+    playedFor.current = game.roundNumber;
+    Audio.playSfx(game.winnerId === humanId ? "win" : "lose");
+  }, [game.phase, game.roundNumber, game.winnerId, humanId]);
 
   if (game.phase !== "round_over") return null;
   const rows = game.players.map((p) => ({

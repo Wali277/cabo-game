@@ -358,6 +358,9 @@ io.on("connection", (socket) => {
     const activeIds = room.members
       .map((m) => m.playerId)
       .filter((pid) => !room.disconnects[pid]?.forfeited);
+    if (activeIds.length < 2) {
+      return cb({ ok: false, error: "Not enough active players for a rematch" });
+    }
     const allVoted = activeIds.every((pid) => room.playAgainVotes.includes(pid));
 
     if (!allVoted) {

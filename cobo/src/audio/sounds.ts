@@ -26,7 +26,9 @@ export type SfxName =
   | "lose"
   | "coin_flip"
   | "coin_land"
-  | "action_trigger";
+  | "action_trigger"
+  | "rejoin"
+  | "leave";
 
 interface AudioSettings {
   musicVol: number;       // 0-1
@@ -237,6 +239,17 @@ class AudioEngine {
       case "action_trigger":
         this.tone(now,        523, 0.1, "triangle", 0.22);
         this.tone(now + 0.08, 784, 0.18, "triangle", 0.22);
+        break;
+      case "rejoin":
+        // Quick rising 3-note "they're back" cue
+        this.tone(now,        587, 0.08, "triangle", 0.2);
+        this.tone(now + 0.08, 784, 0.08, "triangle", 0.2);
+        this.tone(now + 0.16, 1047, 0.18, "triangle", 0.22);
+        break;
+      case "leave":
+        // Soft descending two-tone "someone left" cue
+        this.tone(now,       523, 0.12, "sine", 0.18);
+        this.tone(now + 0.1, 392, 0.22, "sine", 0.18);
         break;
     }
   }
