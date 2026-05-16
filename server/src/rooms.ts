@@ -24,6 +24,9 @@ export interface Room {
   // Ready-up system: first player to click arms a 10s timer; second click starts immediately.
   readyVotes: string[];
   readyStartedAt: number | null;
+  // Same system for the "Start round" button inside the game (setup_peek phase).
+  roundReadyVotes: string[];
+  roundReadyStartedAt: number | null;
 }
 
 function randomCode(): string {
@@ -65,6 +68,8 @@ export class Rooms {
       disconnects: {},
       readyVotes: [],
       readyStartedAt: null,
+      roundReadyVotes: [],
+      roundReadyStartedAt: null,
     };
     this.map.set(code, room);
     return room;

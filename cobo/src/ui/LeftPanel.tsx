@@ -1,4 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
+import { useEffect, useState } from "react";
 import { useStore } from "../state/store";
 import { actionOf } from "../engine/game";
 import { Audio } from "../audio/sounds";
@@ -21,6 +22,14 @@ export function LeftPanel() {
   const mode = useStore((s) => s.mode);
   const mp = useStore((s) => s.mp);
 
+  // Ticker for the round-start countdown (only active during setup_peek in MP).
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (mode !== "mp" || !mp?.roundReadyStartedAt) return;
+    const id = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(id);
+  }, [mode, mp?.roundReadyStartedAt]);
+
   const draw = useStore((s) => s.draw);
   const drawDiscard = useStore((s) => s.drawDiscard);
   const discardNoAction = useStore((s) => s.discardNoAction);
@@ -34,7 +43,6 @@ export function LeftPanel() {
   const canDraw = isHumanTurn && game.phase === "turn_start";
   const canDrawDiscard = canDraw && game.discard.length > 0;
 
-  const isHost = mode === "mp" ? mp?.hostId === mp?.viewerId : true;
   const me = game.players.find((p) => p.id === humanId);
   const peekedCount = me ? me.knownToSelf.filter(Boolean).length : 0;
 
@@ -49,15 +57,53 @@ export function LeftPanel() {
 
   if (game.phase === "setup_peek") {
     emoji = "👀";
-    instruction =
-      peekedCount === 0
-        ? "Tap any 2 of your cards to peek at them."
-        : peekedCount === 1
-        ? "One more — pick another card (or skip)."
-        : isHost
-        ? "Memorised? Start when ready!"
-        : "Memorised your cards. Waiting for host…";
-    if (isHost) {
+
+    if (mode === "mp" && mp) {
+      // Collective ready-up: either player can start, uses a 10s server timer.
+      const iReady = mp.roundReadyVotes.includes(humanId);
+      const otherReadyId = mp.roundReadyVotes.find((id) => id !== humanId);
+      const otherReadyName = otherReadyId
+        ? mp.members.find((m) => m.id === otherReadyId)?.name ?? "Opponent"
+        : null;
+      const secsLeft = mp.roundReadyStartedAt
+        ? Math.max(0, Math.ceil((10_000 - (now - mp.roundReadyStartedAt)) / 1000))
+        : null;
+
+      if (iReady) {
+        instruction = otherReadyName
+          ? "Starting the round…"
+          : secsLeft !== null
+          ? `Round starts in ${secsLeft}s — waiting for other player`
+          : "Waiting for other player…";
+      } else {
+        instruction = otherReadyName && secsLeft !== null
+          ? `${otherReadyName} started the round! Starting in ${secsLeft}s…`
+          : peekedCount === 0
+          ? "Tap any 2 of your cards to peek at them."
+          : peekedCount === 1
+          ? "One more — pick another card (or skip)."
+          : "Memorised? Start when ready!";
+        buttons = (
+          <button
+            className={`btn primary left-btn${otherReadyName ? " ready-pulse" : ""}`}
+            onClick={start}
+          >
+            {otherReadyName
+              ? "▶ Start now!"
+              : peekedCount === 0 ? "⏩ Skip & start"
+              : peekedCount < 2 ? "▶ Start now"
+              : "▶ Start round"}
+          </button>
+        );
+      }
+    } else {
+      // Single-player: human always sees the start button.
+      instruction =
+        peekedCount === 0
+          ? "Tap any 2 of your cards to peek at them."
+          : peekedCount === 1
+          ? "One more — pick another card (or skip)."
+          : "Memorised? Start when ready!";
       buttons = (
         <button className="btn primary left-btn" onClick={start}>
           {peekedCount === 0 ? "⏩ Skip & start" : peekedCount < 2 ? "▶ Start now" : "▶ Start round"}

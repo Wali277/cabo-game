@@ -58,6 +58,8 @@ export interface MpRoom {
   disconnects: Record<string, { startedAt: number; forfeited: boolean }>;
   readyVotes: string[];
   readyStartedAt: number | null;
+  roundReadyVotes: string[];
+  roundReadyStartedAt: number | null;
 }
 
 export type ActionTargetingMode =

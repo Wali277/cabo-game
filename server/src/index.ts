@@ -44,6 +44,8 @@ const readyTimers = new Map<string, ReturnType<typeof setTimeout>>();
 // 5s if only one player has picked — happens when the other player has
 // disconnected and their client-side auto-pick never fires).
 const coinTossTimers = new Map<string, ReturnType<typeof setTimeout>>();
+// Per-room timers for the setup_peek → start_play collective ready-up.
+const roundReadyTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 function startRoomGame(roomCode: string) {
   const room = rooms.get(roomCode);
@@ -130,6 +132,8 @@ function publicView(room: ReturnType<Rooms["get"]> & {}, viewerId: string) {
     disconnects,
     readyVotes: room.readyVotes,
     readyStartedAt: room.readyStartedAt,
+    roundReadyVotes: room.roundReadyVotes,
+    roundReadyStartedAt: room.roundReadyStartedAt,
   };
 }
 
@@ -377,6 +381,11 @@ io.on("connection", (socket) => {
     room.playAgainVotes = [];
     room.readyVotes = [];
     room.readyStartedAt = null;
+    room.roundReadyVotes = [];
+    room.roundReadyStartedAt = null;
+    const rrTimer = roundReadyTimers.get(bound.roomCode);
+    if (rrTimer) clearTimeout(rrTimer);
+    roundReadyTimers.delete(bound.roomCode);
     cb({ ok: true });
     broadcastRoom(bound.roomCode);
   });
@@ -385,6 +394,46 @@ io.on("connection", (socket) => {
     if (!bound) return cb?.({ ok: false, error: "Not in a room" });
     const room = rooms.get(bound.roomCode);
     if (!room || !room.game) return cb?.({ ok: false, error: "No game" });
+
+    // Intercept start_play during setup_peek: collective ready-up with 10s timer.
+    // First player to click arms the timer; second click (or timer expiry) starts.
+    if (action.type === "start_play" && room.game.phase === "setup_peek") {
+      if (!room.roundReadyVotes.includes(bound.playerId)) {
+        room.roundReadyVotes.push(bound.playerId);
+      }
+      const otherVoted = room.roundReadyVotes.some((id) => id !== bound!.playerId);
+
+      if (!room.roundReadyStartedAt) {
+        room.roundReadyStartedAt = Date.now();
+        const localCode = bound.roomCode;
+        const timerId = setTimeout(() => {
+          const r = rooms.get(localCode);
+          if (!r || !r.game || r.game.phase !== "setup_peek") return;
+          r.game = startPlay(r.game);
+          r.roundReadyVotes = [];
+          r.roundReadyStartedAt = null;
+          roundReadyTimers.delete(localCode);
+          broadcastRoom(localCode);
+        }, 10_000);
+        roundReadyTimers.set(bound.roomCode, timerId);
+        cb?.({ ok: true });
+        broadcastRoom(bound.roomCode);
+        return;
+      } else if (otherVoted) {
+        // Second player clicked — start immediately.
+        const timerId = roundReadyTimers.get(bound.roomCode);
+        if (timerId) clearTimeout(timerId);
+        roundReadyTimers.delete(bound.roomCode);
+        room.roundReadyVotes = [];
+        room.roundReadyStartedAt = null;
+        // Fall through to applyAction below.
+      } else {
+        // Same player clicking again while timer is running — ignore.
+        cb?.({ ok: true });
+        return;
+      }
+    }
+
     const next = applyAction(room.game, bound.playerId, action);
     if (!next) return cb?.({ ok: false, error: "Illegal action" });
     room.game = next;
