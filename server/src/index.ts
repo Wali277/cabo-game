@@ -78,6 +78,12 @@ function broadcastRoom(roomCode: string) {
 // peeking via dev tools could see opponents' cards — but it's acceptable for
 // a friends-only game with no traffic.
 function publicView(room: ReturnType<Rooms["get"]> & {}, viewerId: string) {
+  // Surface disconnect / forfeit info so the client can render the notification
+  // and the victory-by-forfeit overlay.
+  const disconnects: Record<string, { startedAt: number; forfeited: boolean }> = {};
+  for (const [pid, d] of Object.entries(room.disconnects)) {
+    disconnects[pid] = { startedAt: d.startedAt, forfeited: d.forfeited };
+  }
   return {
     code: room.code,
     hostId: room.hostId,
@@ -91,6 +97,8 @@ function publicView(room: ReturnType<Rooms["get"]> & {}, viewerId: string) {
     })),
     game: room.game,
     coinToss: room.coinToss,
+    playAgainVotes: room.playAgainVotes,
+    disconnects,
   };
 }
 
@@ -205,8 +213,14 @@ io.on("connection", (socket) => {
     if (!room) return cb({ ok: false, error: "Room not found" });
     const member = room.members.find((m) => m.playerId === playerId);
     if (!member) return cb({ ok: false, error: "Not a member" });
+    // If we'd already marked them forfeited, the seat is closed; don't restore.
+    if (room.disconnects[playerId]?.forfeited) {
+      return cb({ ok: false, error: "You forfeited this match" });
+    }
     member.socketId = socket.id;
     member.connected = true;
+    // Clear any in-progress disconnect timer for this player
+    delete room.disconnects[playerId];
     bound = { roomCode: code, playerId };
     socket.join(code);
     cb({ ok: true });
@@ -265,9 +279,28 @@ io.on("connection", (socket) => {
     if (!bound) return cb({ ok: false, error: "Not in a room" });
     const room = rooms.get(bound.roomCode);
     if (!room || !room.game) return cb({ ok: false, error: "No game" });
-    if (room.hostId !== bound.playerId) return cb({ ok: false, error: "Only host" });
+    if (room.game.phase !== "round_over") return cb({ ok: false, error: "Round not over" });
+
+    // Record this player's vote (idempotent).
+    if (!room.playAgainVotes.includes(bound.playerId)) {
+      room.playAgainVotes.push(bound.playerId);
+    }
+
+    // Active players = members who have not forfeited. We need ALL of them to vote.
+    const activeIds = room.members
+      .map((m) => m.playerId)
+      .filter((pid) => !room.disconnects[pid]?.forfeited);
+    const allVoted = activeIds.every((pid) => room.playAgainVotes.includes(pid));
+
+    if (!allVoted) {
+      // Just broadcast the vote — other players see "X wants a rematch".
+      cb({ ok: true, waiting: true });
+      broadcastRoom(bound.roomCode);
+      return;
+    }
+
+    // Everyone has voted — start the next round.
     const players = room.game.players.map((p) => ({ id: p.id, name: p.name, isBot: false }));
-    // Alternate starting player: whoever didn't start last round starts this one
     const nextStarter = (room.lastStarterIdx + 1) % players.length;
     room.game = newGame({
       players,
@@ -277,6 +310,7 @@ io.on("connection", (socket) => {
     room.game.currentPlayer = nextStarter;
     room.lastStarterIdx = nextStarter;
     room.coinToss = null; // No coin toss from round 2 onward
+    room.playAgainVotes = []; // reset for next round
     cb({ ok: true });
     broadcastRoom(bound.roomCode);
   });
@@ -292,14 +326,49 @@ io.on("connection", (socket) => {
     broadcastRoom(bound.roomCode);
   });
 
+  // The client calls this when the local player explicitly leaves the room
+  // (back-to-menu, leave-room button). We treat it as an immediate disconnect
+  // so the other player gets the "X left" notification right away.
+  socket.on("room:leave", () => {
+    handleDisconnect();
+  });
+
   socket.on("disconnect", () => {
+    handleDisconnect();
+  });
+
+  function handleDisconnect() {
     if (!bound) return;
     const room = rooms.get(bound.roomCode);
     if (!room) return;
+    const wasAlreadyDisconnected = !!room.disconnects[bound.playerId];
     const member = room.members.find((m) => m.playerId === bound!.playerId);
     if (member) {
       member.connected = false;
       member.socketId = "";
+    }
+    // If a game is in progress, start a forfeit countdown for this player.
+    // Don't track disconnects in the lobby (no game yet). Idempotent — if we
+    // already started a timer (e.g. room:leave then real disconnect) reuse it.
+    if (
+      room.game &&
+      room.game.phase !== "round_over" &&
+      !wasAlreadyDisconnected &&
+      !room.disconnects[bound.playerId]?.forfeited
+    ) {
+      room.disconnects[bound.playerId] = { startedAt: Date.now(), forfeited: false };
+      const localBound = bound;
+      setTimeout(() => {
+        const r = rooms.get(localBound.roomCode);
+        if (!r) return;
+        const d = r.disconnects[localBound.playerId];
+        if (!d || d.forfeited) return;
+        // If they reconnected, the entry was deleted in room:rejoin — bail.
+        const m = r.members.find((mm) => mm.playerId === localBound.playerId);
+        if (m?.connected) return;
+        d.forfeited = true;
+        broadcastRoom(localBound.roomCode);
+      }, 20_000);
     }
     broadcastRoom(bound.roomCode);
     // Garbage-collect empty rooms after a minute
@@ -309,7 +378,7 @@ io.on("connection", (socket) => {
         rooms.remove(bound!.roomCode);
       }
     }, 60_000);
-  });
+  }
 });
 
 const PORT = Number(process.env.PORT) || 8787;

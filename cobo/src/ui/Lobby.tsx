@@ -13,13 +13,15 @@ interface Props {
 
 export function Lobby({ initialCode }: Props) {
   const mp = useStore((s) => s.mp);
-  const [mode, setMode] = useState<"choose" | "create" | "join">(
+  const [mode, setMode] = useState<"choose" | "join">(
     initialCode ? "join" : "choose",
   );
   const [name, setName] = useState("");
   const [code, setCode] = useState(initialCode?.toUpperCase() ?? "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [codeCopied, setCodeCopied] = useState(false);
+  const [urlCopied, setUrlCopied] = useState(false);
   const backToMenu = useStore((s) => s.backToMenu);
   const leaveRoomToLobby = useStore((s) => s.leaveRoomToLobby);
 
@@ -67,6 +69,18 @@ export function Lobby({ initialCode }: Props) {
   if (mp) {
     const isHost = mp.hostId === mp.viewerId;
     const url = `${window.location.origin}/room/${mp.code}`;
+
+    function copyCode() {
+      navigator.clipboard?.writeText(mp!.code);
+      setCodeCopied(true);
+      setTimeout(() => setCodeCopied(false), 1500);
+    }
+    function copyUrl() {
+      navigator.clipboard?.writeText(url);
+      setUrlCopied(true);
+      setTimeout(() => setUrlCopied(false), 1500);
+    }
+
     return (
       <div className="lobby">
         <motion.h1
@@ -74,53 +88,62 @@ export function Lobby({ initialCode }: Props) {
           initial={{ scale: 0.6, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
         >
-          ROOM <span className="room-code">{mp.code}</span>
+          ROOM
         </motion.h1>
-        <p className="subtitle">Share this link with friends to join:</p>
-        <div className="share-row">
-          <input className="share-url" readOnly value={url} onFocus={(e) => e.target.select()} />
-          <button
-            className="btn"
-            onClick={() => navigator.clipboard?.writeText(url)}
-          >
-            Copy
-          </button>
-        </div>
 
-        <div className="menu-card">
-          <div className="menu-label">Players ({mp.members.length}/4)</div>
-          <div className="members">
-            {mp.members.map((m) => (
-              <div key={m.id} className={`member ${m.connected ? "" : "offline"}`}>
-                <span className="mname">{m.name}</span>
-                {m.isHost && <span className="badge host">HOST</span>}
-                {!m.connected && <span className="badge off">offline</span>}
-              </div>
-            ))}
-            {Array.from({ length: Math.max(0, 4 - mp.members.length) }).map((_, i) => (
-              <div key={`empty${i}`} className="member empty">
-                waiting…
-              </div>
-            ))}
-          </div>
-          {isHost ? (
-            <button
-              className="btn primary big"
-              disabled={mp.members.length < 2 || busy}
-              onClick={async () => {
-                setBusy(true);
-                await startGameMp();
-                setBusy(false);
-              }}
-            >
-              {mp.members.length < 2 ? "Need at least 2 players" : "Start game"}
+        <div className="room-info-row">
+          {/* Game code panel — beside the player list */}
+          <div className="menu-card room-code-card">
+            <div className="menu-label">Game code</div>
+            <div className="big-room-code">{mp.code}</div>
+            <button className="btn primary" onClick={copyCode}>
+              {codeCopied ? "✓ Copied" : "Copy code"}
             </button>
-          ) : (
-            <div className="hint">Waiting for host to start…</div>
-          )}
-          <div className="room-nav-row">
-            <button className="btn" onClick={leaveRoomToLobby}>← Back to rooms</button>
-            <button className="btn ghost" onClick={backToMenu}>Main menu</button>
+            <div className="menu-label" style={{ marginTop: 6 }}>Or share link</div>
+            <div className="share-row">
+              <input className="share-url" readOnly value={url} onFocus={(e) => e.target.select()} />
+              <button className="btn" onClick={copyUrl}>
+                {urlCopied ? "✓" : "Copy"}
+              </button>
+            </div>
+          </div>
+
+          {/* Players panel */}
+          <div className="menu-card room-players-card">
+            <div className="menu-label">Players ({mp.members.length}/4)</div>
+            <div className="members">
+              {mp.members.map((m) => (
+                <div key={m.id} className={`member ${m.connected ? "" : "offline"}`}>
+                  <span className="mname">{m.name}</span>
+                  {m.isHost && <span className="badge host">HOST</span>}
+                  {!m.connected && <span className="badge off">offline</span>}
+                </div>
+              ))}
+              {Array.from({ length: Math.max(0, 4 - mp.members.length) }).map((_, i) => (
+                <div key={`empty${i}`} className="member empty">
+                  waiting…
+                </div>
+              ))}
+            </div>
+            {isHost ? (
+              <button
+                className="btn primary big"
+                disabled={mp.members.length < 2 || busy}
+                onClick={async () => {
+                  setBusy(true);
+                  await startGameMp();
+                  setBusy(false);
+                }}
+              >
+                {mp.members.length < 2 ? "Need at least 2 players" : "Start game"}
+              </button>
+            ) : (
+              <div className="hint">Waiting for host to start…</div>
+            )}
+            <div className="room-nav-row">
+              <button className="btn" onClick={leaveRoomToLobby}>← Back to rooms</button>
+              <button className="btn ghost" onClick={backToMenu}>Main menu</button>
+            </div>
           </div>
         </div>
       </div>
@@ -156,22 +179,13 @@ export function Lobby({ initialCode }: Props) {
 
         {mode === "choose" && (
           <div className="row gap">
-            <button className="btn primary big" onClick={() => setMode("create")}>
-              Create room
+            <button className="btn primary big" disabled={busy} onClick={doCreate}>
+              {busy ? "Creating…" : "Create room"}
             </button>
             <button className="btn big" onClick={() => setMode("join")}>
               Join room
             </button>
           </div>
-        )}
-
-        {mode === "create" && (
-          <>
-            <button className="btn primary big" disabled={busy} onClick={doCreate}>
-              {busy ? "Creating…" : "Create the room"}
-            </button>
-            <button className="btn" onClick={() => setMode("choose")}>Back</button>
-          </>
         )}
 
         {mode === "join" && (

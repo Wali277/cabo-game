@@ -896,12 +896,110 @@
   min-width: 220px;
   border: 2px solid #a87bff;
 }
-.sb-title { font-weight: 700; font-size: 13px; color: #6e4ec9; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
-.sb-rows { display: flex; flex-direction: column; gap: 3px; }
-.sb-row { display: flex; justify-content: space-between; font-weight: 600; font-size: 14px; }
-.sb-row.lead { color: #6e4ec9; font-weight: 800; }
-.sb-row.worst { color: #c2418a; }
-.sb-total { font-weight: 800; }
+.sb-title { font-weight: 700; font-size: 13px; color: #6e4ec9; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+
+/* Per-round scoreboard table */
+.sb-table { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.sb-thead, .sb-trow {
+  display: grid;
+  align-items: center;
+  gap: 4px;
+  /* gridTemplateColumns is set inline per-render (variable round count) */
+}
+.sb-thead {
+  font-weight: 800;
+  color: #6e4ec9;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid #e5e0f5;
+  padding: 2px 0 4px;
+}
+.sb-th, .sb-td { text-align: center; padding: 2px 0; }
+.sb-th-name, .sb-td-name { text-align: left; display: flex; align-items: center; gap: 4px; }
+.sb-th-total, .sb-td-total { font-weight: 800; }
+.sb-tbody { display: flex; flex-direction: column; gap: 2px; }
+.sb-trow { font-weight: 600; padding: 3px 0; border-radius: 6px; }
+.sb-trow.lead { color: #6e4ec9; font-weight: 800; background: rgba(168, 123, 255, 0.08); }
+.sb-trow.worst { color: #c2418a; }
+.sb-rank { font-size: 12px; font-weight: 800; min-width: 18px; }
+.sb-pname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Modal scoreboard variant */
+.modal-sb { margin: 10px 0; font-size: 14px; }
+
+/* ========== Lobby in-room: code + players layout ========== */
+.room-info-row {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.room-code-card { min-width: 240px; flex: 0 0 auto; align-items: center; text-align: center; }
+.room-players-card { min-width: 360px; flex: 1 1 360px; max-width: 440px; }
+.big-room-code {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 56px;
+  font-weight: 900;
+  letter-spacing: 12px;
+  text-align: center;
+  color: #1c1d2b;
+  background: #ffd86b;
+  padding: 14px 8px 12px 20px;
+  border-radius: 16px;
+  border: 4px solid #fff;
+  box-shadow: 0 6px 0 #c98e00, 0 14px 30px rgba(0,0,0,0.2);
+}
+
+/* ========== Play Again — rematch request ========== */
+.play-again-btn.their-turn {
+  animation: rematchPulse 1.6s ease-in-out infinite;
+  position: relative;
+}
+.play-again-btn.voted { opacity: 0.65; }
+@keyframes rematchPulse {
+  0%, 100% { box-shadow: 0 4px 0 #1a1a4a, 0 0 0 0 rgba(168, 123, 255, 0.55); transform: translateY(0); }
+  50% { box-shadow: 0 5px 0 #1a1a4a, 0 0 0 14px rgba(168, 123, 255, 0); transform: translateY(-1px); }
+}
+
+/* ========== MP disconnect notification (top right) ========== */
+.mp-notice {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  background: rgba(13, 22, 56, 0.96);
+  color: #f4ebff;
+  padding: 12px 14px 12px 16px;
+  border-radius: 14px;
+  border: 2px solid #ff5b6e;
+  box-shadow: 0 12px 28px rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 250;
+  max-width: 340px;
+  font-weight: 600;
+  font-size: 14px;
+}
+.mp-notice .mp-notice-title { font-weight: 800; color: #ff5b6e; display: block; font-size: 13px; text-transform: uppercase; letter-spacing: 0.8px; }
+.mp-notice .mp-notice-body { display: block; margin-top: 2px; }
+.mp-notice .mp-notice-timer { color: #ffd86b; font-variant-numeric: tabular-nums; }
+.mp-notice-close {
+  background: transparent;
+  border: none;
+  color: #f4ebff;
+  font-size: 18px;
+  font-weight: 900;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 8px;
+  line-height: 1;
+}
+.mp-notice-close:hover { background: rgba(255, 91, 110, 0.2); }
+
+/* ========== Forfeit victory overlay ========== */
+.forfeit-modal .modal-burst { color: #ffd86b; }
 
 /* ========== Round end overlay ========== */
 .overlay {

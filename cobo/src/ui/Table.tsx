@@ -8,6 +8,7 @@ import { Scoreboard, RoundEndOverlay } from "./Scoreboard";
 import { ActionBanner } from "./ActionBanner";
 import { ActionLog } from "./ActionLog";
 import { TrainingPanel } from "./TrainingPanel";
+import { MpNotices } from "./MpNotices";
 import { botMove, ingestReveals, resetBotKnowledge } from "../ai/bot";
 import { clearReveals as clearRevealsEngine } from "../engine/game";
 import { Audio } from "../audio/sounds";
@@ -248,6 +249,7 @@ export function Table() {
 
         <ActionBanner />
         <RoundEndOverlay />
+        <MpNotices />
 
         {/* Tap-anywhere overlay to dismiss peek/spy reveals early */}
         {hasDismissableReveal && (

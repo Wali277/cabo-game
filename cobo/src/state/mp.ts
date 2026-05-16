@@ -153,6 +153,9 @@ export function sendAction(payload: { type: MpActionType } & Record<string, any>
 }
 
 export function leaveRoom() {
+  // Tell the server we're leaving on purpose so the other player can be
+  // notified immediately rather than waiting for the socket to time out.
+  try { socket?.emit("room:leave"); } catch { /* ignore */ }
   clearSession();
   useStore.setState({ mp: null });
   socket?.disconnect();

@@ -54,6 +54,8 @@ export interface MpRoom {
     startedAt: number | null;
     result: "heads" | "tails" | null;
   } | null;
+  playAgainVotes: string[];
+  disconnects: Record<string, { startedAt: number; forfeited: boolean }>;
 }
 
 export type ActionTargetingMode =
