@@ -40,6 +40,10 @@ const rooms = new Rooms();
 // Per-room timers for the ready-up countdown. Stored outside the Room so they
 // aren't serialised and can be properly cancelled on early start or room cleanup.
 const readyTimers = new Map<string, ReturnType<typeof setTimeout>>();
+// Per-room timers for the coin-toss server-side fallback (auto-resolve after
+// 5s if only one player has picked — happens when the other player has
+// disconnected and their client-side auto-pick never fires).
+const coinTossTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 function startRoomGame(roomCode: string) {
   const room = rooms.get(roomCode);
@@ -297,10 +301,36 @@ io.on("connection", (socket) => {
 
     if (!ct.choices[otherSide]) {
       // First pick — start the 5-second window for the other player.
-      // Do NOT auto-assign yet; the other player gets a chance to click.
       ct.startedAt = Date.now();
+      // Server-side fallback: auto-resolve if the other player doesn't pick.
+      // The client-side timer only fires for active clients, so if the other
+      // player has disconnected we'd otherwise be stuck forever.
+      const localCode = bound.roomCode;
+      const pickerId = bound.playerId;
+      const existing = coinTossTimers.get(localCode);
+      if (existing) clearTimeout(existing);
+      const timerId = setTimeout(() => {
+        const r = rooms.get(localCode);
+        if (!r || !r.coinToss || !r.game) return;
+        const ctNow = r.coinToss;
+        if (ctNow.result) return;
+        const otherMember = r.members.find((m) => m.playerId !== pickerId);
+        if (!otherMember) return;
+        const remainingSide: "heads" | "tails" =
+          ctNow.choices.heads === pickerId ? "tails" : "heads";
+        if (ctNow.choices[remainingSide]) return;
+        ctNow.choices[remainingSide] = otherMember.playerId;
+        const winner = r.game.players[r.game.currentPlayer];
+        ctNow.result = ctNow.choices.heads === winner.id ? "heads" : "tails";
+        coinTossTimers.delete(localCode);
+        broadcastRoom(localCode);
+      }, 5000);
+      coinTossTimers.set(localCode, timerId);
     } else {
       // Second pick — both sides are now assigned; determine the result.
+      const existing = coinTossTimers.get(bound.roomCode);
+      if (existing) clearTimeout(existing);
+      coinTossTimers.delete(bound.roomCode);
       const winner = room.game.players[room.game.currentPlayer];
       ct.result = ct.choices.heads === winner.id ? "heads" : "tails";
     }
