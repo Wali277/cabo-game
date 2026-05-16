@@ -446,12 +446,13 @@
 .tslot-right  { grid-area: right;  justify-content: flex-start; }
 .tslot-bottom { grid-area: bottom; align-items: flex-start; }
 
-/* Side players: cards in a 2×2 grid so they don't stretch vertically */
+/* Side players: single horizontal row of cards */
 .pos-left .hand-row,
 .pos-right .hand-row {
-  display: grid;
-  grid-template-columns: repeat(2, auto);
-  gap: 6px;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 5px;
 }
 
 /* Unused — kept for compat */
@@ -1042,8 +1043,8 @@
 /* ========== MP Chat (bottom-right floating button + expanded panel) ========== */
 .chat-toggle {
   position: fixed;
-  right: 14px;
-  bottom: 70px; /* above the AudioControls button */
+  right: 18px;
+  bottom: 96px; /* clearly above the AudioControls button (18px + 52px fab + 26px gap) */
   width: 52px;
   height: 52px;
   border-radius: 50%;
@@ -1081,8 +1082,8 @@
 }
 .chat-panel {
   position: fixed;
-  right: 14px;
-  bottom: 134px; /* sits above the toggle button */
+  right: 18px;
+  bottom: 160px; /* sits above the toggle button (96px + 52px + 12px gap) */
   width: 320px;
   height: 380px;
   background: rgba(13, 22, 56, 0.97);
@@ -1293,14 +1294,26 @@
   border: 1.5px solid #ff5b6e;
   color: #ff5b6e;
 }
+.straw-badge-mid {
+  background: rgba(122, 168, 255, 0.2);
+  border: 1.5px solid #7aa8ff;
+  color: #7aa8ff;
+}
 
-/* The straw bar itself */
+/* The straw bar itself — candy-cane red/white diagonal stripes */
 .straw-stub {
   width: 40px;
   border-radius: 6px 6px 2px 2px;
-  background: linear-gradient(to top, #c39a3a 0%, #ffd86b 60%, #fff8d6 100%);
-  border: 2px solid rgba(255, 216, 107, 0.5);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+  background-color: #ffffff;
+  background-image: repeating-linear-gradient(
+    -45deg,
+    #ff1f1f 0px,
+    #ff1f1f 8px,
+    #ffffff 8px,
+    #ffffff 16px
+  );
+  border: 2px solid #c9000f;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0.6);
   cursor: pointer;
   outline: none;
   padding: 0;

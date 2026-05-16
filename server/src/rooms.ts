@@ -34,6 +34,9 @@ export interface Room {
   // Same system for the "Start round" button inside the game (setup_peek phase).
   roundReadyVotes: string[];
   roundReadyStartedAt: number | null;
+  // Straw-draw continue: all players must click Continue (or timer runs out).
+  strawReadyVotes: string[];
+  strawReadyStartedAt: number | null;
 }
 
 function randomCode(): string {
@@ -78,6 +81,8 @@ export class Rooms {
       readyStartedAt: null,
       roundReadyVotes: [],
       roundReadyStartedAt: null,
+      strawReadyVotes: [],
+      strawReadyStartedAt: null,
     };
     this.map.set(code, room);
     return room;

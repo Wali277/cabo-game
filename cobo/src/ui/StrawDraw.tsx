@@ -4,6 +4,8 @@ import { useStore } from "../state/store";
 import { sendStrawPick } from "../state/mp";
 import { Audio } from "../audio/sounds";
 
+const CONTINUE_TIMER_MS = 10_000;
+
 const STRAW_WINDOW_MS = 10_000;
 const STRAW_STUB_H = 60;   // px — initial equal height before reveal
 const STRAW_MIN_H  = 64;   // px — shortest straw after reveal
@@ -31,6 +33,18 @@ export function StrawDraw() {
       Audio.playSfx("straw_reveal");
     }
   }, [result]);
+
+  const [continueNow, setContinueNow] = useState(Date.now());
+  const iReadyContinue = mp?.strawReadyVotes?.includes(humanId) ?? false;
+  const continueStartedAt = mp?.strawReadyStartedAt ?? null;
+  useEffect(() => {
+    if (!continueStartedAt) return;
+    const id = setInterval(() => setContinueNow(Date.now()), 250);
+    return () => clearInterval(id);
+  }, [continueStartedAt]);
+  const continueSecsLeft = continueStartedAt
+    ? Math.max(0, Math.ceil((CONTINUE_TIMER_MS - (continueNow - continueStartedAt)) / 1000))
+    : null;
 
   const myRank = useMemo(() => {
     if (!result || !humanId) return null;
@@ -129,19 +143,22 @@ export function StrawDraw() {
             const isLongest = revealed && s.length === total - 1;
             const isShortest = revealed && s.length === 0;
 
+            // Rank: longest straw (length = total-1) = 1st place
+            const rank = revealed ? total - s.length : null;
+
             return (
               <div key={i} className="straw-col">
-                {/* Crown / rank badge above */}
+                {/* Rank badge above each straw */}
                 <div className="straw-badge-slot">
                   <AnimatePresence>
-                    {revealed && (isLongest || isShortest) && (
+                    {revealed && rank !== null && (
                       <motion.div
-                        className={`straw-badge ${isLongest ? "straw-badge-best" : "straw-badge-worst"}`}
+                        className={`straw-badge ${isLongest ? "straw-badge-best" : isShortest ? "straw-badge-worst" : "straw-badge-mid"}`}
                         initial={{ opacity: 0, y: 8, scale: 0.8 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         transition={{ delay: animDelay(i) + 0.55, duration: 0.3, type: "spring" }}
                       >
-                        {isLongest ? "1st 🏆" : `${rankLabel(total)}`}
+                        {isLongest ? `${rankLabel(1)} 🏆` : isShortest ? rankLabel(total) : rankLabel(rank)}
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -203,14 +220,19 @@ export function StrawDraw() {
 
               <motion.button
                 className="straw-continue-btn"
-                onClick={proceedFromStrawDraw}
+                onClick={iReadyContinue ? undefined : proceedFromStrawDraw}
+                disabled={iReadyContinue}
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: total * 0.12 + 0.85, duration: 0.3 }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.96 }}
+                whileHover={iReadyContinue ? {} : { scale: 1.05 }}
+                whileTap={iReadyContinue ? {} : { scale: 0.96 }}
               >
-                Continue →
+                {iReadyContinue
+                  ? continueSecsLeft !== null
+                    ? `Waiting… (${mp!.strawReadyVotes.length}/${mp!.members.length} ready, ${continueSecsLeft}s)`
+                    : `Waiting for others… (${mp!.strawReadyVotes.length}/${mp!.members.length} ready)`
+                  : "Continue →"}
               </motion.button>
             </motion.div>
           )}

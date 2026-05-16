@@ -48,6 +48,8 @@ const coinTossTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const roundReadyTimers = new Map<string, ReturnType<typeof setTimeout>>();
 // Per-room timers for the straw-draw fallback (10s after first pick).
 const strawDrawTimers = new Map<string, ReturnType<typeof setTimeout>>();
+// Per-room timers for the straw-continue collective ready-up (10s after first click).
+const strawReadyTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 function startRoomGame(roomCode: string) {
   const room = rooms.get(roomCode);
@@ -155,6 +157,11 @@ function broadcastRoom(roomCode: string) {
     if (!socket) continue;
     socket.emit("room:state", publicView(room, member.playerId));
   }
+  // Animations are single-use — clear them immediately after every broadcast so
+  // they don't replay when the next action triggers another broadcast.
+  if (room.game && room.game.animations.length > 0) {
+    room.game = clearAnimations(room.game);
+  }
 }
 
 // Send full game state for friends-only mode. The client controls which cards
@@ -189,6 +196,8 @@ function publicView(room: ReturnType<Rooms["get"]> & {}, viewerId: string) {
     readyStartedAt: room.readyStartedAt,
     roundReadyVotes: room.roundReadyVotes,
     roundReadyStartedAt: room.roundReadyStartedAt,
+    strawReadyVotes: room.strawReadyVotes,
+    strawReadyStartedAt: room.strawReadyStartedAt,
   };
 }
 
@@ -258,9 +267,14 @@ function applyAction(game: GameState, playerId: string, action: ActionMsg): Game
     case "action_peek_and_swap_pick":
       if (!requireCurrent()) return null;
       return actionPeekAndSwapPick(game, action.targetPlayerId, action.index);
-    case "action_peek_and_swap_decide":
+    case "action_peek_and_swap_decide": {
       if (!requireCurrent()) return null;
-      return actionPeekAndSwapDecide(game, action.doSwap, action.ownIndex);
+      const decided = actionPeekAndSwapDecide(game, action.doSwap, action.ownIndex);
+      if (!decided) return null;
+      // The peek_and_swap reveal is only needed during the decide phase.
+      // Clear it immediately so cards flip back face-down on all clients.
+      return { ...decided, reveals: decided.reveals.filter((r) => r.reason !== "peek_and_swap") };
+    }
     case "call_cabo":
       if (!requireCurrent()) return null;
       return callCabo(game);
@@ -333,19 +347,32 @@ io.on("connection", (socket) => {
       room.readyVotes.push(bound.playerId);
     }
 
+    // All active (non-forfeited) players must vote before we start.
+    const activeIds = room.members
+      .map((m) => m.playerId)
+      .filter((pid) => !room.disconnects[pid]?.forfeited);
+    const allVoted = activeIds.every((pid) => room.readyVotes.includes(pid));
+
     if (!room.readyStartedAt) {
       // First player to click — arm the 10s countdown.
       room.readyStartedAt = Date.now();
       const localCode = bound.roomCode;
       const timerId = setTimeout(() => { startRoomGame(localCode); }, 10_000);
       readyTimers.set(bound.roomCode, timerId);
-      cb?.({ ok: true });
-      broadcastRoom(bound.roomCode);
-    } else {
-      // A second player clicked (or timer already running) — start immediately.
-      startRoomGame(bound.roomCode);
-      cb?.({ ok: true });
     }
+
+    if (allVoted) {
+      // Everyone clicked — cancel the timer and start now.
+      const timerId = readyTimers.get(bound.roomCode);
+      if (timerId) clearTimeout(timerId);
+      readyTimers.delete(bound.roomCode);
+      startRoomGame(bound.roomCode); // broadcasts internally
+      cb?.({ ok: true });
+      return;
+    }
+
+    cb?.({ ok: true });
+    broadcastRoom(bound.roomCode);
   });
 
   socket.on("room:coin_toss_pick", ({ side }: { side: "heads" | "tails" }, cb) => {
@@ -433,6 +460,57 @@ io.on("connection", (socket) => {
     broadcastRoom(bound.roomCode);
   });
 
+  // All players click "Continue" after straw reveal — same approval pattern as ready-up.
+  socket.on("room:straw_ready", (_payload, cb) => {
+    if (!bound) return cb?.({ ok: false });
+    const room = rooms.get(bound.roomCode);
+    if (!room || !room.strawDraw?.result) return cb?.({ ok: false, error: "No straw result" });
+
+    if (!room.strawReadyVotes.includes(bound.playerId)) {
+      room.strawReadyVotes.push(bound.playerId);
+    }
+
+    const activeIds = room.members
+      .map((m) => m.playerId)
+      .filter((pid) => !room.disconnects[pid]?.forfeited);
+    const allVoted = activeIds.every((pid) => room.strawReadyVotes.includes(pid));
+
+    function startFromStraw() {
+      if (!room) return;
+      const existing = strawReadyTimers.get(bound!.roomCode);
+      if (existing) clearTimeout(existing);
+      strawReadyTimers.delete(bound!.roomCode);
+      room.strawReadyVotes = [];
+      room.strawReadyStartedAt = null;
+      // Game already has the correct currentPlayer from finalizeStrawDraw.
+      broadcastRoom(bound!.roomCode);
+      // Signal clients to transition: send a special flag they can detect.
+      // We set strawDraw to null so the client's applyMpRoom routes to "game".
+      room.strawDraw = null;
+      broadcastRoom(bound!.roomCode);
+    }
+
+    if (!room.strawReadyStartedAt) {
+      room.strawReadyStartedAt = Date.now();
+      const localCode = bound.roomCode;
+      const timerId = setTimeout(() => {
+        const r = rooms.get(localCode);
+        if (!r || !r.strawDraw?.result) return;
+        startFromStraw();
+      }, 10_000);
+      strawReadyTimers.set(bound.roomCode, timerId);
+    }
+
+    if (allVoted) {
+      startFromStraw();
+      cb?.({ ok: true });
+      return;
+    }
+
+    cb?.({ ok: true });
+    broadcastRoom(bound.roomCode);
+  });
+
   socket.on("room:play_again", (_payload, cb) => {
     if (!bound) return cb({ ok: false, error: "Not in a room" });
     const room = rooms.get(bound.roomCode);
@@ -477,9 +555,14 @@ io.on("connection", (socket) => {
     room.readyStartedAt = null;
     room.roundReadyVotes = [];
     room.roundReadyStartedAt = null;
+    room.strawReadyVotes = [];
+    room.strawReadyStartedAt = null;
     const rrTimer = roundReadyTimers.get(bound.roomCode);
     if (rrTimer) clearTimeout(rrTimer);
     roundReadyTimers.delete(bound.roomCode);
+    const srTimer = strawReadyTimers.get(bound.roomCode);
+    if (srTimer) clearTimeout(srTimer);
+    strawReadyTimers.delete(bound.roomCode);
     cb({ ok: true });
     broadcastRoom(bound.roomCode);
   });
@@ -495,9 +578,15 @@ io.on("connection", (socket) => {
       if (!room.roundReadyVotes.includes(bound.playerId)) {
         room.roundReadyVotes.push(bound.playerId);
       }
-      const otherVoted = room.roundReadyVotes.some((id) => id !== bound!.playerId);
+
+      // All active players must vote before round starts.
+      const activeRoundIds = room.members
+        .map((m) => m.playerId)
+        .filter((pid) => !room.disconnects[pid]?.forfeited);
+      const allRoundVoted = activeRoundIds.every((pid) => room.roundReadyVotes.includes(pid));
 
       if (!room.roundReadyStartedAt) {
+        // First click — arm the 10s countdown.
         room.roundReadyStartedAt = Date.now();
         const localCode = bound.roomCode;
         const timerId = setTimeout(() => {
@@ -510,22 +599,25 @@ io.on("connection", (socket) => {
           broadcastRoom(localCode);
         }, 10_000);
         roundReadyTimers.set(bound.roomCode, timerId);
+        if (!allRoundVoted) {
+          cb?.({ ok: true });
+          broadcastRoom(bound.roomCode);
+          return;
+        }
+      } else if (!allRoundVoted) {
+        // Timer already running, not everyone voted yet — just update the vote count.
         cb?.({ ok: true });
         broadcastRoom(bound.roomCode);
         return;
-      } else if (otherVoted) {
-        // Second player clicked — start immediately.
-        const timerId = roundReadyTimers.get(bound.roomCode);
-        if (timerId) clearTimeout(timerId);
-        roundReadyTimers.delete(bound.roomCode);
-        room.roundReadyVotes = [];
-        room.roundReadyStartedAt = null;
-        // Fall through to applyAction below.
-      } else {
-        // Same player clicking again while timer is running — ignore.
-        cb?.({ ok: true });
-        return;
       }
+
+      // Everyone voted — cancel timer and fall through to applyAction (startPlay).
+      const timerId = roundReadyTimers.get(bound.roomCode);
+      if (timerId) clearTimeout(timerId);
+      roundReadyTimers.delete(bound.roomCode);
+      room.roundReadyVotes = [];
+      room.roundReadyStartedAt = null;
+      // Fall through to applyAction below.
     }
 
     const next = applyAction(room.game, bound.playerId, action);

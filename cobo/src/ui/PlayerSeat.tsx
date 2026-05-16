@@ -146,7 +146,10 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
               className={`hand-slot${spied ? " spy-glow" : ""}`}
               key={c.id}
               initial={hasInitial ? initial : false}
-              animate={hasInitial ? { x: 0, y: 0, opacity: 1, scale: 1 } : undefined}
+              // Always target the fully-visible state so a slot can never get
+              // stuck mid-animation (which previously caused cards to vanish
+              // when another state update arrived during an entrance animation).
+              animate={{ x: 0, y: 0, opacity: 1, scale: 1 }}
               transition={CARD_SPRING}
             >
               <CardView

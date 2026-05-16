@@ -73,6 +73,8 @@ export interface MpRoom {
     startedAt: number | null;
     result: string[] | null;
   } | null;
+  strawReadyVotes: string[];
+  strawReadyStartedAt: number | null;
 }
 
 export type ActionTargetingMode =
@@ -762,8 +764,16 @@ export const useStore = create<StoreState>((set, get) => ({
     set({ chatMessages: [], chatOpen: false, chatUnread: 0 });
   },
   proceedFromStrawDraw() {
+    const { screen, mode } = get();
+    if (screen !== "straw_draw") return;
+    if (mode === "mp") {
+      // Vote via server — server broadcasts strawDraw: null when all ready,
+      // which triggers applyMpRoom to route to the game screen.
+      import("./mp").then((m) => m.sendStrawReady());
+      return;
+    }
+    // SP fallback (straw draw is MP-only but guard anyway)
     const st = get();
-    if (st.screen !== "straw_draw") return;
     set({
       game: st.mp?.game ?? null,
       pendingGame: null,

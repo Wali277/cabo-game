@@ -183,6 +183,10 @@ export function sendReady() {
   return new Promise<any>((resolve) => getSocket().emit("room:ready", {}, resolve));
 }
 
+export function sendStrawReady() {
+  return new Promise<any>((resolve) => getSocket().emit("room:straw_ready", {}, resolve));
+}
+
 export function sendChat(text: string) {
   return new Promise<any>((resolve) => getSocket().emit("room:chat", { text }, resolve));
 }

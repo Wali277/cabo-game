@@ -139,7 +139,7 @@ export function LeftPanel() {
               ♻ Draw from Discard
             </button>
             <div className="left-divider" />
-            <button className="btn danger left-btn" onClick={callCaboAction}>
+            <button className="btn danger left-btn" onClick={callCaboAction} disabled={!!game.caboCallerId}>
               🚨 Call CABO!
             </button>
           </>

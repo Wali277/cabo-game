@@ -45,9 +45,9 @@ export function shuffle<T>(arr: T[], rng: () => number): T[] {
 export function cardScore(card: Card): number {
   switch (card.rank) {
     case "A": return 1;
-    case "J":
-    case "Q": return 10;
-    case "K":
+    case "J": return 11;
+    case "Q": return 12;
+    case "K": return 13;
     case "Joker": return 0;
     default: return parseInt(card.rank, 10);
   }

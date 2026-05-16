@@ -77,6 +77,9 @@ export function Table() {
       const latest = useStore.getState().game;
       if (!latest) return;
       useStore.setState({ game: clearRevealsEngine(latest) });
+      if (useStore.getState().mode === "mp") {
+        import("../state/mp").then((m) => m.sendAction({ type: "clear_reveals" }));
+      }
     }, 2400);
     return () => clearTimeout(t);
   }, [game.reveals, game.phase]);
