@@ -446,11 +446,11 @@
 .tslot-right  { grid-area: right;  justify-content: flex-start; }
 .tslot-bottom { grid-area: bottom; align-items: flex-start; }
 
-/* Side players: single horizontal row of cards */
+/* Side players: single vertical column of cards */
 .pos-left .hand-row,
 .pos-right .hand-row {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   flex-wrap: nowrap;
   gap: 5px;
 }
@@ -814,30 +814,31 @@
 /* ========== Action banner ========== */
 .action-banner {
   position: fixed;
-  top: 38%;
+  top: 36%;
   left: 50%;
   transform: translateX(-50%);
   color: #1c1d2b;
   font-weight: 900;
-  font-size: 38px;
+  font-size: 20px;
   letter-spacing: 1px;
-  padding: 18px 32px;
-  border-radius: 22px;
-  border: 5px solid #fff;
+  padding: 10px 20px;
+  border-radius: 14px;
+  border: 3px solid #fff;
   box-shadow:
-    0 0 0 4px #1c1d2b,
-    0 18px 40px rgba(0,0,0,0.45),
-    inset 0 -6px 0 rgba(0,0,0,0.15);
+    0 0 0 3px #1c1d2b,
+    0 10px 24px rgba(0,0,0,0.45),
+    inset 0 -4px 0 rgba(0,0,0,0.15);
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
   z-index: 150;
   pointer-events: none;
-  text-shadow: 2px 2px 0 rgba(255,255,255,0.55);
+  text-shadow: 1px 1px 0 rgba(255,255,255,0.55);
+  white-space: nowrap;
 }
 .action-emoji {
-  font-size: 56px;
-  filter: drop-shadow(0 4px 0 rgba(0,0,0,0.15));
+  font-size: 30px;
+  filter: drop-shadow(0 3px 0 rgba(0,0,0,0.15));
   animation: bouncyEmoji 0.8s ease;
 }
 @keyframes bouncyEmoji {
@@ -1301,36 +1302,49 @@
 }
 
 /* The straw bar itself — candy-cane red/white diagonal stripes */
+/* Barber-pole spin: shifts stripe background-position to create spiral effect */
+@keyframes straw-barber {
+  from { background-position: 0 0; }
+  to   { background-position: 48px 0; }
+}
+
 .straw-stub {
   width: 40px;
   border-radius: 6px 6px 2px 2px;
   background-color: #ffffff;
   background-image: repeating-linear-gradient(
     -45deg,
-    #ff1f1f 0px,
-    #ff1f1f 8px,
+    #e8001a 0px,
+    #e8001a 8px,
     #ffffff 8px,
     #ffffff 16px
   );
+  background-size: 48px 48px;
   border: 2px solid #c9000f;
   box-shadow: 0 4px 12px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0.6);
   cursor: pointer;
   outline: none;
   padding: 0;
   display: block;
-  transition: filter 0.15s ease;
+  transition: filter 0.15s ease, box-shadow 0.15s ease;
 }
 .straw-stub:disabled { cursor: default; }
+/* Taken by someone else: dim slightly but keep candy-cane */
 .straw-stub.taken {
-  background: linear-gradient(to top, #6e4ec9 0%, #a87bff 60%, #c5b3ff 100%);
-  border-color: rgba(168, 123, 255, 0.6);
+  filter: brightness(0.72) saturate(0.6);
+  border-color: rgba(200, 180, 200, 0.5);
 }
+/* My straw: green glow border, full brightness */
 .straw-stub.mine {
-  background: linear-gradient(to top, #228a5b 0%, #67e0a3 60%, #d4f7e3 100%);
-  border-color: rgba(103, 224, 163, 0.6);
+  filter: none;
+  border: 3px solid #67e0a3;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.35), 0 0 18px rgba(103,224,163,0.55), inset 0 0 0 1px rgba(255,255,255,0.6);
 }
+/* Reveal phase: start the barber-pole spin as straws grow */
 .straw-stub.revealed {
-  box-shadow: 0 8px 20px rgba(0,0,0,0.45);
+  animation: straw-barber 0.4s linear infinite;
+  box-shadow: 0 8px 22px rgba(0,0,0,0.45);
+  filter: none;
 }
 
 /* Name label below each straw */
@@ -1479,7 +1493,7 @@
   position: fixed;
   bottom: 18px;
   right: 18px;
-  z-index: 200;
+  z-index: 260; /* above chat-toggle(240) and chat-panel(245) */
   display: flex;
   flex-direction: column;
   align-items: flex-end;

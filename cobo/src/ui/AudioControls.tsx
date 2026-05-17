@@ -1,15 +1,18 @@
 import { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Audio } from "../audio/sounds";
+import { useStore } from "../state/store";
 
 /**
  * Bottom-right audio controls widget.
  *  Collapsed: a small floating circular button with a speaker icon.
  *  Expanded: a panel with two sliders (music + SFX) and per-channel mute toggles.
  *  Music starts on first interaction (browsers require a user gesture for AudioContext).
+ *  Opening audio auto-closes chat, and vice-versa (mutual exclusion via store).
  */
 export function AudioControls() {
-  const [expanded, setExpanded] = useState(false);
+  const expanded = useStore((s) => s.audioOpen);
+  const setAudioOpen = useStore((s) => s.setAudioOpen);
   const [, force] = useState(0);
   const settings = Audio.getSettings();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -37,7 +40,7 @@ export function AudioControls() {
     const onDown = (e: PointerEvent) => {
       if (!panelRef.current) return;
       if (!panelRef.current.contains(e.target as Node)) {
-        setExpanded(false);
+        setAudioOpen(false);
       }
     };
     // Defer so the click that opened the panel doesn't immediately close it
@@ -46,7 +49,7 @@ export function AudioControls() {
       clearTimeout(t);
       window.removeEventListener("pointerdown", onDown);
     };
-  }, [expanded]);
+  }, [expanded, setAudioOpen]);
 
   const overallIcon = settings.musicMuted && settings.sfxMuted
     ? "🔇"
@@ -122,7 +125,7 @@ export function AudioControls() {
         onClick={() => {
           Audio.ensure();
           Audio.startMusic();
-          setExpanded((v) => !v);
+          setAudioOpen(!expanded);
         }}
         whileHover={{ scale: 1.08 }}
         whileTap={{ scale: 0.92 }}

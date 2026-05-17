@@ -104,6 +104,7 @@ interface StoreState {
   chatMessages: ChatMessage[];
   chatOpen: boolean;
   chatUnread: number;
+  audioOpen: boolean;
   init: (numBots: number) => void;
   trainInit: () => void;
   trainingInjectCard: (card: Card) => void;
@@ -137,6 +138,7 @@ interface StoreState {
   proceedFromStrawDraw: () => void;
   receiveChatMessage: (msg: ChatMessage) => void;
   setChatOpen: (open: boolean) => void;
+  setAudioOpen: (open: boolean) => void;
   clearChat: () => void;
 }
 
@@ -171,6 +173,7 @@ export const useStore = create<StoreState>((set, get) => ({
   chatMessages: [],
   chatOpen: false,
   chatUnread: 0,
+  audioOpen: false,
 
   init(numBots) {
     const game = newGame({ players: makePlayers(numBots) });
@@ -757,7 +760,10 @@ export const useStore = create<StoreState>((set, get) => ({
   },
 
   setChatOpen(open) {
-    set({ chatOpen: open, chatUnread: open ? 0 : get().chatUnread });
+    set({ chatOpen: open, chatUnread: open ? 0 : get().chatUnread, audioOpen: open ? false : get().audioOpen });
+  },
+  setAudioOpen(open) {
+    set({ audioOpen: open, chatOpen: open ? false : get().chatOpen });
   },
 
   clearChat() {
