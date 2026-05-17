@@ -431,12 +431,13 @@
     ".    top    ."
     "left center right"
     ".    bottom .";
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(300px, 480px) auto;
   grid-template-rows: auto 1fr auto;
   gap: 16px;
   width: 100%;
   height: 100%;
   min-height: 0;
+  justify-content: center; /* centres the columns so side players sit next to deck */
 }
 
 .tslot { display: flex; align-items: center; justify-content: center; }
@@ -1301,27 +1302,28 @@
   color: #7aa8ff;
 }
 
-/* The straw bar itself — candy-cane red/white diagonal stripes */
-/* Barber-pole spin: shifts stripe background-position to create spiral effect */
+/* Barber-pole spin — shifts stripe position to create a candy-cane spiral */
 @keyframes straw-barber {
   from { background-position: 0 0; }
-  to   { background-position: 48px 0; }
+  to   { background-position: 56px 0; }
 }
 
 .straw-stub {
-  width: 40px;
-  border-radius: 6px 6px 2px 2px;
-  background-color: #ffffff;
+  width: 44px;
+  border-radius: 14px 14px 4px 4px;   /* rounded candy-cane top */
+  background-color: #fff8f8;
   background-image: repeating-linear-gradient(
     -45deg,
-    #e8001a 0px,
-    #e8001a 8px,
-    #ffffff 8px,
-    #ffffff 16px
+    #d80015 0px,
+    #d80015 13px,    /* thick red band */
+    #fff8f8 13px,
+    #fff8f8 26px     /* thick white band */
   );
-  background-size: 48px 48px;
-  border: 2px solid #c9000f;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0.6);
+  background-size: 56px 56px;
+  border: 3px solid #1c1d2b;           /* same dark border as cards */
+  box-shadow:
+    0 5px 0 #1c1d2b,                   /* cartoon 3-D bottom edge */
+    0 8px 18px rgba(0,0,0,0.4);
   cursor: pointer;
   outline: none;
   padding: 0;
@@ -1329,21 +1331,25 @@
   transition: filter 0.15s ease, box-shadow 0.15s ease;
 }
 .straw-stub:disabled { cursor: default; }
-/* Taken by someone else: dim slightly but keep candy-cane */
+/* Taken by someone else — dim but keep candy-cane */
 .straw-stub.taken {
-  filter: brightness(0.72) saturate(0.6);
-  border-color: rgba(200, 180, 200, 0.5);
+  filter: brightness(0.65) saturate(0.55);
 }
-/* My straw: green glow border, full brightness */
+/* My straw — yellow glow matching the game's accent colour */
 .straw-stub.mine {
   filter: none;
-  border: 3px solid #67e0a3;
-  box-shadow: 0 4px 14px rgba(0,0,0,0.35), 0 0 18px rgba(103,224,163,0.55), inset 0 0 0 1px rgba(255,255,255,0.6);
+  border-color: #ffd86b;
+  box-shadow:
+    0 5px 0 #1c1d2b,
+    0 0 18px rgba(255,216,107,0.7),
+    0 8px 18px rgba(0,0,0,0.4);
 }
-/* Reveal phase: start the barber-pole spin as straws grow */
+/* Reveal phase — slow barber-pole spiral as straws grow */
 .straw-stub.revealed {
-  animation: straw-barber 0.4s linear infinite;
-  box-shadow: 0 8px 22px rgba(0,0,0,0.45);
+  animation: straw-barber 1.4s linear infinite;
+  box-shadow:
+    0 5px 0 #1c1d2b,
+    0 10px 24px rgba(0,0,0,0.45);
   filter: none;
 }
 
