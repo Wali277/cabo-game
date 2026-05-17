@@ -18,7 +18,7 @@ interface Props {
 const CARD_SPRING = { type: "spring" as const, stiffness: 300, damping: 26 };
 
 export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: Props) {
-  const cardSize = isHuman ? "lg" : (tablePos === "left" || tablePos === "right") ? "sm" : "md";
+  const cardSize = isHuman ? "lg" : "md";
   const game = useStore((s) => s.game!);
   const targeting = useStore((s) => s.targeting);
   const humanId = useStore((s) => s.humanId);
