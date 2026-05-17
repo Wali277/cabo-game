@@ -557,6 +557,9 @@ io.on("connection", (socket) => {
     room.roundReadyStartedAt = null;
     room.strawReadyVotes = [];
     room.strawReadyStartedAt = null;
+    // Clear stale disconnect/forfeit state from the previous round so every
+    // new round starts with all members treated as active.
+    room.disconnects = {};
     const rrTimer = roundReadyTimers.get(bound.roomCode);
     if (rrTimer) clearTimeout(rrTimer);
     roundReadyTimers.delete(bound.roomCode);
@@ -683,6 +686,40 @@ io.on("connection", (socket) => {
         const m = r.members.find((mm) => mm.playerId === localBound.playerId);
         if (m?.connected) return;
         d.forfeited = true;
+
+        // If the forfeited player currently holds the turn, auto-advance so the
+        // game does not freeze waiting for a disconnected player to act.
+        if (r.game && r.game.phase !== "round_over") {
+          const cur = r.game.players[r.game.currentPlayer];
+          if (cur && cur.id === localBound.playerId) {
+            if (r.game.phase === "turn_drawn" && r.game.drawnFrom !== "discard") {
+              // Auto-discard the drawn card without triggering any ability.
+              r.game = discardDrawnSkipAction(r.game);
+            } else if (r.game.phase === "turn_drawn" && r.game.drawnFrom === "discard") {
+              // Drawn from discard — must swap; swap into slot 0 arbitrarily.
+              r.game = swapDrawnWithHand(r.game, 0);
+            } else if (r.game.phase === "turn_start") {
+              // Auto-draw from deck and discard without action.
+              const afterDraw = drawFromDeck(r.game);
+              if (afterDraw.phase === "turn_drawn") {
+                r.game = discardDrawnSkipAction(afterDraw);
+              } else {
+                r.game = afterDraw; // round ended via drawFromDeck (deck empty edge-case)
+              }
+            } else if (
+              r.game.phase === "pending_action" ||
+              r.game.phase === "action_peek_own" ||
+              r.game.phase === "action_peek_other" ||
+              r.game.phase === "action_blind_swap" ||
+              r.game.phase === "action_peek_and_swap_pick" ||
+              r.game.phase === "action_peek_and_swap_decide"
+            ) {
+              // Skip any in-progress action and advance the turn.
+              r.game = skipPendingAction(r.game);
+            }
+          }
+        }
+
         broadcastRoom(localBound.roomCode);
       }, 20_000);
     }

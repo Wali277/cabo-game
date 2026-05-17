@@ -49,12 +49,17 @@ export function newGame(opts: NewGameOptions): GameState {
     }
   }
 
+  // Per Cabo rules, one card is placed face-up in the discard pile at the
+  // start of every match. This gives the first player an immediate choice
+  // between drawing from the deck or taking the known discard card.
+  const initialDiscard = deck.shift()!;
+
   const state: GameState = {
     players,
     currentPlayer: 0,
     phase: "setup_peek",
     deck,
-    discard: [],
+    discard: [initialDiscard],
     drawnCard: null,
     drawnFrom: null,
     pendingActionSource: null,

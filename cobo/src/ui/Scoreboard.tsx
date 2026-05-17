@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useRef } from "react";
 import { useStore } from "../state/store";
+import { cardScore } from "../engine/game";
 import { Audio } from "../audio/sounds";
 
 export function Scoreboard() {
@@ -83,10 +84,7 @@ export function RoundEndOverlay() {
   const rows = game.players.map((p) => ({
     id: p.id,
     name: p.name,
-    handSum: p.hand.reduce((s, c) => {
-      const v = c.rank === "K" ? 0 : c.rank === "J" || c.rank === "Q" ? 10 : c.rank === "A" ? 1 : parseInt(c.rank, 10);
-      return s + v;
-    }, 0),
+    handSum: p.hand.reduce((s, c) => s + cardScore(c), 0),
     pts: game.scores[p.id][game.scores[p.id].length - 1],
     cumulative: game.scores[p.id].reduce((a, b) => a + b, 0),
   }));
