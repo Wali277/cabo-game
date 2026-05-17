@@ -75,6 +75,9 @@ export interface MpRoom {
   } | null;
   strawReadyVotes: string[];
   strawReadyStartedAt: number | null;
+  bustedThisRound: string[];
+  kickedIds: string[];
+  gloriosVictory: string | null;
 }
 
 export type ActionTargetingMode =

@@ -149,6 +149,13 @@ if (hasBuiltClient) {
   console.log("No built client found at cobo/dist — running in API-only mode (use Vite for the client).");
 }
 
+/** Players who can still participate: not forfeited and not permanently kicked. */
+function activePlayerIds(room: { members: { playerId: string }[]; disconnects: Record<string, { forfeited: boolean }>; kickedIds: string[] }): string[] {
+  return room.members
+    .map((m) => m.playerId)
+    .filter((pid) => !room.disconnects[pid]?.forfeited && !room.kickedIds.includes(pid));
+}
+
 function broadcastRoom(roomCode: string) {
   const room = rooms.get(roomCode);
   if (!room) return;
@@ -198,6 +205,9 @@ function publicView(room: ReturnType<Rooms["get"]> & {}, viewerId: string) {
     roundReadyStartedAt: room.roundReadyStartedAt,
     strawReadyVotes: room.strawReadyVotes,
     strawReadyStartedAt: room.strawReadyStartedAt,
+    bustedThisRound: room.bustedThisRound,
+    kickedIds: room.kickedIds,
+    gloriosVictory: room.gloriosVictory,
   };
 }
 
@@ -317,6 +327,9 @@ io.on("connection", (socket) => {
     if (!room) return cb({ ok: false, error: "Room not found" });
     const member = room.members.find((m) => m.playerId === playerId);
     if (!member) return cb({ ok: false, error: "Not a member" });
+    if (room.kickedIds.includes(playerId)) {
+      return cb({ ok: false, error: "You have been eliminated from this game." });
+    }
     member.socketId = socket.id;
     member.connected = true;
     // Clear any in-progress disconnect timer for this player
@@ -347,10 +360,7 @@ io.on("connection", (socket) => {
       room.readyVotes.push(bound.playerId);
     }
 
-    // All active (non-forfeited) players must vote before we start.
-    const activeIds = room.members
-      .map((m) => m.playerId)
-      .filter((pid) => !room.disconnects[pid]?.forfeited);
+    const activeIds = activePlayerIds(room);
     const allVoted = activeIds.every((pid) => room.readyVotes.includes(pid));
 
     if (!room.readyStartedAt) {
@@ -470,9 +480,7 @@ io.on("connection", (socket) => {
       room.strawReadyVotes.push(bound.playerId);
     }
 
-    const activeIds = room.members
-      .map((m) => m.playerId)
-      .filter((pid) => !room.disconnects[pid]?.forfeited);
+    const activeIds = activePlayerIds(room);
     const allVoted = activeIds.every((pid) => room.strawReadyVotes.includes(pid));
 
     function startFromStraw() {
@@ -517,15 +525,22 @@ io.on("connection", (socket) => {
     if (!room || !room.game) return cb({ ok: false, error: "No game" });
     if (room.game.phase !== "round_over") return cb({ ok: false, error: "Round not over" });
 
+    // Clear any old victory state from a previous game session.
+    room.gloriosVictory = null;
+
+    // Finalise busts from the round that just ended: move to permanent kicked list.
+    for (const id of room.bustedThisRound) {
+      if (!room.kickedIds.includes(id)) room.kickedIds.push(id);
+    }
+    room.bustedThisRound = [];
+
     // Record this player's vote (idempotent).
     if (!room.playAgainVotes.includes(bound.playerId)) {
       room.playAgainVotes.push(bound.playerId);
     }
 
-    // Active players = members who have not forfeited. We need ALL of them to vote.
-    const activeIds = room.members
-      .map((m) => m.playerId)
-      .filter((pid) => !room.disconnects[pid]?.forfeited);
+    // Active players = members who have not forfeited AND have not been kicked.
+    const activeIds = activePlayerIds(room);
     if (activeIds.length < 2) {
       return cb({ ok: false, error: "Not enough active players for a rematch" });
     }
@@ -538,16 +553,34 @@ io.on("connection", (socket) => {
       return;
     }
 
-    // Everyone has voted — start the next round.
-    const players = room.game.players.map((p) => ({ id: p.id, name: p.name, isBot: false }));
-    const nextStarter = (room.lastStarterIdx + 1) % players.length;
+    // Everyone has voted — determine players for next round (exclude kicked).
+    const playersForNextRound = room.game.players.filter(
+      (p) => !room.kickedIds.includes(p.id)
+    );
+
+    if (playersForNextRound.length <= 1) {
+      // Only one player left — declare glorious victory.
+      room.gloriosVictory = playersForNextRound[0]?.id ?? null;
+      room.playAgainVotes = [];
+      cb({ ok: true });
+      broadcastRoom(bound.roomCode);
+      return;
+    }
+
+    // Continue with remaining (non-kicked) players only.
+    const players = playersForNextRound.map((p) => ({
+      id: p.id,
+      name: p.name,
+      isBot: false,
+    }));
+    const nextStarterIdx = (room.lastStarterIdx + 1) % players.length;
     room.game = newGame({
       players,
       roundNumber: room.game.roundNumber + 1,
       scores: room.game.scores,
     });
-    room.game.currentPlayer = nextStarter;
-    room.lastStarterIdx = nextStarter;
+    room.game.currentPlayer = nextStarterIdx;
+    room.lastStarterIdx = nextStarterIdx;
     room.coinToss = null;
     room.strawDraw = null; // No straw draw from round 2 onward — alternation handles order.
     room.playAgainVotes = [];
@@ -557,6 +590,8 @@ io.on("connection", (socket) => {
     room.roundReadyStartedAt = null;
     room.strawReadyVotes = [];
     room.strawReadyStartedAt = null;
+    room.bustedThisRound = [];
+    // kickedIds intentionally not cleared — eliminations persist across rounds.
     // Clear stale disconnect/forfeit state from the previous round so every
     // new round starts with all members treated as active.
     room.disconnects = {};
@@ -582,10 +617,7 @@ io.on("connection", (socket) => {
         room.roundReadyVotes.push(bound.playerId);
       }
 
-      // All active players must vote before round starts.
-      const activeRoundIds = room.members
-        .map((m) => m.playerId)
-        .filter((pid) => !room.disconnects[pid]?.forfeited);
+      const activeRoundIds = activePlayerIds(room);
       const allRoundVoted = activeRoundIds.every((pid) => room.roundReadyVotes.includes(pid));
 
       if (!room.roundReadyStartedAt) {
@@ -626,6 +658,14 @@ io.on("connection", (socket) => {
     const next = applyAction(room.game, bound.playerId, action);
     if (!next) return cb?.({ ok: false, error: "Illegal action" });
     room.game = next;
+
+    // After a round ends, compute which players are newly busted (cumulative > 100)
+    if (room.game.phase === "round_over") {
+      room.bustedThisRound = room.game.players
+        .filter((p) => (room.game!.scores[p.id] ?? []).reduce((a: number, b: number) => a + b, 0) > 100)
+        .map((p) => p.id);
+    }
+
     cb?.({ ok: true });
     broadcastRoom(bound.roomCode);
   });

@@ -5,6 +5,8 @@ import { PlayerSeat } from "./PlayerSeat";
 import { Center } from "./Center";
 import { LeftPanel } from "./LeftPanel";
 import { Scoreboard, RoundEndOverlay } from "./Scoreboard";
+import { BustedOverlay } from "./BustedOverlay";
+import { GloriousVictory } from "./GloriousVictory";
 import { ActionBanner } from "./ActionBanner";
 import { ActionLog } from "./ActionLog";
 import { TrainingPanel } from "./TrainingPanel";
@@ -265,6 +267,8 @@ export function Table() {
 
         <ActionBanner />
         <RoundEndOverlay />
+        <BustedOverlay />
+        <GloriousVictory />
         <MpNotices />
 
         {/* Tap-anywhere overlay to dismiss peek/spy reveals early */}

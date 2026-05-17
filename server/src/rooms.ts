@@ -28,6 +28,9 @@ export interface Room {
   } | null;
   playAgainVotes: string[];
   disconnects: Record<string, { startedAt: number; forfeited: boolean }>;
+  bustedThisRound: string[];
+  kickedIds: string[];
+  gloriosVictory: string | null;
   // Ready-up system: first player to click arms a 10s timer; second click starts immediately.
   readyVotes: string[];
   readyStartedAt: number | null;
@@ -77,6 +80,9 @@ export class Rooms {
       strawDraw: null,
       playAgainVotes: [],
       disconnects: {},
+      bustedThisRound: [],
+      kickedIds: [],
+      gloriosVictory: null,
       readyVotes: [],
       readyStartedAt: null,
       roundReadyVotes: [],

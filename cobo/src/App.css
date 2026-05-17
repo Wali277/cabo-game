@@ -2043,3 +2043,39 @@
 .action-banner {
   filter: drop-shadow(0 0 26px rgba(255,255,255,0.35));
 }
+
+/* ── Busted overlay ─────────────────────────────────────────────────── */
+.busted-modal .modal-burst { font-size: 72px; }
+.busted-modal h2 { color: #ff5b6e; }
+.busted-score {
+  font-size: 36px;
+  font-weight: 800;
+  color: #ff5b6e;
+  margin: 4px 0 16px;
+  text-shadow: 0 2px 8px rgba(255,91,110,0.4);
+}
+
+/* ── Glorious Victory overlay ───────────────────────────────────────── */
+.glory-modal {
+  border-color: #ffd86b !important;
+  background: linear-gradient(135deg, #1c1d2b 0%, #2d1d52 100%);
+  color: #fff;
+}
+.glory-modal .modal-burst { font-size: 72px; }
+.glory-modal h2 {
+  color: #ffd86b;
+  font-size: 30px;
+  letter-spacing: 0.04em;
+  text-shadow: 0 2px 12px rgba(255,216,107,0.5);
+}
+.glory-subtitle {
+  color: #a87bff;
+  font-size: 17px;
+  margin: 4px 0 12px;
+}
+.glory-modal .btn.primary {
+  background: #ffd86b;
+  color: #1c1d2b;
+  border-color: #ffd86b;
+}
+.glory-modal .btn.primary:hover { background: #ffe99a; }

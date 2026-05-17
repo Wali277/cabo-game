@@ -6,12 +6,16 @@ import { Audio } from "../audio/sounds";
 
 export function Scoreboard() {
   const game = useStore((s) => s.game!);
-  const rows = Object.entries(game.scores).map(([id, arr]) => ({
-    id,
-    name: game.players.find((p) => p.id === id)?.name ?? id,
-    total: arr.reduce((a, b) => a + b, 0),
-    rounds: arr,
-  }));
+  const mp = useStore((s) => s.mp);
+  const kickedSet = new Set(mp?.kickedIds ?? []);
+  const rows = Object.entries(game.scores)
+    .filter(([id]) => !kickedSet.has(id))
+    .map(([id, arr]) => ({
+      id,
+      name: game.players.find((p) => p.id === id)?.name ?? id,
+      total: arr.reduce((a, b) => a + b, 0),
+      rounds: arr,
+    }));
   rows.sort((a, b) => a.total - b.total); // lowest total = closest to winning
 
   // Each player's per-round column count (use the longest array)
@@ -69,6 +73,7 @@ export function RoundEndOverlay() {
   const humanId = useStore((s) => s.humanId);
   const playAgain = useStore((s) => s.playAgain);
   const backToMenu = useStore((s) => s.backToMenu);
+  const kickedSet = new Set(mp?.kickedIds ?? []);
 
   // Play the win/lose SFX once per round end. Keyed on roundNumber so a fresh
   // round triggers a fresh sound, and reconnecting mid-overlay still plays it.
@@ -81,13 +86,15 @@ export function RoundEndOverlay() {
   }, [game.phase, game.roundNumber, game.winnerId, humanId]);
 
   if (game.phase !== "round_over") return null;
-  const rows = game.players.map((p) => ({
-    id: p.id,
-    name: p.name,
-    handSum: p.hand.reduce((s, c) => s + cardScore(c), 0),
-    pts: game.scores[p.id][game.scores[p.id].length - 1],
-    cumulative: game.scores[p.id].reduce((a, b) => a + b, 0),
-  }));
+  const rows = game.players
+    .filter((p) => !kickedSet.has(p.id))
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      handSum: p.hand.reduce((s, c) => s + cardScore(c), 0),
+      pts: game.scores[p.id][game.scores[p.id].length - 1],
+      cumulative: game.scores[p.id].reduce((a, b) => a + b, 0),
+    }));
   // Rank by cumulative score ascending — Cabo: lowest wins
   rows.sort((a, b) => a.cumulative - b.cumulative);
   const lowestCum = rows[0].cumulative;

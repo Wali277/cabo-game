@@ -409,13 +409,9 @@ function endRound(state: GameState): GameState {
   }
   // Score
   const totals = s.players.map((p) => ({ id: p.id, name: p.name, total: handScore(p.hand) }));
-  let lowest = Math.min(...totals.map((t) => t.total));
+  const lowest = Math.min(...totals.map((t) => t.total));
   for (const t of totals) {
-    let pts = t.total;
-    if (s.caboCallerId === t.id && t.total !== lowest) {
-      pts += 5;
-    }
-    s.scores[t.id].push(pts);
+    s.scores[t.id].push(t.total);
   }
   // Winner of the round: lowest total. If cabo caller tied lowest, they win the tie.
   const lowestPlayers = totals.filter((t) => t.total === lowest);
