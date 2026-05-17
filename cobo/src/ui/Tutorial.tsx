@@ -30,7 +30,7 @@ const SLIDES: Slide[] = [
   {
     title: "Action cards",
     body:
-      "If you DISCARD a drawn action card, its power triggers:\n  • 7 or 8 — peek at one of your own cards\n  • 9 or 10 — spy on one opponent card\n  • J or Q — blind-swap one of your cards with an opponent's\n  • ♠/♣ K — peek at any card, then optionally swap with one of yours\n(Swapping a hand card does NOT trigger its action — only discarding the drawn card.)",
+      "If you DISCARD a drawn action card, its power triggers:\n  • 7 or 8 — peek at one of your own cards\n  • 9 or 10 — spy on one opponent card\n  • J or Q — blind-swap one of your cards with an opponent's\n  • K (any suit) — peek at any card, then optionally swap with one of yours\n(Swapping a hand card does NOT trigger its action — only discarding the drawn card.)",
   },
   {
     title: "Snap (throw-in)",
@@ -45,7 +45,7 @@ const SLIDES: Slide[] = [
   {
     title: "Scoring",
     body:
-      "Ace = 1 · 2–10 = face value · J / Q = 10 · K = 0 (Kings are the best card to hold). Round scores stack across rounds — first to play again carries totals.",
+      "Ace = 1 · 2–10 = face value · J = 11 · Q = 12 · K = 13 · Joker = 0\n\nJokers are the best cards to hold — they're worth nothing! Kings are the most dangerous — they're worth 13 points. Round scores stack across rounds — lowest total after all rounds wins.",
   },
 ];
 

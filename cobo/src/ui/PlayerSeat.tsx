@@ -119,6 +119,41 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
 
   const known = player.knownToSelf;
 
+  // Side players (left/right) render their card row horizontally then rotate it
+  // so CABO text faces the person sitting on that side.
+  // sm card: 56×81 → row of 4: ~266px wide × 93px tall
+  // After rotation: wrapper is 93px wide × 266px tall.
+  const isSide = tablePos === "left" || tablePos === "right";
+  const sideRotateDeg = tablePos === "right" ? -90 : 90;
+
+  const cardSlots = player.hand.map((c, idx) => {
+    const { faceUp, card } = cardFaceUp(idx);
+    const hl = cardHighlight(idx);
+    const knownDot = isHuman && known[idx] && !faceUp;
+    const spied = cardIsBeingSpied(idx);
+    const initial = slotInitial(idx);
+    const hasInitial = Object.keys(initial).length > 0;
+    return (
+      <motion.div
+        className={`hand-slot${spied ? " spy-glow" : ""}`}
+        key={c.id}
+        initial={hasInitial ? initial : false}
+        animate={{ x: 0, y: 0, opacity: 1, scale: 1 }}
+        transition={CARD_SPRING}
+      >
+        <CardView
+          card={card}
+          faceUp={faceUp}
+          highlight={hl}
+          onClick={() => handleClick(idx)}
+          size={cardSize}
+          layoutId={c.id}
+        />
+        {knownDot && <div className="known-dot" title="You've seen this card" />}
+      </motion.div>
+    );
+  });
+
   return (
     <div className={`player-seat seat-${seatIndex}${tablePos ? ` pos-${tablePos}` : ""}`}>
       <div
@@ -133,38 +168,21 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
         <span>{player.name}</span>
         {player.calledCabo && <span className="cabo-badge">CABO!</span>}
       </div>
-      <div className="hand-row">
-        {player.hand.map((c, idx) => {
-          const { faceUp, card } = cardFaceUp(idx);
-          const hl = cardHighlight(idx);
-          const knownDot = isHuman && known[idx] && !faceUp;
-          const spied = cardIsBeingSpied(idx);
-          const initial = slotInitial(idx);
-          const hasInitial = Object.keys(initial).length > 0;
-          return (
-            <motion.div
-              className={`hand-slot${spied ? " spy-glow" : ""}`}
-              key={c.id}
-              initial={hasInitial ? initial : false}
-              // Always target the fully-visible state so a slot can never get
-              // stuck mid-animation (which previously caused cards to vanish
-              // when another state update arrived during an entrance animation).
-              animate={{ x: 0, y: 0, opacity: 1, scale: 1 }}
-              transition={CARD_SPRING}
-            >
-              <CardView
-                card={card}
-                faceUp={faceUp}
-                highlight={hl}
-                onClick={() => handleClick(idx)}
-                size={cardSize}
-                layoutId={c.id}
-              />
-              {knownDot && <div className="known-dot" title="You've seen this card" />}
-            </motion.div>
-          );
-        })}
-      </div>
+
+      {isSide ? (
+        // Fixed-size wrapper reserves the post-rotation footprint (93×266).
+        // The inner hand-row is a horizontal row that gets rotated into a column.
+        <div className="hand-row-side-wrap">
+          <div
+            className="hand-row hand-row-side"
+            style={{ transform: `translateX(-50%) translateY(-50%) rotate(${sideRotateDeg}deg)` }}
+          >
+            {cardSlots}
+          </div>
+        </div>
+      ) : (
+        <div className="hand-row">{cardSlots}</div>
+      )}
     </div>
   );
 }

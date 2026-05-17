@@ -447,13 +447,25 @@
 .tslot-right  { grid-area: right;  justify-content: flex-start; }
 .tslot-bottom { grid-area: bottom; align-items: flex-start; }
 
-/* Side players: single vertical column of cards */
-.pos-left .hand-row,
-.pos-right .hand-row {
-  display: flex;
-  flex-direction: column;
+/* Side players: cards are rendered in a horizontal row then rotated 90°
+   so CABO text faces the player sitting on that side.
+   sm card = 56×81 → row of 4 ≈ 266px wide × 93px tall
+   After rotation: wrapper reserves 93px wide × 266px tall. */
+.hand-row-side-wrap {
+  width: 93px;
+  height: 266px;
+  position: relative;
+  flex-shrink: 0;
+}
+.hand-row-side {
+  /* absolute + centered so transform-origin is the row's own center */
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  flex-direction: row;   /* horizontal row — rotation makes it appear vertical */
   flex-wrap: nowrap;
-  gap: 5px;
+  gap: 10px;
+  /* transform applied inline with the rotation direction per seat */
 }
 
 /* Unused — kept for compat */
