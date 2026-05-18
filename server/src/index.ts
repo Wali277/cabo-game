@@ -662,10 +662,10 @@ io.on("connection", (socket) => {
     if (!next || next === room.game) return cb?.({ ok: false, error: "Illegal action" });
     room.game = next;
 
-    // After a round ends, compute which players are newly busted (cumulative > 100)
+    // After a round ends, compute which players are newly busted (cumulative > 65)
     if (room.game.phase === "round_over") {
       room.bustedThisRound = room.game.players
-        .filter((p) => (room.game!.scores[p.id] ?? []).reduce((a: number, b: number) => a + b, 0) > 100)
+        .filter((p) => (room.game!.scores[p.id] ?? []).reduce((a: number, b: number) => a + b, 0) > 65)
         .map((p) => p.id);
     }
 

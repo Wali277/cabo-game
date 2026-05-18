@@ -31,7 +31,7 @@ export function BustedOverlay() {
         >
           <div className="modal-burst">💥</div>
           <h2>You&apos;re Busted!</h2>
-          <p className="modal-subtitle">Your total score reached {total} pts — over the 100 limit</p>
+          <p className="modal-subtitle">Your total score reached {total} pts — over the 65 limit</p>
           <div className="busted-score">{total} pts</div>
           <p style={{ fontSize: "14px", color: "#888", marginBottom: "20px" }}>
             You&apos;ve been eliminated. Better luck next game!
