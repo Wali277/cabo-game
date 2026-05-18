@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react"; // useState kept for hydrated
 import "./App.css";
 import { useStore } from "./state/store";
 import { Menu } from "./ui/Menu";
@@ -20,7 +20,9 @@ function getRoomFromPath(): string | null {
 function App() {
   const screen = useStore((s) => s.screen);
   const enterLobby = useStore((s) => s.enterLobby);
-  const [initialRoom] = useState<string | null>(() => getRoomFromPath());
+  // NOTE: do NOT memoize the room code here. leaveRoom() clears the URL to "/"
+  // so re-reading getRoomFromPath() on each Lobby mount gives the correct value
+  // (null after a game ends, real code only on a fresh direct-link visit).
   const [hydrated, setHydrated] = useState(false);
 
   const prevScreenRef = useRef(screen);
@@ -104,7 +106,7 @@ function App() {
   return (
     <>
       {screen === "menu" && <Menu />}
-      {screen === "lobby" && <Lobby initialCode={initialRoom ?? undefined} />}
+      {screen === "lobby" && <Lobby initialCode={getRoomFromPath() ?? undefined} />}
       {screen === "coin_toss" && <CoinToss />}
       {screen === "straw_draw" && <StrawDraw />}
       {screen === "game" && <Table />}

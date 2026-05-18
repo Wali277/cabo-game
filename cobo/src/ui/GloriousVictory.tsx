@@ -12,7 +12,11 @@ export function GloriousVictory() {
   const game = useStore((s) => s.game);
 
   const victorId = mp?.gloriosVictory ?? null;
-  const show = mode === "mp" && !!victorId;
+  // Don't show GV for players who are themselves busted — they see BustedOverlay.
+  const localPlayerEliminated =
+    (mp?.bustedThisRound.includes(humanId) ?? false) ||
+    (mp?.kickedIds.includes(humanId) ?? false);
+  const show = mode === "mp" && !!victorId && !localPlayerEliminated;
 
   // Fire confetti + win sound only for the winner
   useEffect(() => {

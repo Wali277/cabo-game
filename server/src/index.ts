@@ -525,6 +525,12 @@ io.on("connection", (socket) => {
     if (!room || !room.game) return cb({ ok: false, error: "No game" });
     if (room.game.phase !== "round_over") return cb({ ok: false, error: "Round not over" });
 
+    // If glory was auto-declared at round-end (because only 1 survivor remained),
+    // there is nothing to vote on — reject stray play_again requests.
+    if (room.gloriosVictory) {
+      return cb({ ok: false, error: "Game over — a winner has already been declared" });
+    }
+
     // Clear any old victory state from a previous game session.
     room.gloriosVictory = null;
 
@@ -668,11 +674,29 @@ io.on("connection", (socket) => {
     if (!next || next === room.game) return cb?.({ ok: false, error: "Illegal action" });
     room.game = next;
 
-    // After a round ends, compute which players are newly busted (cumulative > 30)
+    // After a round ends, compute which players are newly busted (cumulative > 60)
     if (room.game.phase === "round_over") {
       room.bustedThisRound = room.game.players
-        .filter((p) => (room.game!.scores[p.id] ?? []).reduce((a: number, b: number) => a + b, 0) > 30)
+        .filter((p) => (room.game!.scores[p.id] ?? []).reduce((a: number, b: number) => a + b, 0) > 60)
         .map((p) => p.id);
+
+      // If busts this round leave only one active player, declare glorious victory
+      // immediately — no play-again vote needed.
+      if (room.bustedThisRound.length > 0) {
+        const allEliminated = new Set([...room.kickedIds, ...room.bustedThisRound]);
+        const survivors = room.members
+          .map((m) => m.playerId)
+          .filter((pid) => !allEliminated.has(pid) && !room.disconnects[pid]?.forfeited);
+
+        if (survivors.length <= 1) {
+          // Move busted players to kickedIds right away so they cannot rejoin.
+          // Keep bustedThisRound populated so clients can show the BustedOverlay.
+          for (const id of room.bustedThisRound) {
+            if (!room.kickedIds.includes(id)) room.kickedIds.push(id);
+          }
+          room.gloriosVictory = survivors[0] ?? null;
+        }
+      }
     }
 
     cb?.({ ok: true });

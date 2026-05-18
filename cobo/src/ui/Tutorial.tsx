@@ -40,12 +40,17 @@ const SLIDES: Slide[] = [
   {
     title: "Calling CABO",
     body:
-      "Skip your draw to call CABO. Every other player gets ONE more turn, then everyone reveals. Lowest total wins the round. If you called CABO but didn't win, you take a +5 penalty.",
+      "Skip your draw to call CABO. Every other player gets ONE more turn, then everyone reveals. Lowest hand total wins the round. Calling CABO doesn't protect you — if your hand isn't the lowest, you still score whatever you're holding.",
   },
   {
     title: "Scoring",
     body:
       "Ace = 1 · 2–10 = face value · J = 11 · Q = 12 · K = 13 · Joker = 0\n\nJokers are the best cards to hold — they're worth nothing! Kings are the most dangerous — they're worth 13 points. Round scores stack across rounds — lowest total after all rounds wins.",
+  },
+  {
+    title: "Bust! (Multiplayer)",
+    body:
+      "In multiplayer, your scores add up across every round. If your cumulative total exceeds 60 points you are BUSTED — permanently eliminated from the room. No rejoining, no exceptions!\n\nThe last player still standing wins a Glorious Victory. Play smart: keeping each round's score low is how you survive the long game. Kings and Jacks are your worst enemies late in a session.",
   },
 ];
 
