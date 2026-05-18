@@ -77,15 +77,22 @@ export function RoundEndOverlay() {
 
   // Play the win/lose SFX once per round end. Keyed on roundNumber so a fresh
   // round triggers a fresh sound, and reconnecting mid-overlay still plays it.
+  // Skip when GloriousVictory is about to take over (GV fires its own win SFX).
   const playedFor = useRef<number | null>(null);
   useEffect(() => {
     if (game.phase !== "round_over") return;
+    if (mp?.gloriosVictory) return; // GloriousVictory fires the win SFX
+    if (mode === "mp" && mp?.bustedThisRound.includes(humanId)) return;
     if (playedFor.current === game.roundNumber) return;
     playedFor.current = game.roundNumber;
     Audio.playSfx(game.winnerId === humanId ? "win" : "lose");
-  }, [game.phase, game.roundNumber, game.winnerId, humanId]);
+  }, [game.phase, game.roundNumber, game.winnerId, humanId, mp?.gloriosVictory]);
 
   if (game.phase !== "round_over") return null;
+  // GloriousVictory takes over when a winner is declared — hide this overlay.
+  if (mode === "mp" && mp?.gloriosVictory) return null;
+  // BustedOverlay takes over for the busted player — hide this overlay for them.
+  if (mode === "mp" && mp?.bustedThisRound.includes(humanId)) return null;
   const rows = game.players
     .filter((p) => !kickedSet.has(p.id))
     .map((p) => ({

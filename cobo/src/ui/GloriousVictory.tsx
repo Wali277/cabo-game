@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useEffect } from "react";
 import confetti from "canvas-confetti";
 import { useStore } from "../state/store";
+import { Audio } from "../audio/sounds";
 
 export function GloriousVictory() {
   const mp = useStore((s) => s.mp);
@@ -13,9 +14,10 @@ export function GloriousVictory() {
   const victorId = mp?.gloriosVictory ?? null;
   const show = mode === "mp" && !!victorId;
 
-  // Fire confetti only for the winner
+  // Fire confetti + win sound only for the winner
   useEffect(() => {
     if (!show || victorId !== humanId) return;
+    Audio.playSfx("win");
     const fire = () => {
       confetti({
         particleCount: 120,
@@ -47,7 +49,7 @@ export function GloriousVictory() {
         className="overlay"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        style={{ zIndex: 210 }}
+        style={{ zIndex: 400 }}
       >
         <motion.div
           className="modal glory-modal"

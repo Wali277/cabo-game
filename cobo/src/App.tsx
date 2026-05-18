@@ -9,6 +9,7 @@ import { StrawDraw } from "./ui/StrawDraw";
 import { AudioControls } from "./ui/AudioControls";
 import { ChatPanel } from "./ui/ChatPanel";
 import { EliminatedOverlay } from "./ui/EliminatedOverlay";
+import { BUSTED_ROOM_KEY } from "./ui/BustedOverlay";
 import { getSocket } from "./state/mp";
 
 function getRoomFromPath(): string | null {
@@ -28,9 +29,22 @@ function App() {
   useEffect(() => {
     const room = getRoomFromPath();
     if (room) {
-      // A room code in the URL means the player followed a share link or is
-      // refreshing mid-game. Open the socket (which auto-rejoins via the stored
-      // session if one exists) and navigate to the lobby/room screen.
+      // Check if this player was previously busted/eliminated from this room.
+      // If yes, show the elimination screen immediately — don't enter the lobby.
+      try {
+        const raw = localStorage.getItem(BUSTED_ROOM_KEY);
+        if (raw) {
+          const saved = JSON.parse(raw) as { code: string };
+          if (saved.code === room) {
+            useStore.setState({ eliminatedFromRoom: true });
+            setHydrated(true);
+            return;
+          }
+        }
+      } catch { /* ignore malformed data */ }
+
+      // Normal path: open the socket (auto-rejoins via stored session if any)
+      // and navigate to the lobby/room screen.
       getSocket();
       enterLobby();
     }

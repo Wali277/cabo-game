@@ -1,5 +1,10 @@
+import { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useStore } from "../state/store";
+
+// Key used to persist the "busted from room X" flag across page loads/refreshes.
+// Cleared when the player explicitly dismisses the EliminatedOverlay.
+export const BUSTED_ROOM_KEY = "cobo.mp.busted";
 
 export function BustedOverlay() {
   const game = useStore((s) => s.game!);
@@ -8,9 +13,21 @@ export function BustedOverlay() {
   const backToMenu = useStore((s) => s.backToMenu);
   const mode = useStore((s) => s.mode);
 
-  if (mode !== "mp" || !mp) return null;
-  if (game.phase !== "round_over") return null;
-  if (!mp.bustedThisRound.includes(humanId)) return null;
+  const isBusted =
+    mode === "mp" &&
+    !!mp &&
+    game.phase === "round_over" &&
+    mp.bustedThisRound.includes(humanId);
+
+  // Persist a "busted from this room" marker in localStorage so that if the
+  // player navigates back to the same link (after leaveRoom clears their
+  // session), they still see the EliminatedOverlay instead of the lobby.
+  useEffect(() => {
+    if (!isBusted || !mp?.code) return;
+    localStorage.setItem(BUSTED_ROOM_KEY, JSON.stringify({ code: mp.code }));
+  }, [isBusted, mp?.code]);
+
+  if (!isBusted) return null;
 
   const scores = game.scores[humanId] ?? [];
   const total = scores.reduce((a, b) => a + b, 0);
@@ -21,7 +38,7 @@ export function BustedOverlay() {
         className="overlay"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        style={{ zIndex: 210 }}
+        style={{ zIndex: 300 }}
       >
         <motion.div
           className="modal busted-modal"

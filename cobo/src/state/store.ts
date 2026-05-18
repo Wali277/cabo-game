@@ -756,9 +756,14 @@ export const useStore = create<StoreState>((set, get) => ({
   },
 
   backToMenu() {
-    const { mode } = get();
+    const { mode, eliminatedFromRoom } = get();
     if (mode === "mp") {
       import("./mp").then((m) => m.leaveRoom());
+    }
+    // If the player was on the EliminatedOverlay, clear the persisted busted
+    // marker so they won't see the elimination screen again on a fresh visit.
+    if (eliminatedFromRoom) {
+      try { localStorage.removeItem("cobo.mp.busted"); } catch { /* ignore */ }
     }
     set({
       screen: "menu", mode: "sp", training: false, mp: null,
