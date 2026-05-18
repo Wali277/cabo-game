@@ -674,28 +674,76 @@ io.on("connection", (socket) => {
     if (!next || next === room.game) return cb?.({ ok: false, error: "Illegal action" });
     room.game = next;
 
-    // After a round ends, compute which players are newly busted (cumulative > 60)
+    // After a round ends: track wins, detect busts, and determine if the game ends.
     if (room.game.phase === "round_over") {
+      // ── 1. Track round wins ──────────────────────────────────────────────────
+      // Increment the win counter for whoever had the lowest hand this round.
+      const roundWinnerId = room.game.winnerId;
+      if (roundWinnerId) {
+        room.roundWins[roundWinnerId] = (room.roundWins[roundWinnerId] ?? 0) + 1;
+      }
+
+      // ── 2. Compute newly busted players (cumulative score > 60) ─────────────
       room.bustedThisRound = room.game.players
         .filter((p) => (room.game!.scores[p.id] ?? []).reduce((a: number, b: number) => a + b, 0) > 60)
         .map((p) => p.id);
 
-      // If busts this round leave only one active player, declare glorious victory
-      // immediately — no play-again vote needed.
       if (room.bustedThisRound.length > 0) {
         const allEliminated = new Set([...room.kickedIds, ...room.bustedThisRound]);
         const survivors = room.members
           .map((m) => m.playerId)
           .filter((pid) => !allEliminated.has(pid) && !room.disconnects[pid]?.forfeited);
 
-        if (survivors.length <= 1) {
-          // Move busted players to kickedIds right away so they cannot rejoin.
-          // Keep bustedThisRound populated so clients can show the BustedOverlay.
+        if (survivors.length === 1) {
+          // ── One clear survivor after busts → regular Glorious Victory ────────
           for (const id of room.bustedThisRound) {
             if (!room.kickedIds.includes(id)) room.kickedIds.push(id);
           }
-          room.gloriosVictory = survivors[0] ?? null;
+          room.gloriosVictory = survivors[0];
+
+        } else if (survivors.length === 0) {
+          // ── Everyone busted simultaneously → tiebreaker ──────────────────────
+          // Only consider players who were active in this round (not previously kicked).
+          const contestants = room.bustedThisRound.filter(
+            (pid) => !room.kickedIds.includes(pid),
+          );
+
+          let gloriousWinnerId: string | null = null;
+
+          if (contestants.length === 1) {
+            // Only one active buster — they win by default.
+            gloriousWinnerId = contestants[0];
+          } else if (contestants.length > 1) {
+            // Tiebreaker 1: most round wins accumulated across all previous rounds.
+            const maxWins = Math.max(...contestants.map((pid) => room.roundWins[pid] ?? 0));
+            const topByWins = contestants.filter((pid) => (room.roundWins[pid] ?? 0) === maxWins);
+
+            if (topByWins.length === 1) {
+              gloriousWinnerId = topByWins[0];
+            } else {
+              // Tiebreaker 2: whoever won this last round is the Glorious Victor.
+              // (There is always exactly one round winner, so this always resolves.)
+              const lastWinner = room.game.winnerId;
+              gloriousWinnerId =
+                lastWinner && topByWins.includes(lastWinner)
+                  ? lastWinner
+                  : topByWins[0]; // ultra-rare fallback
+            }
+          }
+
+          if (gloriousWinnerId) {
+            // The Glorious Victor technically busted but wins by tiebreaker.
+            // Remove them from bustedThisRound so they see GloriousVictory, not BustedOverlay.
+            room.bustedThisRound = room.bustedThisRound.filter((id) => id !== gloriousWinnerId);
+            // Permanently kick the actual losers (the victor is exempt — game is over).
+            for (const id of room.bustedThisRound) {
+              if (!room.kickedIds.includes(id)) room.kickedIds.push(id);
+            }
+            room.gloriosVictory = gloriousWinnerId;
+          }
+          // If contestants.length === 0 (edge case: all were already kicked), do nothing.
         }
+        // survivors.length > 1: multiple players still active → normal play-again flow.
       }
     }
 

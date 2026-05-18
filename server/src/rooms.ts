@@ -31,6 +31,9 @@ export interface Room {
   bustedThisRound: string[];
   kickedIds: string[];
   gloriosVictory: string | null;
+  /** Number of rounds each player has won (lowest hand at round end). Used for
+   *  the simultaneous-bust tiebreaker: most wins → Glorious Victor. */
+  roundWins: Record<string, number>;
   // Ready-up system: first player to click arms a 10s timer; second click starts immediately.
   readyVotes: string[];
   readyStartedAt: number | null;
@@ -83,6 +86,7 @@ export class Rooms {
       bustedThisRound: [],
       kickedIds: [],
       gloriosVictory: null,
+      roundWins: {},
       readyVotes: [],
       readyStartedAt: null,
       roundReadyVotes: [],
