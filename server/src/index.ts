@@ -208,6 +208,7 @@ function publicView(room: ReturnType<Rooms["get"]> & {}, viewerId: string) {
     bustedThisRound: room.bustedThisRound,
     kickedIds: room.kickedIds,
     gloriosVictory: room.gloriosVictory,
+    gloriosVictoryReason: room.gloriosVictoryReason,
   };
 }
 
@@ -533,6 +534,7 @@ io.on("connection", (socket) => {
 
     // Clear any old victory state from a previous game session.
     room.gloriosVictory = null;
+    room.gloriosVictoryReason = null;
 
     // Finalise busts from the round that just ended: move to permanent kicked list.
     for (const id of room.bustedThisRound) {
@@ -551,6 +553,7 @@ io.on("connection", (socket) => {
       // Only one (or zero) active players remain after this round's busts —
       // declare glorious victory immediately without waiting for more votes.
       room.gloriosVictory = activeIds[0] ?? null;
+      room.gloriosVictoryReason = "survivor";
       room.playAgainVotes = [];
       cb({ ok: true });
       broadcastRoom(bound.roomCode);
@@ -573,6 +576,7 @@ io.on("connection", (socket) => {
     if (playersForNextRound.length <= 1) {
       // Only one player left — declare glorious victory.
       room.gloriosVictory = playersForNextRound[0]?.id ?? null;
+      room.gloriosVictoryReason = "survivor";
       room.playAgainVotes = [];
       cb({ ok: true });
       broadcastRoom(bound.roomCode);
@@ -700,6 +704,7 @@ io.on("connection", (socket) => {
             if (!room.kickedIds.includes(id)) room.kickedIds.push(id);
           }
           room.gloriosVictory = survivors[0];
+          room.gloriosVictoryReason = "survivor";
 
         } else if (survivors.length === 0) {
           // ── Everyone busted simultaneously → tiebreaker ──────────────────────
@@ -709,10 +714,12 @@ io.on("connection", (socket) => {
           );
 
           let gloriousWinnerId: string | null = null;
+          let gloriousReason: "survivor" | "more_wins" | "final_round" = "survivor";
 
           if (contestants.length === 1) {
             // Only one active buster — they win by default.
             gloriousWinnerId = contestants[0];
+            gloriousReason = "survivor";
           } else if (contestants.length > 1) {
             // Tiebreaker 1: most round wins accumulated across all previous rounds.
             const maxWins = Math.max(...contestants.map((pid) => room.roundWins[pid] ?? 0));
@@ -720,6 +727,7 @@ io.on("connection", (socket) => {
 
             if (topByWins.length === 1) {
               gloriousWinnerId = topByWins[0];
+              gloriousReason = "more_wins";
             } else {
               // Tiebreaker 2: whoever won this last round is the Glorious Victor.
               // (There is always exactly one round winner, so this always resolves.)
@@ -728,6 +736,7 @@ io.on("connection", (socket) => {
                 lastWinner && topByWins.includes(lastWinner)
                   ? lastWinner
                   : topByWins[0]; // ultra-rare fallback
+              gloriousReason = "final_round";
             }
           }
 
@@ -740,6 +749,7 @@ io.on("connection", (socket) => {
               if (!room.kickedIds.includes(id)) room.kickedIds.push(id);
             }
             room.gloriosVictory = gloriousWinnerId;
+            room.gloriosVictoryReason = gloriousReason;
           }
           // If contestants.length === 0 (edge case: all were already kicked), do nothing.
         }

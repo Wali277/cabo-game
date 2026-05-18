@@ -2079,3 +2079,64 @@
   border-color: #ffd86b;
 }
 .glory-modal .btn.primary:hover { background: #ffe99a; }
+.glory-tiebreaker {
+  font-size: 13px;
+  color: #a87bff;
+  font-style: italic;
+  margin: -4px 0 12px;
+  opacity: 0.9;
+}
+
+/* ── End-game scoreboard (shared by GloriousVictory + GameLostOverlay) ── */
+.end-scoreboard {
+  width: 100%;
+  margin: 8px 0 4px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(0,0,0,0.25);
+}
+.end-scoreboard-header {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.45);
+  padding: 6px 12px 4px;
+  background: rgba(255,255,255,0.04);
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+.end-score-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.end-score-table th {
+  text-align: left;
+  padding: 5px 10px;
+  color: rgba(255,255,255,0.4);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.end-score-table td {
+  padding: 6px 10px;
+  color: rgba(255,255,255,0.75);
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.end-score-table tr:last-child td { border-bottom: none; }
+.end-score-table tr.end-score-winner td {
+  color: #ffd86b;
+  font-weight: 700;
+}
+.end-score-rounds {
+  color: rgba(255,255,255,0.4) !important;
+  font-size: 11px !important;
+  font-variant-numeric: tabular-nums;
+}
+.end-score-total {
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}

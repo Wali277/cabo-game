@@ -78,6 +78,7 @@ export interface MpRoom {
   bustedThisRound: string[];
   kickedIds: string[];
   gloriosVictory: string | null;
+  gloriosVictoryReason: "survivor" | "more_wins" | "final_round" | null;
 }
 
 export type ActionTargetingMode =

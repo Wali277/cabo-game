@@ -31,6 +31,8 @@ export interface Room {
   bustedThisRound: string[];
   kickedIds: string[];
   gloriosVictory: string | null;
+  /** Why this player won — drives the tiebreaker message on the client. */
+  gloriosVictoryReason: "survivor" | "more_wins" | "final_round" | null;
   /** Number of rounds each player has won (lowest hand at round end). Used for
    *  the simultaneous-bust tiebreaker: most wins → Glorious Victor. */
   roundWins: Record<string, number>;
@@ -86,6 +88,7 @@ export class Rooms {
       bustedThisRound: [],
       kickedIds: [],
       gloriosVictory: null,
+      gloriosVictoryReason: null,
       roundWins: {},
       readyVotes: [],
       readyStartedAt: null,
