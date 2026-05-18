@@ -151,8 +151,13 @@ export type MpActionType =
   | "clear_animations"
   | "clear_reveals";
 
-export function sendAction(payload: { type: MpActionType } & Record<string, any>) {
-  getSocket().emit("action", payload);
+export function sendAction(
+  payload: { type: MpActionType } & Record<string, any>,
+  onFail?: () => void,
+) {
+  getSocket().emit("action", payload, (resp: { ok: boolean; error?: string }) => {
+    if (!resp?.ok && onFail) onFail();
+  });
 }
 
 export function leaveRoom() {

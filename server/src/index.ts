@@ -656,7 +656,10 @@ io.on("connection", (socket) => {
     }
 
     const next = applyAction(room.game, bound.playerId, action);
-    if (!next) return cb?.({ ok: false, error: "Illegal action" });
+    // `next === room.game` means the engine returned the same reference — a silent
+    // precondition failure (e.g. wrong phase, null drawnCard). Treat it identically
+    // to a null return: reject the action so the client knows to retry.
+    if (!next || next === room.game) return cb?.({ ok: false, error: "Illegal action" });
     room.game = next;
 
     // After a round ends, compute which players are newly busted (cumulative > 100)

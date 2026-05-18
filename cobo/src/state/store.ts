@@ -509,9 +509,18 @@ export const useStore = create<StoreState>((set, get) => ({
     const { game, targeting, humanId, mode } = get();
     if (!game) return;
 
-    const dispatch = (type: string, payload: Record<string, any> = {}) => {
+    // Fire-and-forget for non-critical actions. For actions that change targeting
+    // state, pass onFail so the UI recovers if the server rejects (e.g. due to a
+    // brief reconnect causing a phase mismatch).
+    const dispatch = (
+      type: string,
+      payload: Record<string, any> = {},
+      onFail?: () => void,
+    ) => {
       if (mode === "mp") {
-        import("./mp").then((m) => m.sendAction({ type: type as any, ...payload }));
+        import("./mp").then((m) =>
+          m.sendAction({ type: type as any, ...payload }, onFail),
+        );
       }
     };
 
@@ -526,14 +535,24 @@ export const useStore = create<StoreState>((set, get) => ({
     if (player.id !== humanId) return;
 
     if (game.phase === "turn_drawn" && targeting === "swap_hand") {
-      if (mode === "mp") dispatch("swap_drawn", { handIndex: index });
-      else set({ game: swapDrawnWithHand(game, index) });
+      if (mode === "mp") {
+        dispatch("swap_drawn", { handIndex: index }, () => {
+          // Server rejected — restore targeting so the player can try again without
+          // having to manually re-click "Swap into Hand".
+          set({ targeting: "swap_hand" });
+        });
+      } else {
+        set({ game: swapDrawnWithHand(game, index) });
+      }
       set({ targeting: null });
       return;
     }
     if (game.phase === "action_peek_own" && targeting === "peek_own") {
-      if (mode === "mp") dispatch("action_peek_own", { index });
-      else set({ game: actionPeekOwn(game, index) });
+      if (mode === "mp") {
+        dispatch("action_peek_own", { index }, () => set({ targeting: "peek_own" }));
+      } else {
+        set({ game: actionPeekOwn(game, index) });
+      }
       set({ targeting: null });
       return;
     }
@@ -545,8 +564,15 @@ export const useStore = create<StoreState>((set, get) => ({
       game.phase === "action_peek_and_swap_decide" &&
       targeting === "peek_and_swap_self"
     ) {
-      if (mode === "mp") dispatch("action_peek_and_swap_decide", { doSwap: true, ownIndex: index });
-      else set({ game: actionPeekAndSwapDecide(game, true, index) });
+      if (mode === "mp") {
+        dispatch(
+          "action_peek_and_swap_decide",
+          { doSwap: true, ownIndex: index },
+          () => set({ targeting: "peek_and_swap_self" }),
+        );
+      } else {
+        set({ game: actionPeekAndSwapDecide(game, true, index) });
+      }
       set({ targeting: null });
       return;
     }
