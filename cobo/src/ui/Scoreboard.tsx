@@ -24,6 +24,15 @@ export function Scoreboard() {
   const leaders = rows.filter((r) => r.total === lowestTotal).length;
   const isTopTie = leaders > 1;
 
+  // Per-round minimum (= round winner) for green highlighting.
+  const roundMins: number[] = [];
+  for (let i = 0; i < roundCount; i++) {
+    const values = rows
+      .map((r) => r.rounds[i])
+      .filter((v): v is number => typeof v === "number");
+    roundMins.push(values.length > 0 ? Math.min(...values) : Infinity);
+  }
+
   const gridCols = `minmax(70px, 1.2fr) repeat(${Math.max(1, roundCount)}, minmax(22px, 1fr)) minmax(36px, 1.1fr)`;
 
   return (
@@ -51,11 +60,18 @@ export function Scoreboard() {
                   <span className="sb-rank">{crown}</span>
                   <span className="sb-pname">{t.name}</span>
                 </span>
-                {Array.from({ length: Math.max(1, roundCount) }).map((_, ri) => (
-                  <span key={ri} className="sb-td sb-td-round">
-                    {t.rounds[ri] !== undefined ? t.rounds[ri] : "—"}
-                  </span>
-                ))}
+                {Array.from({ length: Math.max(1, roundCount) }).map((_, ri) => {
+                  const v = t.rounds[ri];
+                  const isRoundWin = v !== undefined && v === roundMins[ri];
+                  return (
+                    <span
+                      key={ri}
+                      className={`sb-td sb-td-round${isRoundWin ? " sb-td-round-win" : ""}`}
+                    >
+                      {v !== undefined ? v : "—"}
+                    </span>
+                  );
+                })}
                 <span className="sb-td sb-td-total">{t.total}</span>
               </div>
             );
@@ -121,6 +137,15 @@ export function RoundEndOverlay() {
   const roundCount = Math.max(0, ...rows.map((r) => game.scores[r.id]?.length ?? 0));
   const modalGridCols = `minmax(90px, 1.3fr) repeat(${Math.max(1, roundCount)}, minmax(28px, 1fr)) minmax(48px, 1.1fr)`;
 
+  // Per-round minimum (= round winner) for green highlighting.
+  const modalRoundMins: number[] = [];
+  for (let i = 0; i < roundCount; i++) {
+    const values = rows
+      .map((r) => game.scores[r.id]?.[i])
+      .filter((v): v is number => typeof v === "number");
+    modalRoundMins.push(values.length > 0 ? Math.min(...values) : Infinity);
+  }
+
   return (
     <AnimatePresence>
       <motion.div
@@ -167,11 +192,18 @@ export function RoundEndOverlay() {
                       <span className="sb-rank">{crown}</span>
                       <span className="sb-pname">{t.name}</span>
                     </span>
-                    {Array.from({ length: Math.max(1, roundCount) }).map((_, ri) => (
-                      <span key={ri} className="sb-td sb-td-round">
-                        {game.scores[t.id][ri] !== undefined ? game.scores[t.id][ri] : "—"}
-                      </span>
-                    ))}
+                    {Array.from({ length: Math.max(1, roundCount) }).map((_, ri) => {
+                      const v = game.scores[t.id][ri];
+                      const isRoundWin = v !== undefined && v === modalRoundMins[ri];
+                      return (
+                        <span
+                          key={ri}
+                          className={`sb-td sb-td-round${isRoundWin ? " sb-td-round-win" : ""}`}
+                        >
+                          {v !== undefined ? v : "—"}
+                        </span>
+                      );
+                    })}
                     <span className="sb-td sb-td-total">{t.cumulative}</span>
                   </div>
                 );

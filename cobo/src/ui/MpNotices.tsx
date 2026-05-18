@@ -68,9 +68,16 @@ export function MpNotices() {
 
   if (mode !== "mp" || !mp || !game) return null;
 
-  // Find disconnected opponents (not the local viewer)
+  // Find disconnected opponents (not the local viewer).
+  // Skip busted/kicked players — they were removed by the bust system, not by
+  // disconnecting. The two systems are intentionally separate.
+  const kickedSet = new Set(mp.kickedIds ?? []);
+  const bustedSet = new Set(mp.bustedThisRound ?? []);
+  const gameIsOver = !!mp.gloriosVictory;
   const disconnectedOpponents = Object.entries(mp.disconnects ?? {})
     .filter(([id]) => id !== humanId)
+    .filter(([id]) => !kickedSet.has(id) && !bustedSet.has(id))
+    .filter(() => !gameIsOver)
     .map(([id, d]) => ({
       id,
       ...d,

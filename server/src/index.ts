@@ -179,8 +179,11 @@ function broadcastRoom(roomCode: string) {
 function publicView(room: ReturnType<Rooms["get"]> & {}, viewerId: string) {
   // Surface disconnect / forfeit info so the client can render the notification
   // and the victory-by-forfeit overlay.
+  // Exclude busted/kicked players entirely — their absence is a gameplay
+  // elimination, not a tab-close. The bust system handles their UI separately.
   const disconnects: Record<string, { startedAt: number; forfeited: boolean }> = {};
   for (const [pid, d] of Object.entries(room.disconnects)) {
+    if (room.kickedIds.includes(pid) || room.bustedThisRound.includes(pid)) continue;
     disconnects[pid] = { startedAt: d.startedAt, forfeited: d.forfeited };
   }
   return {
@@ -800,9 +803,22 @@ io.on("connection", (socket) => {
     // If a game is in progress, start a forfeit countdown for this player.
     // Don't track disconnects in the lobby (no game yet). Idempotent — if we
     // already started a timer (e.g. room:leave then real disconnect) reuse it.
+    //
+    // CRITICAL: Bust ≠ disconnect. A player who has been busted/kicked or who
+    // is leaving an ended game must NEVER trigger the forfeit countdown — they
+    // were removed by the game's bust system, not by leaving. These two systems
+    // are completely separate: bust = gameplay elimination (tracked in
+    // bustedThisRound/kickedIds, no timer), disconnect = network/tab-close
+    // (tracked in disconnects, 20s forfeit timer). They must not collide.
+    const isBustedOrKicked =
+      room.kickedIds.includes(bound.playerId) ||
+      room.bustedThisRound.includes(bound.playerId);
+    const gameIsOver = !!room.gloriosVictory;
     if (
       room.game &&
       room.game.phase !== "round_over" &&
+      !isBustedOrKicked &&
+      !gameIsOver &&
       !wasAlreadyDisconnected &&
       !room.disconnects[bound.playerId]?.forfeited
     ) {

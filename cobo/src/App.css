@@ -936,6 +936,8 @@
 .sb-th, .sb-td { text-align: center; padding: 2px 0; }
 .sb-th-name, .sb-td-name { text-align: left; display: flex; align-items: center; gap: 4px; }
 .sb-th-total, .sb-td-total { font-weight: 800; }
+/* Per-round winner (lowest hand that round) — always green for clear indication. */
+.sb-td-round-win { color: #2da970 !important; font-weight: 800; }
 .sb-tbody { display: flex; flex-direction: column; gap: 2px; }
 .sb-trow { font-weight: 600; padding: 3px 0; border-radius: 6px; }
 .sb-trow.lead { color: #6e4ec9; font-weight: 800; background: rgba(168, 123, 255, 0.08); }
@@ -2047,6 +2049,22 @@
 /* ── Busted overlay ─────────────────────────────────────────────────── */
 .busted-modal .modal-burst { font-size: 72px; }
 .busted-modal h2 { color: #ff5b6e; }
+
+/* ── Game-Lost overlay (loser sees this when the game ends) ─────────── */
+.game-lost-modal .modal-subtitle { display: none; }
+.game-lost-howwon {
+  font-size: 14px;
+  color: rgba(255,255,255,0.65);
+  font-style: italic;
+  margin: -4px 0 10px;
+}
+.game-lost-busted {
+  font-size: 18px;
+  font-weight: 700;
+  color: #ff5b6e;
+  margin: 0 0 14px;
+  letter-spacing: 0.02em;
+}
 .busted-score {
   font-size: 36px;
   font-weight: 800;
@@ -2080,49 +2098,49 @@
 }
 .glory-modal .btn.primary:hover { background: #ffe99a; }
 .glory-tiebreaker {
-  font-size: 13px;
+  font-size: 14px;
   color: #a87bff;
   font-style: italic;
   margin: -4px 0 12px;
-  opacity: 0.9;
+  opacity: 0.95;
 }
 
 /* ── End-game scoreboard (shared by GloriousVictory + GameLostOverlay) ── */
 .end-scoreboard {
   width: 100%;
-  margin: 8px 0 4px;
+  margin: 10px 0 4px;
   border-radius: 10px;
   overflow: hidden;
   border: 1px solid rgba(255,255,255,0.1);
   background: rgba(0,0,0,0.25);
 }
 .end-scoreboard-header {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(255,255,255,0.45);
-  padding: 6px 12px 4px;
+  color: rgba(255,255,255,0.55);
+  padding: 7px 12px 5px;
   background: rgba(255,255,255,0.04);
   border-bottom: 1px solid rgba(255,255,255,0.07);
 }
 .end-score-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: 15px;
 }
 .end-score-table th {
   text-align: left;
-  padding: 5px 10px;
-  color: rgba(255,255,255,0.4);
+  padding: 6px 10px;
+  color: rgba(255,255,255,0.5);
   font-weight: 600;
-  font-size: 11px;
+  font-size: 13px;
   letter-spacing: 0.05em;
   border-bottom: 1px solid rgba(255,255,255,0.06);
 }
 .end-score-table td {
-  padding: 6px 10px;
-  color: rgba(255,255,255,0.75);
+  padding: 7px 10px;
+  color: rgba(255,255,255,0.8);
   border-bottom: 1px solid rgba(255,255,255,0.05);
 }
 .end-score-table tr:last-child td { border-bottom: none; }
@@ -2131,12 +2149,52 @@
   font-weight: 700;
 }
 .end-score-rounds {
-  color: rgba(255,255,255,0.4) !important;
-  font-size: 11px !important;
+  color: rgba(255,255,255,0.55) !important;
+  font-size: 13px !important;
   font-variant-numeric: tabular-nums;
 }
 .end-score-total {
   font-weight: 700;
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+/* Round winner — always green regardless of variant. The lowest score for
+   any given round = that round's winner in Cabo (lowest hand wins). */
+.end-score-round-win {
+  color: #67e0a3 !important;
+  font-weight: 700;
+}
+
+/* ── Lost-variant (GameLostOverlay): black bg + red loser numbers, gold
+   winner row, green round-wins (inherited from above). ─────────────────── */
+.end-scoreboard-lost {
+  background: #000;
+  border-color: rgba(255,91,110,0.35);
+}
+.end-scoreboard-lost .end-scoreboard-header {
+  background: rgba(255,91,110,0.1);
+  color: #ff5b6e;
+  border-bottom-color: rgba(255,91,110,0.25);
+}
+.end-scoreboard-lost .end-score-table th {
+  color: rgba(255,255,255,0.6);
+  border-bottom-color: rgba(255,255,255,0.1);
+}
+.end-scoreboard-lost .end-score-table td {
+  color: #ff5b6e;
+  border-bottom-color: rgba(255,255,255,0.06);
+}
+.end-scoreboard-lost .end-score-rounds {
+  color: #ff5b6e !important;
+}
+/* Winner row inside loser screen stays gold. */
+.end-scoreboard-lost .end-score-winner td {
+  color: #ffd86b !important;
+}
+.end-scoreboard-lost .end-score-winner .end-score-rounds {
+  color: #ffd86b !important;
+}
+/* Round-winner green still overrides everything else. */
+.end-scoreboard-lost .end-score-round-win {
+  color: #67e0a3 !important;
 }

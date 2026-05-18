@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useStore } from "../state/store";
 import { Audio } from "../audio/sounds";
+import { EndScoreboard, buildScoreRows } from "./EndScoreboard";
 
 /**
  * Shown to the loser(s) when the game is fully over (gloriosVictory is set)
@@ -18,6 +19,7 @@ export function GameLostOverlay() {
   const mode = useStore((s) => s.mode);
 
   const gloriosVictory = mp?.gloriosVictory ?? null;
+  const reason = mp?.gloriosVictoryReason ?? null;
 
   // Show when: game is over AND I am not the winner AND I was eliminated.
   const iAmEliminated =
@@ -43,18 +45,23 @@ export function GameLostOverlay() {
     mp?.members.find((m) => m.id === gloriosVictory)?.name ??
     "Your opponent";
 
-  // Build scoreboard rows: all players with cumulative scores + round scores.
-  const scoreRows = (() => {
-    if (!game) return [];
-    const scores = game.scores ?? {};
-    return game.players
-      .map((p) => {
-        const rounds = scores[p.id] ?? [];
-        const total = rounds.reduce((a: number, b: number) => a + b, 0);
-        return { id: p.id, name: p.name, rounds, total };
-      })
-      .sort((a, b) => a.total - b.total); // lowest total first (best)
-  })();
+  // Build the "how they won" subtitle — varies by reason so it's clear to
+  // the loser why the winner won (especially in tiebreaker cases).
+  let howWonMsg: string;
+  switch (reason) {
+    case "more_wins":
+      howWonMsg = "Won by winning more rounds";
+      break;
+    case "final_round":
+      howWonMsg = "Won by winning the final round (tied on wins)";
+      break;
+    case "survivor":
+    default:
+      howWonMsg = "Won by being the last one standing";
+      break;
+  }
+
+  const scoreRows = buildScoreRows(game, mp?.members ?? null);
 
   return (
     <AnimatePresence>
@@ -65,49 +72,28 @@ export function GameLostOverlay() {
         style={{ zIndex: 350 }}
       >
         <motion.div
-          className="modal busted-modal"
+          className="modal busted-modal game-lost-modal"
           initial={{ scale: 0.6, y: 20, rotate: -4 }}
           animate={{ scale: 1, y: 0, rotate: 0 }}
           transition={{ type: "spring", stiffness: 200, damping: 18 }}
         >
           <div className="modal-burst">🏁</div>
           <h2>{victorName} Won!</h2>
-          <p className="modal-subtitle">They were the last one standing</p>
-          <p style={{ fontSize: "16px", color: "#ff5b6e", fontWeight: 600, marginBottom: "16px" }}>
-            You busted
-          </p>
+          <p className="game-lost-howwon">{howWonMsg}</p>
+          <p className="game-lost-busted">You busted</p>
 
-          {/* Scoreboard */}
-          {scoreRows.length > 0 && (
-            <div className="end-scoreboard">
-              <div className="end-scoreboard-header">Final Scores</div>
-              <table className="end-score-table">
-                <thead>
-                  <tr>
-                    <th>Player</th>
-                    <th>Rounds</th>
-                    <th>Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {scoreRows.map((row) => (
-                    <tr
-                      key={row.id}
-                      className={row.id === gloriosVictory ? "end-score-winner" : ""}
-                    >
-                      <td>{row.id === humanId ? `${row.name} (You)` : row.name}</td>
-                      <td className="end-score-rounds">
-                        {row.rounds.join(" + ") || "—"}
-                      </td>
-                      <td className="end-score-total">{row.total}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <EndScoreboard
+            rows={scoreRows}
+            winnerId={gloriosVictory}
+            humanId={humanId}
+            variant="lost"
+          />
 
-          <button className="btn primary big" onClick={backToMenu} style={{ marginTop: "20px" }}>
+          <button
+            className="btn primary big"
+            onClick={backToMenu}
+            style={{ marginTop: "20px" }}
+          >
             Return to Menu
           </button>
         </motion.div>
