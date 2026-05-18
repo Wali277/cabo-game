@@ -12,11 +12,9 @@ export function GloriousVictory() {
   const game = useStore((s) => s.game);
 
   const victorId = mp?.gloriosVictory ?? null;
-  // Don't show GV for players who are themselves busted — they see BustedOverlay.
-  const localPlayerEliminated =
-    (mp?.bustedThisRound.includes(humanId) ?? false) ||
-    (mp?.kickedIds.includes(humanId) ?? false);
-  const show = mode === "mp" && !!victorId && !localPlayerEliminated;
+  // Only the actual winner sees the Glorious Victory screen.
+  // Losers (including tiebreaker losers) see GameLostOverlay instead.
+  const show = mode === "mp" && !!victorId && victorId === humanId;
 
   // Fire confetti + win sound only for the winner
   useEffect(() => {

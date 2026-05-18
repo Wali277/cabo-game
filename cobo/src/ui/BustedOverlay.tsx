@@ -13,11 +13,16 @@ export function BustedOverlay() {
   const backToMenu = useStore((s) => s.backToMenu);
   const mode = useStore((s) => s.mode);
 
+  // Only show the "mid-game bust" overlay when:
+  //  • the local player just busted this round, AND
+  //  • the game is NOT over (no gloriosVictory declared).
+  // When the game ends (gloriosVictory set), the loser sees GameLostOverlay instead.
   const isBusted =
     mode === "mp" &&
     !!mp &&
     game.phase === "round_over" &&
-    mp.bustedThisRound.includes(humanId);
+    mp.bustedThisRound.includes(humanId) &&
+    !mp.gloriosVictory;
 
   // Persist a "busted from this room" marker in localStorage so that if the
   // player navigates back to the same link (after leaveRoom clears their

@@ -6,6 +6,7 @@ import { Center } from "./Center";
 import { LeftPanel } from "./LeftPanel";
 import { Scoreboard, RoundEndOverlay } from "./Scoreboard";
 import { BustedOverlay } from "./BustedOverlay";
+import { GameLostOverlay } from "./GameLostOverlay";
 import { GloriousVictory } from "./GloriousVictory";
 import { ActionBanner } from "./ActionBanner";
 import { ActionLog } from "./ActionLog";
@@ -268,6 +269,7 @@ export function Table() {
         <ActionBanner />
         <RoundEndOverlay />
         <BustedOverlay />
+        <GameLostOverlay />
         <GloriousVictory />
         <MpNotices />
 
