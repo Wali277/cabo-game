@@ -8,6 +8,7 @@ import { CoinToss } from "./ui/CoinToss";
 import { StrawDraw } from "./ui/StrawDraw";
 import { AudioControls } from "./ui/AudioControls";
 import { ChatPanel } from "./ui/ChatPanel";
+import { EliminatedOverlay } from "./ui/EliminatedOverlay";
 import { getSocket } from "./state/mp";
 
 function getRoomFromPath(): string | null {
@@ -95,6 +96,7 @@ function App() {
       {screen === "game" && <Table />}
       <AudioControls />
       <ChatPanel />
+      <EliminatedOverlay />
     </>
   );
 }

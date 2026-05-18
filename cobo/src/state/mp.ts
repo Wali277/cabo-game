@@ -45,7 +45,11 @@ export function getSocket(): Socket {
           (resp: { ok: boolean; error?: string }) => {
             if (!resp.ok) {
               clearSession();
-              useStore.setState({ mp: null });
+              if (resp.error === "You have been eliminated from this game.") {
+                useStore.setState({ mp: null, eliminatedFromRoom: true });
+              } else {
+                useStore.setState({ mp: null });
+              }
             }
           },
         );

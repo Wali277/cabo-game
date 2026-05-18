@@ -541,8 +541,14 @@ io.on("connection", (socket) => {
 
     // Active players = members who have not forfeited AND have not been kicked.
     const activeIds = activePlayerIds(room);
-    if (activeIds.length < 2) {
-      return cb({ ok: false, error: "Not enough active players for a rematch" });
+    if (activeIds.length <= 1) {
+      // Only one (or zero) active players remain after this round's busts —
+      // declare glorious victory immediately without waiting for more votes.
+      room.gloriosVictory = activeIds[0] ?? null;
+      room.playAgainVotes = [];
+      cb({ ok: true });
+      broadcastRoom(bound.roomCode);
+      return;
     }
     const allVoted = activeIds.every((pid) => room.playAgainVotes.includes(pid));
 
@@ -662,10 +668,10 @@ io.on("connection", (socket) => {
     if (!next || next === room.game) return cb?.({ ok: false, error: "Illegal action" });
     room.game = next;
 
-    // After a round ends, compute which players are newly busted (cumulative > 65)
+    // After a round ends, compute which players are newly busted (cumulative > 30)
     if (room.game.phase === "round_over") {
       room.bustedThisRound = room.game.players
-        .filter((p) => (room.game!.scores[p.id] ?? []).reduce((a: number, b: number) => a + b, 0) > 65)
+        .filter((p) => (room.game!.scores[p.id] ?? []).reduce((a: number, b: number) => a + b, 0) > 30)
         .map((p) => p.id);
     }
 

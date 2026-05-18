@@ -108,6 +108,7 @@ interface StoreState {
   chatOpen: boolean;
   chatUnread: number;
   audioOpen: boolean;
+  eliminatedFromRoom: boolean;
   init: (numBots: number) => void;
   trainInit: () => void;
   trainingInjectCard: (card: Card) => void;
@@ -177,6 +178,7 @@ export const useStore = create<StoreState>((set, get) => ({
   chatOpen: false,
   chatUnread: 0,
   audioOpen: false,
+  eliminatedFromRoom: false,
 
   init(numBots) {
     const game = newGame({ players: makePlayers(numBots) });
@@ -763,6 +765,7 @@ export const useStore = create<StoreState>((set, get) => ({
       game: null, pendingGame: null, coinToss: null,
       targeting: null, toast: null,
       chatMessages: [], chatOpen: false, chatUnread: 0,
+      eliminatedFromRoom: false,
     });
   },
 
