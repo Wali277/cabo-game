@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useStore } from "../state/store";
 import { Tutorial } from "./Tutorial";
 import { Audio } from "../audio/sounds";
+import { MenuWallpaper } from "./MenuWallpaper";
 
 export function Menu() {
   const init = useStore((s) => s.init);
@@ -12,6 +13,7 @@ export function Menu() {
 
   return (
     <div className="menu">
+      <MenuWallpaper />
       <motion.h1
         className="title"
         initial={{ scale: 0.4, rotate: -10, opacity: 0 }}

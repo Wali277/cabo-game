@@ -18,6 +18,68 @@
     radial-gradient(circle at 70% 60%, rgba(255,255,255,0.25) 0 5px, transparent 6px) 0 0/180px 180px;
   pointer-events: none;
 }
+
+/* ──────────── Live animated wallpaper for the Menu screen ─────────────
+   Scattered card piles on the left and right edges that gently float.
+   Sits behind every other menu element; pointer-events disabled so the
+   menu UI underneath remains fully clickable. */
+.menu-wallpaper {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+/* Keep the existing menu content (title, subtitle, menu-card) above the
+   wallpaper without changing how they were already laid out. */
+.menu > *:not(.menu-wallpaper) {
+  position: relative;
+  z-index: 1;
+}
+.menu-wallpaper-card {
+  position: absolute;
+  will-change: transform;
+  /* Double drop-shadow for richer depth: large soft + tight ground shadow */
+  filter:
+    drop-shadow(0 12px 24px rgba(0, 0, 0, 0.55))
+    drop-shadow(0 4px 8px rgba(0, 0, 0, 0.35));
+}
+/* Soft ambient under-glow beneath each pile — purple to match brand. */
+.menu-wallpaper-glow {
+  position: absolute;
+  width: 55%;
+  height: 70%;
+  top: 15%;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(168, 123, 255, 0.18) 0%,
+    rgba(168, 123, 255, 0.08) 35%,
+    transparent 65%
+  );
+  filter: blur(30px);
+  animation: menuGlowBreathe 10s ease-in-out infinite alternate;
+}
+.menu-wallpaper-glow-left { left: -12%; }
+.menu-wallpaper-glow-right { right: -12%; animation-delay: -5s; }
+
+@keyframes menuGlowBreathe {
+  0%   { opacity: 0.7; transform: scale(0.95); }
+  100% { opacity: 1;   transform: scale(1.05); }
+}
+
+/* On narrow viewports, hide the innermost cards so the wallpaper doesn't
+   crowd the centered menu-card UI. */
+@media (max-width: 720px) {
+  .menu-wallpaper-card.inner { display: none; }
+  .menu-wallpaper-glow { width: 40%; }
+}
+
+/* Respect users' reduced-motion preference: cards stay in place with no
+   float/sway, and the ambient glow stops pulsing. */
+@media (prefers-reduced-motion: reduce) {
+  .menu-wallpaper-glow { animation: none; }
+}
 .title {
   font-size: clamp(64px, 14vw, 160px);
   font-weight: 900;
