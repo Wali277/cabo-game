@@ -12,28 +12,47 @@
  */
 import { useEffect, useState } from "react";
 
-export type TableTheme = "emerald" | "velvet" | "crimson" | "aurora" | "cosmic";
+export type TableTheme = "emerald" | "ocean" | "crimson" | "northern" | "cosmic";
 export const DEFAULT_THEME: TableTheme = "emerald";
 
 const STORAGE_KEY = "cabo:theme";
 const EVENT_NAME = "cabo:theme-change";
 const VALID: ReadonlyArray<TableTheme> = [
-  "emerald", "velvet", "crimson", "aurora", "cosmic",
+  "emerald", "ocean", "crimson", "northern", "cosmic",
 ];
 
 /** Labels shown in the picker UI. */
 export const THEME_LABELS: Record<TableTheme, string> = {
-  emerald: "Emerald Felt",
-  velvet:  "Midnight Velvet",
-  crimson: "Royal Crimson",
-  aurora:  "Aurora Drift",
-  cosmic:  "Cosmic Legacy",
+  emerald:  "Emerald Felt",
+  ocean:    "Midnight Ocean",
+  crimson:  "Royal Crimson",
+  northern: "Northern Lights",
+  cosmic:   "Cosmic Legacy",
 };
+
+/**
+ * Map deprecated v2.14 theme IDs to their v2.15 replacements so anyone who
+ * picked "velvet" / "aurora" before the rename lands on the equivalent new
+ * theme transparently. Returns the same value if no migration is needed.
+ */
+function migrateLegacyId(v: string | null): string | null {
+  if (v === "velvet") return "ocean";
+  if (v === "aurora") return "northern";
+  return v;
+}
 
 function loadFromStorage(): TableTheme {
   try {
-    const v = localStorage.getItem(STORAGE_KEY);
-    if (v && VALID.includes(v as TableTheme)) return v as TableTheme;
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const migrated = migrateLegacyId(raw);
+    // If we rewrote the value, persist the new ID so future loads are cheap
+    // and so we don't keep migrating on every page open.
+    if (migrated !== raw && migrated) {
+      try { localStorage.setItem(STORAGE_KEY, migrated); } catch { /* ignore */ }
+    }
+    if (migrated && VALID.includes(migrated as TableTheme)) {
+      return migrated as TableTheme;
+    }
   } catch { /* ignore — fall back to default */ }
   return DEFAULT_THEME;
 }

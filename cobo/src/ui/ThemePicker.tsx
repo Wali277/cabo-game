@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Audio } from "../audio/sounds";
+import { useStore } from "../state/store";
 import {
   type TableTheme,
   THEME_LABELS,
@@ -11,22 +12,30 @@ import {
 /**
  * Floating theme picker that lives **above the chat button** in the in-game UI.
  *
- * Visual stack (right edge, bottom→top):
- *   - bottom: 18px  → audio FAB     (AudioControls)
- *   - bottom: 96px  → chat FAB      (ChatPanel)
- *   - bottom: 174px → theme FAB     (this component)
+ * Visual stack on the right edge (bottom → top):
+ *   - bottom: 18px   → audio FAB    (AudioControls — always shown)
+ *   - bottom: 96px   → chat FAB     (ChatPanel — multiplayer only)
+ *   - bottom: 174px  → theme FAB    (this component, MP placement)
+ *
+ * In single-player ChatPanel returns null (see ChatPanel.tsx — same predicate
+ * `mode !== "mp" || !mp`), leaving an empty slot. To avoid the 78px gap, the
+ * theme FAB drops down into the chat slot (`bottom: 96px`) whenever the chat
+ * button isn't rendered. The `theme-picker.sp` class in App.css applies that
+ * override.
  *
  * Each button is a 52px circle with a 26px gap to the next, matching the
- * spacing already used by the audio + chat FABs. The popover anchors above the
- * button and shows live gradient previews driven by the same CSS that paints
- * the actual table background — so the swatches always look exactly like the
- * theme they apply.
+ * spacing already used by the audio + chat FABs.
  */
 
-const THEMES: TableTheme[] = ["emerald", "velvet", "crimson", "aurora", "cosmic"];
+const THEMES: TableTheme[] = ["emerald", "ocean", "crimson", "northern", "cosmic"];
 
 export function ThemePicker() {
   const theme = useTheme();
+  const mode = useStore((s) => s.mode);
+  const mp = useStore((s) => s.mp);
+  // Mirror ChatPanel.tsx:28 — the chat FAB hides whenever this predicate is
+  // false, so we use the inverted check to know its slot is free for us.
+  const chatHidden = mode !== "mp" || !mp;
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -57,7 +66,7 @@ export function ThemePicker() {
   }
 
   return (
-    <div className="theme-picker" ref={rootRef}>
+    <div className={`theme-picker${chatHidden ? " sp" : ""}`} ref={rootRef}>
       <AnimatePresence>
         {open && (
           <motion.div

@@ -16,6 +16,8 @@ import { botMove, ingestReveals, resetBotKnowledge } from "../ai/bot";
 import { clearReveals as clearRevealsEngine } from "../engine/game";
 import { Audio } from "../audio/sounds";
 import { useTheme } from "../state/theme";
+import { OceanWallpaper } from "./OceanWallpaper";
+import { NorthernLightsWallpaper } from "./NorthernLightsWallpaper";
 
 export function Table() {
   const game = useStore((s) => s.game!);
@@ -178,9 +180,14 @@ export function Table() {
         {/* Themed background layer (first child so it sits visually at z=0; all
             sibling UI is bumped to z=1 via CSS). The `data-theme` attribute
             selects which gradient renders — see `.table-bg[data-theme=…]` in
-            App.css. The current value is local-only and persisted via
+            App.css. Two themes also overlay an animated wallpaper (fish for
+            Ocean, aurora ribbons for Northern Lights); the others use the
+            pure gradient. The current value is local-only and persisted via
             `cabo:theme` in localStorage. */}
-        <div className="table-bg" data-theme={tableTheme} aria-hidden="true" />
+        <div className="table-bg" data-theme={tableTheme} aria-hidden="true">
+          {tableTheme === "ocean" && <OceanWallpaper />}
+          {tableTheme === "northern" && <NorthernLightsWallpaper />}
+        </div>
 
         {/* Compact top bar */}
         <div className="top-bar">

@@ -117,11 +117,13 @@
     linear-gradient(160deg, #0f3d2e 0%, #155a3f 45%, #0c2e21 100%);
 }
 
-/* 2. Midnight Velvet — near-black with a warm gold halo behind centre play. */
-.table-bg[data-theme="velvet"] {
+/* 2. Midnight Ocean — deep blue + caustic highlight + abyss shadow.
+   Pairs with the <OceanWallpaper /> overlay rendered from Table.tsx. */
+.table-bg[data-theme="ocean"] {
   background:
-    radial-gradient(circle at 50% 50%, rgba(255, 216, 107, 0.10) 0%, transparent 55%),
-    radial-gradient(ellipse at 50% 50%, #1a1428 0%, #07060c 75%);
+    radial-gradient(ellipse at 50% 110%, rgba(0, 0, 0, 0.55) 0%, transparent 60%),
+    radial-gradient(ellipse at 50% -20%, rgba(110, 200, 230, 0.18) 0%, transparent 55%),
+    linear-gradient(180deg, #021830 0%, #053a5e 45%, #021a30 100%);
 }
 
 /* 3. Royal Crimson — deep wine + black with subtle gold radial. */
@@ -131,18 +133,15 @@
     linear-gradient(160deg, #2a0712 0%, #4a0e1a 50%, #1a0509 100%);
 }
 
-/* 4. Aurora Drift — animated teal/blue/indigo blend. Re-uses bgDrift. */
-.table-bg[data-theme="aurora"] {
+/* 4. Northern Lights — dark night sky base; aurora ribbons and stars are
+   painted on top by the <NorthernLightsWallpaper /> overlay. Kept very dark
+   so the ribbons' mix-blend-mode: screen reads as glow. */
+.table-bg[data-theme="northern"] {
   background:
-    radial-gradient(circle at 18% 22%, rgba(26, 92, 67, 0.45) 0 420px, transparent 420px),
-    radial-gradient(circle at 82% 28%, rgba(35, 60, 121, 0.45) 0 440px, transparent 440px),
-    radial-gradient(circle at 70% 88%, rgba(59, 36, 115, 0.40) 0 460px, transparent 460px),
-    linear-gradient(160deg, #07182a 0%, #102a4a 50%, #1a1530 100%);
-  background-attachment: fixed;
-  animation: bgDrift 45s ease-in-out infinite alternate;
+    linear-gradient(180deg, #02050f 0%, #050d22 45%, #0a1830 100%);
 }
 
-/* 5. Cosmic Legacy — preserved exactly from the current body gradient. */
+/* 5. Cosmic Legacy — preserved exactly from the v2.13 body gradient. */
 .table-bg[data-theme="cosmic"] {
   background:
     radial-gradient(circle at 12% 8%, rgba(168, 123, 255, 0.35) 0 380px, transparent 380px),
@@ -153,9 +152,10 @@
   animation: bgDrift 30s ease-in-out infinite alternate;
 }
 
-/* Reduced-motion: drop the slow drift on the two animated themes. */
+/* Reduced-motion: only Cosmic still drifts via bgDrift (Northern Lights and
+   Ocean motion is owned by their wallpaper components, which honour
+   reduced-motion at the React level). */
 @media (prefers-reduced-motion: reduce) {
-  .table-bg[data-theme="aurora"],
   .table-bg[data-theme="cosmic"] {
     animation: none;
   }
@@ -175,6 +175,15 @@
   bottom: 174px;
   right: 18px;
   z-index: 250;
+  /* Smoothly slide between MP and SP slots if the user transitions in-game. */
+  transition: bottom 220ms ease;
+}
+/* Single-player has no chat FAB (ChatPanel returns null), so the slot at
+   bottom: 96px is empty. We drop the theme FAB into that slot to avoid the
+   78px gap above the audio button. Mirror predicate lives in
+   ThemePicker.tsx (`chatHidden`). */
+.theme-picker.sp {
+  bottom: 96px;
 }
 .theme-fab {
   width: 52px;
@@ -277,22 +286,22 @@
     radial-gradient(ellipse at center, transparent 35%, rgba(0, 0, 0, 0.55) 100%),
     linear-gradient(160deg, #0f3d2e 0%, #155a3f 45%, #0c2e21 100%);
 }
-.theme-swatch-preview[data-theme="velvet"] {
+.theme-swatch-preview[data-theme="ocean"] {
   background:
-    radial-gradient(circle at 50% 50%, rgba(255, 216, 107, 0.10) 0%, transparent 55%),
-    radial-gradient(ellipse at 50% 50%, #1a1428 0%, #07060c 75%);
+    radial-gradient(ellipse at 50% -10%, rgba(110, 200, 230, 0.35) 0%, transparent 55%),
+    linear-gradient(180deg, #021830 0%, #053a5e 50%, #021a30 100%);
 }
 .theme-swatch-preview[data-theme="crimson"] {
   background:
     radial-gradient(circle at 50% 28%, rgba(255, 216, 107, 0.10) 0%, transparent 60%),
     linear-gradient(160deg, #2a0712 0%, #4a0e1a 50%, #1a0509 100%);
 }
-.theme-swatch-preview[data-theme="aurora"] {
+.theme-swatch-preview[data-theme="northern"] {
   background:
-    radial-gradient(circle at 18% 22%, rgba(26, 92, 67, 0.55) 0 60%, transparent 60%),
-    radial-gradient(circle at 82% 28%, rgba(35, 60, 121, 0.55) 0 60%, transparent 60%),
-    radial-gradient(circle at 70% 88%, rgba(59, 36, 115, 0.55) 0 60%, transparent 60%),
-    linear-gradient(160deg, #07182a 0%, #102a4a 50%, #1a1530 100%);
+    radial-gradient(ellipse at 30% 25%, rgba(76, 242, 167, 0.55) 0 38%, transparent 55%),
+    radial-gradient(ellipse at 65% 40%, rgba(196, 120, 255, 0.45) 0 38%, transparent 55%),
+    radial-gradient(ellipse at 50% 90%, rgba(76, 242, 167, 0.10) 0 60%, transparent 70%),
+    linear-gradient(180deg, #02050f 0%, #050d22 45%, #0a1830 100%);
 }
 .theme-swatch-preview[data-theme="cosmic"] {
   background:
@@ -320,6 +329,137 @@
   .theme-popover {
     width: calc(100vw - 36px);
     right: 0;
+  }
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   MIDNIGHT OCEAN WALLPAPER
+
+   Cartoonish underwater scene that overlays the Ocean theme's dark blue
+   gradient. All elements sit on the outer band of the viewport so they
+   never intrude on the table grid or the centre cards. Each animation
+   uses transform/opacity only (compositor-friendly). The component itself
+   honours `prefers-reduced-motion` at the React level.
+   ──────────────────────────────────────────────────────────────────────── */
+.ocean-wallpaper {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.ocean-fish {
+  position: absolute;
+  will-change: transform;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35));
+}
+.ocean-starfish {
+  position: absolute;
+  right: 4%;
+  bottom: 8%;
+  opacity: 0.45;
+  will-change: transform;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.4));
+}
+.ocean-seaweed {
+  position: absolute;
+  bottom: -8px;
+  opacity: 0.30;
+  transform-origin: bottom center;
+  will-change: transform;
+}
+.ocean-seaweed-left  { left: 3%; }
+.ocean-seaweed-right { right: 9%; }
+.ocean-bubble {
+  position: absolute;
+  bottom: -20px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 30% 30%,
+    rgba(255, 255, 255, 0.95) 0%,
+    rgba(180, 220, 240, 0.55) 50%,
+    rgba(100, 160, 200, 0.25) 100%
+  );
+  box-shadow: inset 0 0 4px rgba(255, 255, 255, 0.6);
+  will-change: transform, opacity;
+}
+.ocean-light-shaft {
+  position: absolute;
+  top: -20px;
+  width: 60px;
+  height: 50vh;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.18) 0%,
+    rgba(255, 255, 255, 0.04) 60%,
+    transparent 100%
+  );
+  filter: blur(10px);
+  transform: skewX(-8deg);
+  opacity: 0.06;
+  pointer-events: none;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   NORTHERN LIGHTS WALLPAPER
+
+   Aurora ribbons + stars + horizon glow overlaid on the very-dark sky
+   gradient. Ribbons use `mix-blend-mode: screen` so their colours add light
+   on top of the sky instead of replacing it — this is what makes the aurora
+   read as a glow rather than a painted band.
+   ──────────────────────────────────────────────────────────────────────── */
+.northern-wallpaper {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.northern-star {
+  position: absolute;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.85);
+  will-change: opacity;
+}
+.northern-ribbon {
+  position: absolute;
+  left: -25%;
+  width: 150vw;
+  height: 36vh;
+  filter: blur(60px);
+  mix-blend-mode: screen;
+  transform-origin: center;
+  will-change: transform, opacity;
+  pointer-events: none;
+}
+.northern-horizon {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 28vh;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(76, 242, 167, 0.05) 60%,
+    rgba(76, 242, 167, 0.10) 100%
+  );
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+/* Wallpaper-side reduced-motion safety net. The component already swaps to
+   static `animate` props under prefers-reduced-motion, but if any browser
+   misses that hook (e.g. extension-injected media query), this freezes any
+   leftover CSS transform animations as a belt-and-braces measure. */
+@media (prefers-reduced-motion: reduce) {
+  .ocean-fish,
+  .ocean-starfish,
+  .ocean-seaweed,
+  .ocean-bubble,
+  .ocean-light-shaft,
+  .northern-ribbon,
+  .northern-star {
+    animation: none !important;
   }
 }
 
