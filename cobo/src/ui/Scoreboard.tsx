@@ -24,13 +24,19 @@ export function Scoreboard() {
   const leaders = rows.filter((r) => r.total === lowestTotal).length;
   const isTopTie = leaders > 1;
 
-  // Per-round minimum (= round winner) for green highlighting.
+  // Per-round minimum (= round winner) for green highlighting, plus the count
+  // of players tied at that minimum. When more than one player ties at the
+  // lowest, we render those cells in bright gray instead of green — green is
+  // reserved for a SOLE round-winner.
   const roundMins: number[] = [];
+  const roundLowestCounts: number[] = [];
   for (let i = 0; i < roundCount; i++) {
     const values = rows
       .map((r) => r.rounds[i])
       .filter((v): v is number => typeof v === "number");
-    roundMins.push(values.length > 0 ? Math.min(...values) : Infinity);
+    const min = values.length > 0 ? Math.min(...values) : Infinity;
+    roundMins.push(min);
+    roundLowestCounts.push(values.filter((v) => v === min).length);
   }
 
   const gridCols = `minmax(70px, 1.2fr) repeat(${Math.max(1, roundCount)}, minmax(22px, 1fr)) minmax(36px, 1.1fr)`;
@@ -62,12 +68,15 @@ export function Scoreboard() {
                 </span>
                 {Array.from({ length: Math.max(1, roundCount) }).map((_, ri) => {
                   const v = t.rounds[ri];
-                  const isRoundWin = v !== undefined && v === roundMins[ri];
+                  const isLowest = v !== undefined && v === roundMins[ri];
+                  const tiedAtLowest = isLowest && roundLowestCounts[ri] > 1;
+                  const cls = tiedAtLowest
+                    ? " sb-td-round-tie"
+                    : isLowest
+                    ? " sb-td-round-win"
+                    : "";
                   return (
-                    <span
-                      key={ri}
-                      className={`sb-td sb-td-round${isRoundWin ? " sb-td-round-win" : ""}`}
-                    >
+                    <span key={ri} className={`sb-td sb-td-round${cls}`}>
                       {v !== undefined ? v : "—"}
                     </span>
                   );
@@ -137,13 +146,17 @@ export function RoundEndOverlay() {
   const roundCount = Math.max(0, ...rows.map((r) => game.scores[r.id]?.length ?? 0));
   const modalGridCols = `minmax(90px, 1.3fr) repeat(${Math.max(1, roundCount)}, minmax(28px, 1fr)) minmax(48px, 1.1fr)`;
 
-  // Per-round minimum (= round winner) for green highlighting.
+  // Per-round minimum + tied-at-lowest count. Single lowest → green;
+  // multi-way tie at lowest → bright gray for all tied cells.
   const modalRoundMins: number[] = [];
+  const modalLowestCounts: number[] = [];
   for (let i = 0; i < roundCount; i++) {
     const values = rows
       .map((r) => game.scores[r.id]?.[i])
       .filter((v): v is number => typeof v === "number");
-    modalRoundMins.push(values.length > 0 ? Math.min(...values) : Infinity);
+    const min = values.length > 0 ? Math.min(...values) : Infinity;
+    modalRoundMins.push(min);
+    modalLowestCounts.push(values.filter((v) => v === min).length);
   }
 
   return (
@@ -194,12 +207,15 @@ export function RoundEndOverlay() {
                     </span>
                     {Array.from({ length: Math.max(1, roundCount) }).map((_, ri) => {
                       const v = game.scores[t.id][ri];
-                      const isRoundWin = v !== undefined && v === modalRoundMins[ri];
+                      const isLowest = v !== undefined && v === modalRoundMins[ri];
+                      const tiedAtLowest = isLowest && modalLowestCounts[ri] > 1;
+                      const cls = tiedAtLowest
+                        ? " sb-td-round-tie"
+                        : isLowest
+                        ? " sb-td-round-win"
+                        : "";
                       return (
-                        <span
-                          key={ri}
-                          className={`sb-td sb-td-round${isRoundWin ? " sb-td-round-win" : ""}`}
-                        >
+                        <span key={ri} className={`sb-td sb-td-round${cls}`}>
                           {v !== undefined ? v : "—"}
                         </span>
                       );

@@ -18,6 +18,7 @@ import { Audio } from "../audio/sounds";
 import { useTheme } from "../state/theme";
 import { AquariumWallpaper } from "./AquariumWallpaper";
 import { NorthernLightsWallpaper } from "./NorthernLightsWallpaper";
+import { DawnCloudsWallpaper } from "./DawnCloudsWallpaper";
 
 export function Table() {
   const game = useStore((s) => s.game!);
@@ -190,6 +191,7 @@ export function Table() {
               Northern Lights = aurora ribbons + stars overlay. */}
           {tableTheme === "aquarium" && <AquariumWallpaper />}
           {tableTheme === "northern" && <NorthernLightsWallpaper />}
+          {tableTheme === "dawn" && <DawnCloudsWallpaper />}
         </div>
 
         {/* Compact top bar */}

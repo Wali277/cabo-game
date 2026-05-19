@@ -2,14 +2,20 @@
  * Shared final-results scoreboard rendered by both GloriousVictory (for the
  * winner) and GameLostOverlay (for the loser).
  *
- * Highlights:
- *  - Winner row → gold
- *  - For each round column, the lowest score across all players → green
- *    (the player who "won" that round in Cabo: lowest hand)
+ * Layout: one column per round (R1, R2, R3, …) plus a Total column, matching
+ * the in-game RoundEndOverlay so the user sees a consistent score-grid view
+ * everywhere they look at scores.
  *
- * The `variant` prop ("victory" / "lost") drives a class on the wrapper so
- * App.css can apply different color schemes (loser sees red numbers on a
- * dark/black background; winner sees the gold-on-purple glory palette).
+ * Highlights:
+ *  - Winner row → gold (`.end-score-winner`).
+ *  - Per-round cell with the SOLE lowest score → green (`.end-score-round-win`).
+ *  - Per-round cell where 2+ players tied at the lowest → bright gray
+ *    (`.end-score-round-tie`). Green is reserved for a unique winner so a tie
+ *    reads visually distinct.
+ *
+ * The `variant` prop ("victory" / "lost") drives a wrapper class so App.css
+ * can apply different palettes (loser: red numbers on dark; winner: gold on
+ * purple glory).
  */
 export interface ScoreRow {
   id: string;
@@ -28,14 +34,20 @@ interface Props {
 export function EndScoreboard({ rows, winnerId, humanId, variant }: Props) {
   if (rows.length === 0) return null;
 
-  // For each round index, find the lowest value across all players (= round winner).
+  // For each round index, find the lowest value across all players (= round
+  // winner) AND how many players tied at that minimum. We render the green
+  // win highlight only when there's a SOLE lowest score; multi-way ties at
+  // the lowest get a bright-gray highlight instead so they read as ties.
   const numRounds = Math.max(0, ...rows.map((r) => r.rounds.length));
   const roundMins: number[] = [];
+  const roundLowestCounts: number[] = [];
   for (let i = 0; i < numRounds; i++) {
     const values = rows
       .map((r) => r.rounds[i])
       .filter((v): v is number => typeof v === "number");
-    roundMins.push(values.length > 0 ? Math.min(...values) : Infinity);
+    const min = values.length > 0 ? Math.min(...values) : Infinity;
+    roundMins.push(min);
+    roundLowestCounts.push(values.filter((v) => v === min).length);
   }
 
   return (
@@ -45,7 +57,13 @@ export function EndScoreboard({ rows, winnerId, humanId, variant }: Props) {
         <thead>
           <tr>
             <th>Player</th>
-            <th>Rounds</th>
+            {numRounds === 0 ? (
+              <th>Rounds</th>
+            ) : (
+              Array.from({ length: numRounds }).map((_, i) => (
+                <th key={i} className="end-score-round-h">R{i + 1}</th>
+              ))
+            )}
             <th>Total</th>
           </tr>
         </thead>
@@ -56,21 +74,25 @@ export function EndScoreboard({ rows, winnerId, humanId, variant }: Props) {
               className={row.id === winnerId ? "end-score-winner" : ""}
             >
               <td>{row.id === humanId ? `${row.name} (You)` : row.name}</td>
-              <td className="end-score-rounds">
-                {row.rounds.length === 0
-                  ? "—"
-                  : row.rounds.map((v, i) => (
-                      <span
-                        key={i}
-                        className={
-                          v === roundMins[i] ? "end-score-round-win" : undefined
-                        }
-                      >
-                        {i > 0 ? " + " : ""}
-                        {v}
-                      </span>
-                    ))}
-              </td>
+              {numRounds === 0 ? (
+                <td className="end-score-round">—</td>
+              ) : (
+                Array.from({ length: numRounds }).map((_, i) => {
+                  const v = row.rounds[i];
+                  const isLowest = v !== undefined && v === roundMins[i];
+                  const tiedAtLowest = isLowest && roundLowestCounts[i] > 1;
+                  const cls = tiedAtLowest
+                    ? "end-score-round end-score-round-tie"
+                    : isLowest
+                    ? "end-score-round end-score-round-win"
+                    : "end-score-round";
+                  return (
+                    <td key={i} className={cls}>
+                      {v !== undefined ? v : "—"}
+                    </td>
+                  );
+                })
+              )}
               <td className="end-score-total">{row.total}</td>
             </tr>
           ))}

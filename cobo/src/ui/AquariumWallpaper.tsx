@@ -4,49 +4,284 @@ import { motion, useReducedMotion } from "framer-motion";
 /**
  * Live aquarium wallpaper for the Aquarium table theme.
  *
- * v2.17 — autonomous fish simulation
- * ===================================
+ * v2.18 — diverse creature roster
+ * ===============================
  *
- * The previous waypoint-keyframe approach couldn't guarantee that fish faced
- * forward — Framer Motion smoothly interpolates `scaleX` between keyframes,
- * which caused the moonwalking / sideways-swimming glitch even with step-end
- * easing tricks.
+ * The simulation engine is unchanged from v2.17: each creature has its own
+ * (pos, heading, facing) state, the requestAnimationFrame tick advances
+ * physics with steering forces (patrol whim + edge repulsion + creature-
+ * to-creature repulsion), position is ALWAYS updated forward along the
+ * current heading (no backwards-motion code path), and `facing` is derived
+ * from cos(heading) with a ±0.15 dead zone. The transform is applied
+ * imperatively (`scaleX(-facing)`) so the SVG art (drawn facing LEFT by
+ * convention) reads as facing the direction of travel.
  *
- * This version replaces the entire fish motion system with a small physics
- * simulation driven by `requestAnimationFrame`:
+ * What's new in v2.18:
+ *   • The previous 6 fish (ClownFish, BlueTang, YellowTang, Angelfish,
+ *     NeonTetra, Gourami) are gone. They all looked like the same flat
+ *     fish painted different colours.
+ *   • 12 visually distinct sea creatures replace them — sized by real-world
+ *     scale (Dolphin biggest, Shrimp smallest), with bespoke SVG silhouettes
+ *     so each is recognisable at a glance.
+ *   • Each creature carries its own Y-band (`yMin`, `yMax`) so surface
+ *     dwellers (dolphin, seal) stay near the top of the tank, mid-water
+ *     creatures (octopus, manta) hover at depth, and bottom-dwellers
+ *     (crab, shrimp) patrol the sand. The edge-repulsion + hard-clamp
+ *     blocks now read these per-creature bounds instead of the old global
+ *     Y_MIN / Y_MAX.
  *
- *   1. Each fish has its own `(pos, heading, facing)` state stored in a ref.
- *   2. Per frame we compute steering forces:
- *        • patrol whim    — gentle random heading changes over time
- *        • edge repulsion — push back inward when close to the viewport edges
- *        • fish repulsion — push away from any nearby fish (no overlap)
- *      Combined into a desired heading vector.
- *   3. The fish smoothly turns toward the desired heading, but turn rate is
- *      clamped (big fish turn slow, neon tetras turn fast).
- *   4. Position is ALWAYS updated forward along the current heading — there
- *      is no mechanism that can produce backwards motion. The worst case is
- *      a U-turn, which is a wide arc the fish swims out (not an instant flip).
- *   5. `facing` (+1 / -1) is derived from `cos(heading)` with a small dead
- *      zone around vertical so the fish doesn't jitter-flip mid-dive.
+ * Decor (kelp, tunicates, oysters, coral, sand bed, light shafts, bubbles,
+ * starfish) is unchanged from v2.17.
  *
- * The DOM transform is applied imperatively (`el.style.transform = ...`) so
- * the motion runs entirely on the compositor and never triggers a React
- * re-render. `useReducedMotion()` collapses everything to a still tableau.
+ * Layering inside `.aquarium-wallpaper`:
+ *   0 sand + light shafts → 1 creatures → 2 bubbles → 3 coral/kelp → 4 oyster/tunicate → 5 starfish
  *
- * Decor (kelp, tunicates, oysters, coral, bubbles, starfish, sand bed, light
- * shafts) is unchanged from v2.16, except the starfish has been moved down
- * to actually sit on the sand bed instead of floating mid-tank.
- *
- * Layering (z-index inside `.aquarium-wallpaper`):
- *   0 sand + light shafts → 1 fish → 2 bubbles → 3 coral/kelp → 4 oyster/tunicate → 5 starfish
+ * Naming note: the simulation code (variables `fish`, `fishElsRef`,
+ * `fishRepelX/Y`, the `.aquarium-fish` CSS class) keeps its v2.17 names
+ * to minimise diff churn. Within the simulation a "fish" is shorthand for
+ * any swimming creature.
  */
 
 // ────────────────────────────────────────────────────────────────────────────
-// SVG SPECIES — each fish is drawn FACING RIGHT in its SVG. We mirror with
-// `scaleX(-1)` at the wrapper level when the fish is moving leftward.
+// CREATURE SVGs — each drawn FACING LEFT by convention (head/eye at small x,
+// tail/back at large x). The simulation applies `scaleX(-facing)` so they
+// flip to face right when moving right, matching their direction of travel.
 // ────────────────────────────────────────────────────────────────────────────
 
-function ClownFish({ size = 70 }: { size?: number }) {
+interface CreatureProps { size?: number }
+
+/** Dolphin — long sleek grey body, sickle dorsal fin, pointed rostrum. */
+function Dolphin({ size = 160 }: CreatureProps): ReactElement {
+  return (
+    <svg viewBox="0 0 220 110" width={size} height={size * 0.5} aria-hidden="true">
+      <defs>
+        <linearGradient id="dolphinBelly" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"  stopColor="#7a93a8" />
+          <stop offset="60%" stopColor="#5d7689" />
+          <stop offset="100%" stopColor="#3b5163" />
+        </linearGradient>
+        <linearGradient id="dolphinBack" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"  stopColor="#3b5163" />
+          <stop offset="50%" stopColor="#5d7689" />
+          <stop offset="100%" stopColor="#9bb1c4" />
+        </linearGradient>
+      </defs>
+      {/* Belly (lighter underside) */}
+      <path d="M 24 64 Q 60 84 130 78 Q 180 70 198 64 Q 160 92 60 88 Z" fill="#dfe9f1" />
+      {/* Main body */}
+      <path
+        d="M 14 52 Q 50 18 130 24 Q 180 30 198 50 Q 208 56 210 60 L 200 62 Q 160 56 130 60 Q 60 66 24 64 Q 8 60 14 52 Z"
+        fill="url(#dolphinBack)"
+      />
+      {/* Pointed rostrum at the left (head) */}
+      <path d="M 14 52 L 0 56 L 8 60 L 14 52 Z" fill="#5d7689" />
+      {/* Dorsal fin */}
+      <path d="M 92 28 Q 100 4 124 26 Q 110 28 92 28 Z" fill="url(#dolphinBack)" />
+      {/* Pectoral fin */}
+      <path d="M 76 60 Q 80 84 102 76 Q 94 68 80 62 Z" fill="url(#dolphinBelly)" />
+      {/* Tail flukes */}
+      <path d="M 200 50 Q 220 38 220 56 L 218 60 Q 220 76 200 62 Z" fill="url(#dolphinBack)" />
+      {/* Eye */}
+      <circle cx="22" cy="50" r="2.5" fill="#1c1d2b" />
+      <circle cx="21" cy="49" r="0.9" fill="#fff" />
+      {/* Mouth crease */}
+      <path d="M 4 58 Q 12 60 22 58" stroke="#3b5163" strokeWidth="1" fill="none" />
+    </svg>
+  );
+}
+
+/** Manta Ray — flat diamond body, curled cephalic horns, long tail. */
+function MantaRay({ size = 150 }: CreatureProps): ReactElement {
+  return (
+    <svg viewBox="0 0 220 110" width={size} height={size * 0.5} aria-hidden="true">
+      <defs>
+        <linearGradient id="mantaTop" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"  stopColor="#222a36" />
+          <stop offset="60%" stopColor="#3a4756" />
+          <stop offset="100%" stopColor="#54657a" />
+        </linearGradient>
+      </defs>
+      {/* Wing tips trailing back from a centre body */}
+      <path
+        d="M 20 56 Q 60 18 110 36 Q 160 22 200 56 Q 160 78 110 72 Q 60 80 20 56 Z"
+        fill="url(#mantaTop)"
+      />
+      {/* Lighter underside hint along the bottom edge */}
+      <path d="M 30 60 Q 110 80 190 60 Q 110 76 30 60 Z" fill="#aab9c8" opacity="0.55" />
+      {/* Cephalic horns curling forward from the head (left side) */}
+      <path d="M 24 56 Q 14 44 8 50 Q 12 56 22 60" stroke="#222a36" strokeWidth="3" fill="none" strokeLinecap="round" />
+      <path d="M 26 60 Q 16 70 10 62 Q 14 60 24 60" stroke="#222a36" strokeWidth="3" fill="none" strokeLinecap="round" />
+      {/* Long whip tail */}
+      <path d="M 200 56 Q 218 56 214 50" stroke="#222a36" strokeWidth="2.5" fill="none" strokeLinecap="round" />
+      <path d="M 200 60 Q 218 64 210 70" stroke="#222a36" strokeWidth="2.2" fill="none" strokeLinecap="round" />
+      {/* Eye */}
+      <circle cx="32" cy="52" r="2.2" fill="#0e1218" />
+      {/* Wing patterning — subtle spots */}
+      <circle cx="80" cy="44" r="2" fill="#0e1218" opacity="0.5" />
+      <circle cx="130" cy="50" r="2.4" fill="#0e1218" opacity="0.5" />
+      <circle cx="160" cy="58" r="2" fill="#0e1218" opacity="0.5" />
+    </svg>
+  );
+}
+
+/** Seal — torpedo body, rounded head, big dark eye, two front flippers. */
+function Seal({ size = 130 }: CreatureProps): ReactElement {
+  return (
+    <svg viewBox="0 0 200 100" width={size} height={size * 0.5} aria-hidden="true">
+      <defs>
+        <linearGradient id="sealBack" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"  stopColor="#5b6678" />
+          <stop offset="60%" stopColor="#7d8a9d" />
+          <stop offset="100%" stopColor="#a8b3c2" />
+        </linearGradient>
+      </defs>
+      {/* Belly underside */}
+      <path d="M 30 70 Q 90 90 160 78 Q 170 74 170 64 Q 100 80 30 70 Z" fill="#d8dfe8" />
+      {/* Main body */}
+      <path
+        d="M 20 50 Q 28 24 60 26 Q 100 28 150 42 Q 175 50 180 60 Q 175 78 150 78 Q 100 84 60 74 Q 28 70 20 50 Z"
+        fill="url(#sealBack)"
+      />
+      {/* Rounded head (left) */}
+      <path d="M 18 44 Q 8 36 12 50 Q 8 64 22 56 Z" fill="url(#sealBack)" />
+      {/* Tail fluke */}
+      <path d="M 178 56 Q 196 50 196 64 Q 196 76 180 70 Z" fill="url(#sealBack)" />
+      {/* Front flipper */}
+      <path d="M 78 70 Q 80 90 110 84 Q 100 72 82 68 Z" fill="#5b6678" />
+      {/* Eye */}
+      <circle cx="22" cy="46" r="3.5" fill="#0e1218" />
+      <circle cx="20.6" cy="44.6" r="1.2" fill="#fff" />
+      {/* Whiskers */}
+      <path d="M 14 54 L 4 56" stroke="#3a414c" strokeWidth="0.7" />
+      <path d="M 14 56 L 4 60" stroke="#3a414c" strokeWidth="0.7" />
+      {/* Mouth */}
+      <path d="M 12 56 Q 16 60 22 58" stroke="#3a414c" strokeWidth="1.2" fill="none" />
+    </svg>
+  );
+}
+
+/** Octopus — round mantle, big round eye, 8 curling tentacles. */
+function Octopus({ size = 115 }: CreatureProps): ReactElement {
+  return (
+    <svg viewBox="0 0 180 130" width={size} height={size * 0.72} aria-hidden="true">
+      <defs>
+        <radialGradient id="octMantle" cx="35%" cy="30%" r="65%">
+          <stop offset="0%"  stopColor="#f08aa5" />
+          <stop offset="70%" stopColor="#c44a78" />
+          <stop offset="100%" stopColor="#7a1f4a" />
+        </radialGradient>
+      </defs>
+      {/* Mantle (bulbous head) */}
+      <ellipse cx="64" cy="48" rx="50" ry="38" fill="url(#octMantle)" />
+      {/* 8 tentacles curling back toward the right (trailing) */}
+      <g stroke="#c44a78" strokeWidth="6" fill="none" strokeLinecap="round">
+        <path d="M 60 84  Q 100 96  140 86" />
+        <path d="M 70 90  Q 110 110 150 96" />
+        <path d="M 80 92  Q 120 116 160 108" />
+        <path d="M 92 92  Q 130 118 170 118" />
+        <path d="M 50 88  Q 80 108  120 110" />
+        <path d="M 40 84  Q 60 104  98 116" />
+        <path d="M 30 76  Q 40 102  76 122" />
+        <path d="M 24 64  Q 20 100  56 124" />
+      </g>
+      {/* Suction cup dots */}
+      <g fill="#f7b3c8">
+        <circle cx="100" cy="92" r="1.6" />
+        <circle cx="120" cy="100" r="1.6" />
+        <circle cx="140" cy="98" r="1.6" />
+        <circle cx="90"  cy="104" r="1.6" />
+        <circle cx="110" cy="112" r="1.6" />
+        <circle cx="60"  cy="106" r="1.6" />
+      </g>
+      {/* Eye */}
+      <circle cx="32" cy="40" r="7" fill="#fff8ee" />
+      <circle cx="30" cy="40" r="4" fill="#1c1d2b" />
+      <circle cx="29" cy="39" r="1.4" fill="#fff" />
+      {/* Mantle highlight */}
+      <ellipse cx="50" cy="30" rx="20" ry="8" fill="#fff4f8" opacity="0.45" />
+    </svg>
+  );
+}
+
+/** Sea Turtle — oval shell with hexagonal scutes, paddle flippers, small head. */
+function SeaTurtle({ size = 105 }: CreatureProps): ReactElement {
+  return (
+    <svg viewBox="0 0 160 110" width={size} height={size * 0.69} aria-hidden="true">
+      <defs>
+        <linearGradient id="turtleShell" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"  stopColor="#4a8a3a" />
+          <stop offset="60%" stopColor="#356428" />
+          <stop offset="100%" stopColor="#1f3e16" />
+        </linearGradient>
+      </defs>
+      {/* Shell — oval dome */}
+      <ellipse cx="80" cy="58" rx="56" ry="34" fill="url(#turtleShell)" stroke="#1a3010" strokeWidth="1.6" />
+      {/* Scutes (hexagonal pattern) */}
+      <g stroke="#1a3010" strokeWidth="1.2" fill="#3e7430">
+        <polygon points="80,40 92,46 92,58 80,64 68,58 68,46" />
+        <polygon points="56,46 66,50 66,58 56,62 46,58 46,50" />
+        <polygon points="104,46 114,50 114,58 104,62 94,58 94,50" />
+        <polygon points="80,68 92,72 92,80 80,84 68,80 68,72" opacity="0.85" />
+        <polygon points="58,68 66,72 66,78 58,82 50,78 50,72" opacity="0.85" />
+        <polygon points="102,68 110,72 110,78 102,82 94,78 94,72" opacity="0.85" />
+      </g>
+      {/* Head poking out the left */}
+      <ellipse cx="22" cy="58" rx="14" ry="11" fill="#4a8a3a" stroke="#1a3010" strokeWidth="1.4" />
+      <circle cx="16" cy="55" r="2" fill="#1c1d2b" />
+      <circle cx="15.4" cy="54.4" r="0.6" fill="#fff" />
+      {/* Front-left paddle flipper */}
+      <path d="M 36 40 Q 22 22 12 32 Q 22 46 38 46 Z" fill="#3e7430" stroke="#1a3010" strokeWidth="1.2" />
+      {/* Back-left paddle flipper */}
+      <path d="M 40 84 Q 28 100 14 90 Q 28 78 42 76 Z" fill="#3e7430" stroke="#1a3010" strokeWidth="1.2" />
+      {/* Front-right paddle flipper */}
+      <path d="M 124 40 Q 138 22 148 32 Q 138 46 122 46 Z" fill="#3e7430" stroke="#1a3010" strokeWidth="1.2" />
+      {/* Back-right paddle flipper */}
+      <path d="M 120 84 Q 132 100 146 90 Q 132 78 118 76 Z" fill="#3e7430" stroke="#1a3010" strokeWidth="1.2" />
+      {/* Tail */}
+      <path d="M 136 60 L 148 62 L 138 66 Z" fill="#3e7430" stroke="#1a3010" strokeWidth="1" />
+    </svg>
+  );
+}
+
+/** Pufferfish — round spiny body, tiny tail, surprised eye. */
+function Pufferfish({ size = 65 }: CreatureProps): ReactElement {
+  return (
+    <svg viewBox="0 0 110 90" width={size} height={size * 0.82} aria-hidden="true">
+      <defs>
+        <radialGradient id="puffBody" cx="35%" cy="30%" r="70%">
+          <stop offset="0%"  stopColor="#f4d57a" />
+          <stop offset="60%" stopColor="#d49a32" />
+          <stop offset="100%" stopColor="#8a5e14" />
+        </radialGradient>
+      </defs>
+      {/* Round inflated body */}
+      <circle cx="48" cy="46" r="32" fill="url(#puffBody)" stroke="#5a3e10" strokeWidth="1.4" />
+      {/* Belly pale */}
+      <ellipse cx="48" cy="60" rx="22" ry="10" fill="#fff8d8" opacity="0.55" />
+      {/* Spikes — short triangles radiating outward */}
+      <g fill="#d49a32" stroke="#5a3e10" strokeWidth="0.8">
+        <polygon points="48,8 50,16 46,16" />
+        <polygon points="20,18 28,22 22,26" />
+        <polygon points="14,42 22,46 14,50" />
+        <polygon points="22,72 28,68 28,76" />
+        <polygon points="48,84 46,76 50,76" />
+        <polygon points="74,72 80,76 80,68" />
+        <polygon points="76,18 70,22 76,26" />
+      </g>
+      {/* Tail fin (small) */}
+      <path d="M 78 46 L 96 36 L 92 46 L 96 56 Z" fill="#d49a32" stroke="#5a3e10" strokeWidth="1.2" />
+      {/* Big surprised eye */}
+      <circle cx="30" cy="38" r="6" fill="#fff" />
+      <circle cx="28" cy="38" r="3.5" fill="#1c1d2b" />
+      <circle cx="27" cy="37" r="1.2" fill="#fff" />
+      {/* Tiny mouth */}
+      <circle cx="14" cy="48" r="1.6" fill="#5a3e10" />
+    </svg>
+  );
+}
+
+/** Clownfish — iconic orange + white + black-trim aquarium fish. */
+function Clownfish({ size = 55 }: CreatureProps): ReactElement {
   return (
     <svg viewBox="0 0 100 60" width={size} height={size * 0.6} aria-hidden="true">
       <ellipse cx="48" cy="30" rx="34" ry="18" fill="#ff7a2e" />
@@ -56,96 +291,224 @@ function ClownFish({ size = 70 }: { size?: number }) {
       <path d="M 42 14 Q 50 4 60 14 Z" fill="#e85f1e" />
       <circle cx="22" cy="26" r="4" fill="#1c1d2b" />
       <circle cx="20.5" cy="24.5" r="1.4" fill="#fff" />
-      <ellipse cx="48" cy="30" rx="34" ry="18" fill="none" stroke="#3d1700" strokeWidth="1.4" />
+      <ellipse cx="48" cy="30" rx="34" ry="18" fill="none" stroke="#1c1d2b" strokeWidth="1.6" />
+      {/* Black trim along the white stripes for that crisp clownfish look */}
+      <path d="M 26 16 Q 22 30 28 46" stroke="#1c1d2b" strokeWidth="1.4" fill="none" />
+      <path d="M 36 18 Q 32 30 36 44" stroke="#1c1d2b" strokeWidth="1.4" fill="none" />
+      <path d="M 56 16 Q 50 30 58 46" stroke="#1c1d2b" strokeWidth="1.4" fill="none" />
+      <path d="M 66 18 Q 62 30 66 44" stroke="#1c1d2b" strokeWidth="1.4" fill="none" />
     </svg>
   );
 }
 
-function BlueTang({ size = 80 }: { size?: number }) {
+/** Nautilus — spiral chambered shell with small tentacle tufts. */
+function Nautilus({ size = 55 }: CreatureProps): ReactElement {
   return (
-    <svg viewBox="0 0 110 60" width={size} height={size * 0.55} aria-hidden="true">
-      <path d="M 18 30 Q 30 6 70 8 Q 92 14 92 30 Q 92 46 70 52 Q 30 54 18 30 Z" fill="#2b7fd6" />
-      <path d="M 30 18 Q 60 16 80 26 Q 60 36 30 38 Z" fill="#1a5aa3" opacity="0.55" />
-      <path d="M 92 30 L 108 14 L 102 30 L 108 46 Z" fill="#ffd864" />
-      <path d="M 52 8 Q 60 -2 70 8 Z" fill="#1a5aa3" />
-      <circle cx="28" cy="26" r="3.5" fill="#1c1d2b" />
-      <circle cx="26.7" cy="24.7" r="1.2" fill="#fff" />
-      <path d="M 18 30 Q 30 6 70 8 Q 92 14 92 30 Q 92 46 70 52 Q 30 54 18 30 Z" fill="none" stroke="#0d3a78" strokeWidth="1.4" />
+    <svg viewBox="0 0 100 90" width={size} height={size * 0.9} aria-hidden="true">
+      <defs>
+        <linearGradient id="nautilusShell" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%"  stopColor="#f5e6c8" />
+          <stop offset="100%" stopColor="#d2b682" />
+        </linearGradient>
+      </defs>
+      {/* Outer shell — spiral */}
+      <path
+        d="M 50 14 Q 88 14 88 50 Q 88 86 50 86 Q 12 86 12 50 Q 12 22 38 18 Q 56 16 64 30 Q 70 42 60 50 Q 50 56 44 50 Q 40 46 44 42"
+        fill="url(#nautilusShell)"
+        stroke="#7a5c28"
+        strokeWidth="1.6"
+      />
+      {/* Chamber separator lines */}
+      <g stroke="#a8853c" strokeWidth="1.2" fill="none">
+        <path d="M 50 14 Q 60 30 50 50" />
+        <path d="M 88 50 Q 70 50 60 50" />
+        <path d="M 50 86 Q 50 64 50 50" />
+        <path d="M 12 50 Q 30 50 44 50" />
+        <path d="M 22 22 Q 36 32 44 42" />
+        <path d="M 78 22 Q 64 32 56 42" />
+      </g>
+      {/* Tentacle tufts emerging from the opening at the bottom-left */}
+      <g stroke="#a8853c" strokeWidth="1.6" fill="none" strokeLinecap="round">
+        <path d="M 16 64 Q 6 70 4 76" />
+        <path d="M 20 70 Q 8 76 4 84" />
+        <path d="M 24 74 Q 14 84 12 88" />
+        <path d="M 28 78 Q 22 86 22 90" />
+      </g>
+      {/* Eye in the head area */}
+      <circle cx="22" cy="58" r="2.4" fill="#1c1d2b" />
+      <circle cx="21" cy="57" r="0.8" fill="#fff" />
     </svg>
   );
 }
 
-function YellowTang({ size = 65 }: { size?: number }) {
+/** Jellyfish — translucent bell + wavy trailing tentacles. */
+function Jellyfish({ size = 60 }: CreatureProps): ReactElement {
   return (
-    <svg viewBox="0 0 100 70" width={size} height={size * 0.7} aria-hidden="true">
-      <path d="M 16 36 Q 30 8 64 8 Q 88 18 84 36 Q 88 54 64 64 Q 30 64 16 36 Z" fill="#ffd864" />
-      <path d="M 84 36 L 100 22 L 96 36 L 100 50 Z" fill="#f5b830" />
-      <path d="M 16 36 L 4 30 L 8 36 L 4 42 Z" fill="#f5b830" />
-      <path d="M 46 8 Q 56 0 66 8 Z" fill="#f5b830" />
-      <circle cx="34" cy="28" r="3.5" fill="#1c1d2b" />
-      <circle cx="32.8" cy="26.8" r="1.2" fill="#fff" />
-      <path d="M 16 36 Q 30 8 64 8 Q 88 18 84 36 Q 88 54 64 64 Q 30 64 16 36 Z" fill="none" stroke="#8a6500" strokeWidth="1.4" />
+    <svg viewBox="0 0 100 130" width={size} height={size * 1.3} aria-hidden="true">
+      <defs>
+        <radialGradient id="jellyBell" cx="50%" cy="40%" r="60%">
+          <stop offset="0%"  stopColor="#fff" stopOpacity="0.85" />
+          <stop offset="60%" stopColor="#c6b7f0" stopOpacity="0.55" />
+          <stop offset="100%" stopColor="#7a64bf" stopOpacity="0.4" />
+        </radialGradient>
+      </defs>
+      {/* Translucent bell (dome) */}
+      <path
+        d="M 10 60 Q 14 14 50 14 Q 86 14 90 60 Q 86 72 50 70 Q 14 72 10 60 Z"
+        fill="url(#jellyBell)"
+        stroke="#a392d8"
+        strokeWidth="1.2"
+      />
+      {/* Inner organ hint */}
+      <ellipse cx="50" cy="56" rx="14" ry="6" fill="#c6b7f0" opacity="0.4" />
+      <ellipse cx="38" cy="50" rx="4" ry="3" fill="#fff" opacity="0.45" />
+      <ellipse cx="60" cy="48" rx="3" ry="2.4" fill="#fff" opacity="0.45" />
+      {/* Wavy trailing tentacles */}
+      <g stroke="#a392d8" strokeWidth="1.4" fill="none" strokeLinecap="round" opacity="0.85">
+        <path d="M 22 66 Q 16 80 24 96 Q 18 110 26 124" />
+        <path d="M 36 70 Q 30 88 38 102 Q 32 116 40 128" />
+        <path d="M 50 72 Q 46 88 52 104 Q 46 118 54 130" />
+        <path d="M 62 70 Q 68 86 60 102 Q 66 116 58 128" />
+        <path d="M 78 66 Q 84 82 76 96 Q 82 110 74 124" />
+      </g>
+      {/* Frilled bell underside */}
+      <path d="M 14 64 Q 30 76 50 70 Q 70 76 86 64" stroke="#a392d8" strokeWidth="1" fill="none" />
     </svg>
   );
 }
 
-/** Tall, vertically-striped freshwater classic — pointed top/bottom fins. */
-function Angelfish({ size = 75 }: { size?: number }) {
+/** Seahorse — curled prehensile tail, tubular snout, dorsal fin. */
+function Seahorse({ size = 50 }: CreatureProps): ReactElement {
   return (
-    <svg viewBox="0 0 90 100" width={size * 0.9} height={size} aria-hidden="true">
-      <path d="M 26 50 Q 18 22 50 22 Q 78 30 78 50 Q 78 70 50 78 Q 18 78 26 50 Z" fill="#dfe6f0" />
-      <path d="M 34 28 Q 36 50 30 72 L 38 70 Q 40 50 38 30 Z" fill="#1c1d2b" opacity="0.65" />
-      <path d="M 50 24 Q 52 50 48 76 L 56 74 Q 58 50 54 26 Z" fill="#1c1d2b" opacity="0.65" />
-      <path d="M 64 30 Q 66 50 62 70 L 70 68 Q 72 50 68 32 Z" fill="#1c1d2b" opacity="0.55" />
-      <path d="M 38 22 Q 50 -2 70 14 Q 56 20 46 26 Z" fill="#bcc6d6" />
-      <path d="M 38 78 Q 50 102 70 86 Q 56 80 46 74 Z" fill="#bcc6d6" />
-      <path d="M 78 50 L 92 36 Q 88 50 92 64 Z" fill="#dfe6f0" />
-      <path d="M 36 64 L 26 92" stroke="#bcc6d6" strokeWidth="1.6" fill="none" />
-      <circle cx="38" cy="44" r="3" fill="#1c1d2b" />
-      <circle cx="36.8" cy="42.8" r="1" fill="#fff" />
-      <path d="M 26 50 Q 18 22 50 22 Q 78 30 78 50 Q 78 70 50 78 Q 18 78 26 50 Z" fill="none" stroke="#7a8597" strokeWidth="1.2" />
+    <svg viewBox="0 0 80 120" width={size * 0.67} height={size * 1.0} aria-hidden="true">
+      <defs>
+        <linearGradient id="horseBody" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"  stopColor="#ffc04a" />
+          <stop offset="100%" stopColor="#c46a14" />
+        </linearGradient>
+      </defs>
+      {/* Curved S-body with rounded segments */}
+      <path
+        d="M 36 14 Q 18 22 22 42 Q 28 56 46 60 Q 60 64 56 80 Q 50 96 32 100 Q 18 104 22 116 Q 30 120 40 116"
+        stroke="url(#horseBody)"
+        strokeWidth="14"
+        fill="none"
+        strokeLinecap="round"
+      />
+      {/* Head bulge with eye */}
+      <ellipse cx="30" cy="18" rx="10" ry="8" fill="#ffc04a" stroke="#8a4a08" strokeWidth="1.2" />
+      <circle cx="22" cy="16" r="2" fill="#1c1d2b" />
+      <circle cx="21" cy="15.2" r="0.6" fill="#fff" />
+      {/* Snout (tubular, pointing left) */}
+      <path d="M 22 22 L 6 24 L 8 28 L 22 28 Z" fill="#ffc04a" stroke="#8a4a08" strokeWidth="1.2" />
+      {/* Dorsal fin running down the back */}
+      <path d="M 44 36 Q 56 42 50 60 Q 44 56 40 44 Z" fill="#fff0c4" stroke="#8a4a08" strokeWidth="1" />
+      {/* Tail curl segments */}
+      <g stroke="#8a4a08" strokeWidth="1" fill="none">
+        <path d="M 30 104 Q 22 110 28 116" />
+        <path d="M 30 100 Q 26 96 32 90" />
+        <path d="M 36 84 Q 32 80 40 74" />
+      </g>
+      {/* Body segment lines */}
+      <g stroke="#8a4a08" strokeWidth="0.8" fill="none" opacity="0.7">
+        <path d="M 24 32 L 30 30" />
+        <path d="M 22 44 L 32 44" />
+        <path d="M 28 56 L 38 56" />
+        <path d="M 46 68 L 56 70" />
+        <path d="M 50 82 L 60 80" />
+      </g>
     </svg>
   );
 }
 
-/** Tiny streamlined fish with iconic neon-blue + red horizontal stripe. */
-function NeonTetra({ size = 45 }: { size?: number }) {
+/** Crab — squat shell, two eyestalks, two big claws (left-pointing). */
+function Crab({ size = 50 }: CreatureProps): ReactElement {
   return (
-    <svg viewBox="0 0 100 40" width={size} height={size * 0.4} aria-hidden="true">
-      <path d="M 10 20 Q 20 6 60 8 Q 86 12 88 20 Q 86 28 60 32 Q 20 34 10 20 Z" fill="#e8eef5" />
-      <path d="M 18 16 Q 40 10 78 14 Q 80 18 78 20 Q 40 18 18 22 Z" fill="#39bdf2" />
-      <path d="M 52 22 Q 70 22 84 24 L 86 26 Q 70 30 52 28 Z" fill="#ff4b6e" />
-      <path d="M 88 20 L 98 12 L 96 20 L 98 28 Z" fill="#cfd6e0" />
-      <circle cx="20" cy="17" r="2" fill="#1c1d2b" />
-      <circle cx="19.4" cy="16.4" r="0.6" fill="#fff" />
-      <path d="M 10 20 Q 20 6 60 8 Q 86 12 88 20 Q 86 28 60 32 Q 20 34 10 20 Z" fill="none" stroke="#7a8597" strokeWidth="0.8" />
+    <svg viewBox="0 0 110 80" width={size} height={size * 0.73} aria-hidden="true">
+      <defs>
+        <radialGradient id="crabShell" cx="35%" cy="30%" r="70%">
+          <stop offset="0%"  stopColor="#ff6f4a" />
+          <stop offset="70%" stopColor="#c2331a" />
+          <stop offset="100%" stopColor="#7a1f0e" />
+        </radialGradient>
+      </defs>
+      {/* Side legs (4 — 2 per side) */}
+      <g stroke="#7a1f0e" strokeWidth="3.5" fill="none" strokeLinecap="round">
+        <path d="M 38 54 Q 28 64 22 70" />
+        <path d="M 44 58 Q 36 70 30 76" />
+        <path d="M 72 54 Q 82 64 88 70" />
+        <path d="M 66 58 Q 74 70 80 76" />
+      </g>
+      {/* Squat oval shell */}
+      <ellipse cx="55" cy="44" rx="32" ry="20" fill="url(#crabShell)" stroke="#7a1f0e" strokeWidth="1.6" />
+      {/* Shell highlights */}
+      <path d="M 32 38 Q 55 50 78 38" stroke="#ff9b78" strokeWidth="1.4" fill="none" opacity="0.7" />
+      {/* Left claw (head end) — large pincer */}
+      <g stroke="#7a1f0e" strokeWidth="1.6">
+        <path d="M 28 44 Q 16 38 6 30 Q 14 28 22 32 Q 16 36 20 42 Z" fill="#c2331a" />
+        <path d="M 6 30 Q 12 34 18 36" stroke="#7a1f0e" strokeWidth="1.2" fill="none" />
+      </g>
+      {/* Right claw */}
+      <g stroke="#7a1f0e" strokeWidth="1.6">
+        <path d="M 82 44 Q 94 38 104 30 Q 96 28 88 32 Q 94 36 90 42 Z" fill="#c2331a" />
+      </g>
+      {/* Two eyestalks on top */}
+      <line x1="46" y1="28" x2="42" y2="14" stroke="#7a1f0e" strokeWidth="2.2" />
+      <circle cx="42" cy="12" r="3" fill="#fff" stroke="#7a1f0e" strokeWidth="1" />
+      <circle cx="41" cy="11" r="1.4" fill="#1c1d2b" />
+      <line x1="64" y1="28" x2="68" y2="14" stroke="#7a1f0e" strokeWidth="2.2" />
+      <circle cx="68" cy="12" r="3" fill="#fff" stroke="#7a1f0e" strokeWidth="1" />
+      <circle cx="69" cy="11" r="1.4" fill="#1c1d2b" />
     </svg>
   );
 }
 
-/** Pearl gourami — long pelvic feelers, mottled body. */
-function Gourami({ size = 80 }: { size?: number }) {
+/** Shrimp — small segmented body, long antennae, fan tail. */
+function Shrimp({ size = 38 }: CreatureProps): ReactElement {
   return (
-    <svg viewBox="0 0 110 70" width={size} height={size * 0.64} aria-hidden="true">
-      <path d="M 18 36 Q 28 10 66 10 Q 94 16 94 36 Q 94 54 66 60 Q 28 60 18 36 Z" fill="#c8a4d6" />
-      <circle cx="40" cy="26" r="3" fill="#a07ab4" opacity="0.65" />
-      <circle cx="56" cy="36" r="2.4" fill="#a07ab4" opacity="0.65" />
-      <circle cx="70" cy="22" r="3" fill="#a07ab4" opacity="0.6" />
-      <circle cx="80" cy="42" r="2.6" fill="#a07ab4" opacity="0.6" />
-      <circle cx="50" cy="48" r="2" fill="#a07ab4" opacity="0.6" />
-      <path d="M 94 36 L 108 22 L 102 36 L 108 50 Z" fill="#b294c6" />
-      <path d="M 48 10 Q 62 0 78 10 Z" fill="#a07ab4" />
-      <path d="M 40 50 L 28 68" stroke="#c8a4d6" strokeWidth="1.4" fill="none" />
-      <path d="M 44 52 L 36 70" stroke="#c8a4d6" strokeWidth="1.4" fill="none" />
-      <circle cx="30" cy="30" r="3.5" fill="#1c1d2b" />
-      <circle cx="28.8" cy="28.8" r="1.2" fill="#fff" />
-      <path d="M 18 36 Q 28 10 66 10 Q 94 16 94 36 Q 94 54 66 60 Q 28 60 18 36 Z" fill="none" stroke="#6a4a82" strokeWidth="1.4" />
+    <svg viewBox="0 0 100 50" width={size} height={size * 0.5} aria-hidden="true">
+      <defs>
+        <linearGradient id="shrimpBody" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"  stopColor="#ffb6a0" />
+          <stop offset="60%" stopColor="#ec6e58" />
+          <stop offset="100%" stopColor="#a83320" />
+        </linearGradient>
+      </defs>
+      {/* Arched segmented body */}
+      <path
+        d="M 18 32 Q 8 22 18 14 Q 30 8 50 12 Q 72 16 84 24 Q 88 30 84 34 Q 70 32 52 32 Q 32 32 18 32 Z"
+        fill="url(#shrimpBody)"
+        stroke="#7a1f10" strokeWidth="1.2"
+      />
+      {/* Body segments */}
+      <g stroke="#7a1f10" strokeWidth="0.8" fill="none" opacity="0.65">
+        <path d="M 28 14 L 28 32" />
+        <path d="M 40 12 L 40 32" />
+        <path d="M 52 12 L 52 32" />
+        <path d="M 64 16 L 64 32" />
+        <path d="M 74 20 L 74 32" />
+      </g>
+      {/* Fan tail (right side) */}
+      <path d="M 80 22 Q 96 18 96 26 Q 96 34 80 34 Z" fill="#ec6e58" stroke="#7a1f10" strokeWidth="1.2" />
+      {/* Head (left side) with eye */}
+      <ellipse cx="18" cy="22" rx="6" ry="8" fill="#ec6e58" stroke="#7a1f10" strokeWidth="1.2" />
+      <circle cx="14" cy="20" r="1.8" fill="#1c1d2b" />
+      {/* Two long antennae trailing from the head */}
+      <path d="M 14 18 Q 4 8 -4 14" stroke="#a83320" strokeWidth="1.1" fill="none" strokeLinecap="round" />
+      <path d="M 14 24 Q 4 30 -4 30" stroke="#a83320" strokeWidth="1.1" fill="none" strokeLinecap="round" />
+      {/* Tiny legs underneath */}
+      <g stroke="#7a1f10" strokeWidth="1" fill="none">
+        <path d="M 30 32 L 30 38" />
+        <path d="M 40 32 L 40 40" />
+        <path d="M 50 32 L 50 40" />
+        <path d="M 60 32 L 60 38" />
+      </g>
     </svg>
   );
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// DECOR SVGs
+// DECOR SVGs (unchanged from v2.17)
 // ────────────────────────────────────────────────────────────────────────────
 
 function Starfish({ size = 80 }: { size?: number }) {
@@ -255,57 +618,66 @@ function CoralBrain({ size = 110 }: { size?: number }) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// FISH SIMULATION
+// CREATURE SIMULATION
 // ────────────────────────────────────────────────────────────────────────────
 
-interface FishDef {
+interface CreatureDef {
   id: string;
   Component: (props: { size?: number }) => ReactElement;
   size: number;
-  /** Starting position (vw, vh). */
+  /** Starting position (vw, vh). Place inside the creature's yMin..yMax band. */
   startX: number;
   startY: number;
   /** Initial heading in radians (0 = facing right, π = facing left). */
   startHeading: number;
-  /** Cruise speed in vw/sec (vertical is dampened — see TICK below). */
+  /** Cruise speed in vw/sec. */
   baseSpeed: number;
-  /** Max turning rate in rad/sec. Big fish turn slowly; tetras snap. */
+  /** Max turning rate in rad/sec. Big creatures turn slowly. */
   turnRate: number;
   opacity: number;
+  /** Vertical band the creature is allowed in (vh). Surface dwellers get a
+      low yMin; bottom-dwellers get a high yMin. */
+  yMin: number;
+  yMax: number;
 }
 
-interface FishState {
+interface CreatureState {
   pos: { x: number; y: number };
   heading: number;
   /** Last committed left/right facing (only flips when heading clearly horizontal). */
   facing: 1 | -1;
-  /** Where the fish is currently choosing to swim toward. */
+  /** Where the creature is currently choosing to swim toward. */
   patrolHeading: number;
   /** Seconds until next patrol decision. */
   patrolTimer: number;
 }
 
-// 9 fish, varied sizes/speeds, spread across the viewport. Starting positions
-// are well separated so the simulation doesn't begin with collisions.
-const FISH_DEFS: FishDef[] = [
-  { id: "clown1",  Component: ClownFish,  size: 60, startX: 12, startY: 22, startHeading: 0,             baseSpeed: 3.0, turnRate: 0.55, opacity: 0.60 },
-  { id: "clown2",  Component: ClownFish,  size: 54, startX: 82, startY: 76, startHeading: Math.PI,       baseSpeed: 3.2, turnRate: 0.60, opacity: 0.58 },
-  { id: "blue1",   Component: BlueTang,   size: 70, startX: 30, startY: 38, startHeading: 0.4,           baseSpeed: 3.6, turnRate: 0.65, opacity: 0.60 },
-  { id: "blue2",   Component: BlueTang,   size: 64, startX: 68, startY: 52, startHeading: Math.PI + 0.3, baseSpeed: 3.4, turnRate: 0.60, opacity: 0.60 },
-  { id: "yellow",  Component: YellowTang, size: 54, startX: 76, startY: 28, startHeading: -0.2,          baseSpeed: 4.2, turnRate: 0.80, opacity: 0.65 },
-  { id: "angel",   Component: Angelfish,  size: 60, startX: 18, startY: 62, startHeading: 0.2,           baseSpeed: 1.8, turnRate: 0.45, opacity: 0.60 },
-  { id: "tetra1",  Component: NeonTetra,  size: 36, startX: 24, startY: 30, startHeading: 0.2,           baseSpeed: 5.8, turnRate: 1.4,  opacity: 0.70 },
-  { id: "tetra2",  Component: NeonTetra,  size: 34, startX: 72, startY: 66, startHeading: Math.PI + 0.3, baseSpeed: 6.2, turnRate: 1.5,  opacity: 0.70 },
-  { id: "gourami", Component: Gourami,    size: 66, startX: 44, startY: 46, startHeading: 0.1,           baseSpeed: 2.0, turnRate: 0.50, opacity: 0.55 },
+// 12 creatures, sized by real-world scale, distributed across vertical bands
+// so big surface dwellers stay near the top and bottom-feeders stay near the
+// sand. Starting positions placed inside each creature's allowed yMin..yMax
+// slot so they don't immediately fight edge repulsion.
+const CREATURE_DEFS: CreatureDef[] = [
+  // Surface band (yMin 14–30): biggest, fastest
+  { id: "dolphin", Component: Dolphin,   size: 160, startX: 16, startY: 22, startHeading: 0,             baseSpeed: 5.5, turnRate: 0.55, opacity: 0.72, yMin: 14, yMax: 50 },
+  { id: "seal",    Component: Seal,      size: 130, startX: 80, startY: 28, startHeading: Math.PI,       baseSpeed: 4.0, turnRate: 0.65, opacity: 0.72, yMin: 18, yMax: 55 },
+  // Mid-water band (yMin 25–45): medium glide / drift
+  { id: "manta",   Component: MantaRay,  size: 150, startX: 36, startY: 46, startHeading: 0.2,           baseSpeed: 2.8, turnRate: 0.40, opacity: 0.72, yMin: 30, yMax: 70 },
+  { id: "turtle",  Component: SeaTurtle, size: 105, startX: 68, startY: 42, startHeading: Math.PI + 0.1, baseSpeed: 2.2, turnRate: 0.45, opacity: 0.72, yMin: 25, yMax: 70 },
+  // Mid-depth band
+  { id: "octopus", Component: Octopus,   size: 115, startX: 24, startY: 58, startHeading: 0.1,           baseSpeed: 1.8, turnRate: 0.50, opacity: 0.72, yMin: 35, yMax: 75 },
+  { id: "puffer",  Component: Pufferfish,size: 65,  startX: 52, startY: 38, startHeading: 0.3,           baseSpeed: 2.5, turnRate: 0.85, opacity: 0.75, yMin: 30, yMax: 70 },
+  { id: "clown",   Component: Clownfish, size: 55,  startX: 88, startY: 48, startHeading: Math.PI,       baseSpeed: 3.4, turnRate: 0.80, opacity: 0.75, yMin: 22, yMax: 65 },
+  { id: "nautilus",Component: Nautilus,  size: 55,  startX: 44, startY: 64, startHeading: 0,             baseSpeed: 1.4, turnRate: 0.40, opacity: 0.78, yMin: 40, yMax: 75 },
+  { id: "jelly",   Component: Jellyfish, size: 60,  startX: 12, startY: 38, startHeading: 0.05,          baseSpeed: 1.6, turnRate: 0.30, opacity: 0.78, yMin: 18, yMax: 70 },
+  { id: "seahorse",Component: Seahorse,  size: 50,  startX: 76, startY: 60, startHeading: Math.PI + 0.1, baseSpeed: 1.8, turnRate: 0.65, opacity: 0.78, yMin: 35, yMax: 78 },
+  // Sand band (yMin 70+): bottom-feeders
+  { id: "crab",    Component: Crab,      size: 50,  startX: 32, startY: 76, startHeading: 0,             baseSpeed: 1.5, turnRate: 0.55, opacity: 0.78, yMin: 72, yMax: 82 },
+  { id: "shrimp",  Component: Shrimp,    size: 38,  startX: 62, startY: 72, startHeading: Math.PI,       baseSpeed: 4.0, turnRate: 1.20, opacity: 0.78, yMin: 55, yMax: 80 },
 ];
 
-// Viewport bounds in (vw, vh). Fish are softly repelled before reaching the
-// hard edges, then clamped as a last resort. Top/bottom leave room for the
-// top-bar UI and the sand/decor strip respectively.
+// Horizontal viewport bounds (vw). Vertical bounds are now per-creature.
 const X_MIN = -2;
 const X_MAX = 102;
-const Y_MIN = 10;
-const Y_MAX = 82;
 const EDGE_BUFFER = 12; // distance over which the soft-repel ramps up
 
 function wrapAngle(a: number): number {
@@ -321,11 +693,10 @@ function applyTransform(
   facing: number,
   tiltDeg: number,
 ) {
-  // All fish SVGs are drawn facing LEFT (eye near x=0, tail at high x). We
-  // flip them with scaleX(-1) so they face RIGHT. When `facing = 1` (moving
-  // right) we want scaleX(-1); when `facing = -1` (moving left) we want
-  // scaleX(1). Hence the negation: scaleX(-facing).
-  // CSS transform order is right-to-left: rotate first, then scaleX, then translate.
+  // All creature SVGs are drawn facing LEFT (eye near x=0, tail at high x).
+  // scaleX(-facing) flips them to face right when `facing = 1`, leaves them
+  // unflipped (facing left) when `facing = -1`. CSS transform order is
+  // right-to-left: rotate first, then scaleX, then translate.
   el.style.transform = `translate(${xVw}vw, ${yVh}vh) scaleX(${-facing}) rotate(${tiltDeg}deg)`;
 }
 
@@ -377,12 +748,12 @@ const BUBBLES = [
 export function AquariumWallpaper() {
   const reduceMotion = useReducedMotion();
   const fishElsRef = useRef<(HTMLDivElement | null)[]>([]);
-  const statesRef = useRef<FishState[]>([]);
+  const statesRef = useRef<CreatureState[]>([]);
 
   // Lazily initialise simulation state once. Stored in a ref so the animation
   // frame loop can mutate it without triggering React re-renders.
   if (statesRef.current.length === 0) {
-    statesRef.current = FISH_DEFS.map((def) => ({
+    statesRef.current = CREATURE_DEFS.map((def) => ({
       pos: { x: def.startX, y: def.startY },
       heading: def.startHeading,
       facing: Math.cos(def.startHeading) >= 0 ? 1 : -1,
@@ -391,16 +762,15 @@ export function AquariumWallpaper() {
     }));
   }
 
-  // Set initial DOM transforms before paint so fish don't flash at (0,0) on
-  // the first frame.
+  // Set initial DOM transforms before paint so creatures don't flash at (0,0)
+  // on the first frame.
   useLayoutEffect(() => {
     statesRef.current.forEach((fish, i) => {
       const el = fishElsRef.current[i];
       if (!el) return;
       // Tilt = vertical component of heading (positive → nose dips down).
-      // No `facing` factor here: the scaleX(-facing) in applyTransform already
-      // handles mirroring, so a positive sin always means "nose tilts down" for
-      // both left- and right-facing fish after the flip is applied.
+      // No `facing` factor: the scaleX(-facing) in applyTransform already
+      // handles mirroring.
       const tilt = Math.sin(fish.heading) * 15;
       applyTransform(el, fish.pos.x, fish.pos.y, fish.facing, tilt);
     });
@@ -414,21 +784,20 @@ export function AquariumWallpaper() {
     let frameId = 0;
 
     function tick(t: number) {
-      // Cap dt so a backgrounded tab doesn't catapult fish across the screen
-      // when it returns to the foreground.
+      // Cap dt so a backgrounded tab doesn't catapult creatures across the
+      // screen when it returns to the foreground.
       const dt = Math.min(0.05, (t - lastT) / 1000);
       lastT = t;
 
       const states = statesRef.current;
       const n = states.length;
 
-      // Pass 1 — update each fish's physics.
+      // Pass 1 — update each creature's physics.
       for (let i = 0; i < n; i++) {
         const fish = states[i];
-        const def = FISH_DEFS[i];
+        const def = CREATURE_DEFS[i];
 
-        // Patrol whim: occasional small heading change. Rare U-turn so a fish
-        // doesn't only ever drift in one direction.
+        // Patrol whim: occasional small heading change, rare U-turn.
         fish.patrolTimer -= dt;
         if (fish.patrolTimer <= 0) {
           if (Math.random() < 0.12) {
@@ -446,8 +815,10 @@ export function AquariumWallpaper() {
         const patrolX = Math.cos(fish.patrolHeading);
         const patrolY = Math.sin(fish.patrolHeading);
 
-        // Edge repulsion: push back toward the inside of the viewport whenever
-        // the fish gets within EDGE_BUFFER of a wall.
+        // Edge repulsion using PER-CREATURE Y bounds so surface dwellers
+        // (dolphin, seal) get pushed back up if they drift too deep, and
+        // bottom-dwellers (crab, shrimp) get pushed back down if they rise
+        // too high.
         let edgeRepelX = 0;
         let edgeRepelY = 0;
         if (fish.pos.x < X_MIN + EDGE_BUFFER) {
@@ -456,27 +827,24 @@ export function AquariumWallpaper() {
         if (fish.pos.x > X_MAX - EDGE_BUFFER) {
           edgeRepelX -= (fish.pos.x - (X_MAX - EDGE_BUFFER)) / EDGE_BUFFER;
         }
-        if (fish.pos.y < Y_MIN + EDGE_BUFFER) {
-          edgeRepelY += (Y_MIN + EDGE_BUFFER - fish.pos.y) / EDGE_BUFFER;
+        if (fish.pos.y < def.yMin + EDGE_BUFFER) {
+          edgeRepelY += (def.yMin + EDGE_BUFFER - fish.pos.y) / EDGE_BUFFER;
         }
-        if (fish.pos.y > Y_MAX - EDGE_BUFFER) {
-          edgeRepelY -= (fish.pos.y - (Y_MAX - EDGE_BUFFER)) / EDGE_BUFFER;
+        if (fish.pos.y > def.yMax - EDGE_BUFFER) {
+          edgeRepelY -= (fish.pos.y - (def.yMax - EDGE_BUFFER)) / EDGE_BUFFER;
         }
 
-        // Fish-to-fish repulsion: any other fish within the sum-of-radii
-        // pushes us away with a force proportional to overlap. Prevents
-        // overlap and produces natural-looking swim-arounds.
+        // Creature-to-creature repulsion.
         let fishRepelX = 0;
         let fishRepelY = 0;
         for (let j = 0; j < n; j++) {
           if (i === j) continue;
           const other = states[j];
-          const odef = FISH_DEFS[j];
+          const odef = CREATURE_DEFS[j];
           const dx = fish.pos.x - other.pos.x;
           const dy = fish.pos.y - other.pos.y;
           const dist = Math.hypot(dx, dy);
-          // Effective radius in vw-ish units; the /28 divisor was tuned by
-          // eye so the personal-space bubble matches the visual fish size.
+          // Effective radius in vw-ish units, scaled to creature size.
           const radius = (def.size + odef.size) / 28;
           if (dist > 0.01 && dist < radius) {
             const force = (radius - dist) / radius;
@@ -485,53 +853,45 @@ export function AquariumWallpaper() {
           }
         }
 
-        // Combine: patrol (gentle preference) + edge repulsion (medium) +
-        // fish repulsion (strongest — collisions take priority). The result
-        // vector's angle is the desired heading.
+        // Combine forces — fish repulsion strongest (collisions take priority).
         const totalX = patrolX * 1.0 + edgeRepelX * 4 + fishRepelX * 6;
         const totalY = patrolY * 1.0 + edgeRepelY * 4 + fishRepelY * 6;
         const desiredHeading = Math.atan2(totalY, totalX);
 
-        // Turn smoothly toward desired heading, capped by turnRate so big
-        // fish don't snap-rotate.
+        // Turn smoothly toward desired heading, capped by turnRate.
         const diff = wrapAngle(desiredHeading - fish.heading);
         const maxTurn = def.turnRate * dt;
         fish.heading = wrapAngle(
           fish.heading + Math.sign(diff) * Math.min(Math.abs(diff), maxTurn),
         );
 
-        // Slow down on sharp turns (mimics a real fish bracing into a curve).
+        // Slow down on sharp turns (mimics a real creature bracing into a curve).
         const speedScale = 1 - Math.min(0.4, (Math.abs(diff) / Math.PI) * 0.4);
         const moveDist = def.baseSpeed * dt * speedScale;
 
-        // ALWAYS move FORWARD along current heading. There is no code path
-        // that could move the fish backwards relative to its facing.
+        // ALWAYS move FORWARD along current heading. No code path produces
+        // backwards motion relative to the creature's facing.
         fish.pos.x += Math.cos(fish.heading) * moveDist;
-        // Dampen vertical so fish prefer horizontal motion (aquarium feel).
+        // Dampen vertical so creatures prefer horizontal motion (aquarium feel).
         fish.pos.y += Math.sin(fish.heading) * moveDist * 0.7;
 
-        // Hard clamp — should rarely trigger thanks to edge repulsion.
+        // Hard clamp (per-creature Y bounds) — rarely triggers thanks to repel.
         if (fish.pos.x < X_MIN) fish.pos.x = X_MIN;
         else if (fish.pos.x > X_MAX) fish.pos.x = X_MAX;
-        if (fish.pos.y < Y_MIN) fish.pos.y = Y_MIN;
-        else if (fish.pos.y > Y_MAX) fish.pos.y = Y_MAX;
+        if (fish.pos.y < def.yMin) fish.pos.y = def.yMin;
+        else if (fish.pos.y > def.yMax) fish.pos.y = def.yMax;
 
-        // Update facing only when heading is clearly horizontal. The dead
-        // zone around ±90° prevents jittering during steep dives/climbs.
+        // Update facing only when heading is clearly horizontal.
         const cosH = Math.cos(fish.heading);
         if (cosH > 0.15) fish.facing = 1;
         else if (cosH < -0.15) fish.facing = -1;
-        // else keep last facing
       }
 
-      // Pass 2 — flush physics into the DOM (single write phase).
+      // Pass 2 — flush physics into the DOM.
       for (let i = 0; i < n; i++) {
         const fish = states[i];
         const el = fishElsRef.current[i];
         if (!el) continue;
-        // Tilt: positive sin(heading) → fish is moving downward → nose dips
-        // down. The scaleX(-facing) flip in applyTransform handles mirroring,
-        // so a positive tilt always reads as "nose down" regardless of facing.
         const tilt = Math.sin(fish.heading) * 15;
         applyTransform(el, fish.pos.x, fish.pos.y, fish.facing, tilt);
       }
@@ -562,7 +922,7 @@ export function AquariumWallpaper() {
       {/* z=0 — sand bed at the very bottom */}
       <div className="aquarium-sand" />
 
-      {/* z=3 — coral (back layer of foreground) */}
+      {/* z=3 — coral */}
       {CORALS.map((c) => {
         const sideStyle = c.side === "left" ? { left: `${c.inset}%` } : { right: `${c.inset}%` };
         return (
@@ -631,11 +991,10 @@ export function AquariumWallpaper() {
         <Starfish />
       </motion.div>
 
-      {/* z=1 — autonomous fish. Note: NO transform is set via React style here.
-          The transform is applied imperatively in the simulation loop so
-          React re-renders don't reset the fish positions. The opacity stays
-          in JSX since it never changes per fish. */}
-      {FISH_DEFS.map((def, i) => (
+      {/* z=1 — autonomous creatures. Transform is applied imperatively by the
+          simulation loop, NOT via React's style prop (so React re-renders
+          don't reset positions). */}
+      {CREATURE_DEFS.map((def, i) => (
         <div
           key={def.id}
           ref={(el) => {
@@ -648,7 +1007,7 @@ export function AquariumWallpaper() {
         </div>
       ))}
 
-      {/* z=2 — bubbles in front of the fish */}
+      {/* z=2 — bubbles in front of the creatures */}
       {BUBBLES.map((b) => (
         <motion.div
           key={b.id}
