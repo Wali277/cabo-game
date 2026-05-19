@@ -12,13 +12,19 @@
  */
 import { useEffect, useState } from "react";
 
-export type TableTheme = "emerald" | "ocean" | "crimson" | "northern" | "cosmic";
+export type TableTheme =
+  | "emerald"
+  | "ocean"
+  | "crimson"
+  | "northern"
+  | "cosmic"
+  | "aquarium";
 export const DEFAULT_THEME: TableTheme = "emerald";
 
 const STORAGE_KEY = "cabo:theme";
 const EVENT_NAME = "cabo:theme-change";
 const VALID: ReadonlyArray<TableTheme> = [
-  "emerald", "ocean", "crimson", "northern", "cosmic",
+  "emerald", "ocean", "crimson", "northern", "cosmic", "aquarium",
 ];
 
 /** Labels shown in the picker UI. */
@@ -28,6 +34,7 @@ export const THEME_LABELS: Record<TableTheme, string> = {
   crimson:  "Royal Crimson",
   northern: "Northern Lights",
   cosmic:   "Cosmic Legacy",
+  aquarium: "Aquarium",
 };
 
 /**

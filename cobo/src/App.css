@@ -152,9 +152,20 @@
   animation: bgDrift 30s ease-in-out infinite alternate;
 }
 
-/* Reduced-motion: only Cosmic still drifts via bgDrift (Northern Lights and
-   Ocean motion is owned by their wallpaper components, which honour
-   reduced-motion at the React level). */
+/* 6. Aquarium — brighter "lit tank" teal/turquoise base. Visually distinct
+   from the deeper, near-black Midnight Ocean. The animated underwater scene
+   (fish, kelp, oysters etc.) is painted on top by <AquariumWallpaper />. */
+.table-bg[data-theme="aquarium"] {
+  background:
+    radial-gradient(ellipse at 50% -10%, rgba(140, 220, 240, 0.30) 0%, transparent 65%),
+    radial-gradient(ellipse at 50% 105%, rgba(4, 22, 38, 0.55) 0%, transparent 70%),
+    linear-gradient(180deg, #04304f 0%, #0a5478 40%, #052e44 100%);
+}
+
+/* Reduced-motion: only Cosmic still drifts via bgDrift. The two wallpaper
+   themes (Aquarium, Northern Lights) honour reduced-motion at the React
+   level via useReducedMotion(); the CSS @media block below them is a
+   belt-and-braces fallback. */
 @media (prefers-reduced-motion: reduce) {
   .table-bg[data-theme="cosmic"] {
     animation: none;
@@ -310,6 +321,17 @@
     radial-gradient(circle at 80% 95%, rgba(168, 123, 255, 0.45) 0 60%, transparent 60%),
     linear-gradient(160deg, #0d1638 0%, #1a1a4a 40%, #3b2473 100%);
 }
+/* Aquarium — brighter teal-lit gradient plus a tiny suggestion of a fish
+   silhouette and a kelp blade dot so the swatch reads "aquarium" not
+   "another deep-blue theme". */
+.theme-swatch-preview[data-theme="aquarium"] {
+  background:
+    radial-gradient(circle at 70% 60%, rgba(255, 214, 100, 0.50) 0 8%, transparent 10%),
+    radial-gradient(circle at 25% 35%, rgba(57, 189, 242, 0.60) 0 6%, transparent 8%),
+    radial-gradient(circle at 18% 88%, rgba(58, 168, 103, 0.55) 0 18%, transparent 26%),
+    radial-gradient(ellipse at 50% -10%, rgba(140, 220, 240, 0.45) 0%, transparent 60%),
+    linear-gradient(180deg, #04304f 0%, #0a5478 40%, #052e44 100%);
+}
 .theme-swatch-label {
   flex: 1 1 auto;
 }
@@ -333,45 +355,39 @@
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
-   MIDNIGHT OCEAN WALLPAPER
+   AQUARIUM WALLPAPER
 
-   Cartoonish underwater scene that overlays the Ocean theme's dark blue
-   gradient. All elements sit on the outer band of the viewport so they
-   never intrude on the table grid or the centre cards. Each animation
-   uses transform/opacity only (compositor-friendly). The component itself
-   honours `prefers-reduced-motion` at the React level.
+   Richly populated underwater scene overlaid on the Aquarium theme's bright
+   teal-lit gradient (Midnight Ocean is now a separate, decor-free theme).
+   All elements stay on the outer band of the viewport so the table grid and
+   centre cards remain unobstructed. Each animation is transform/opacity only.
+   The component honours `prefers-reduced-motion` at the React level; the
+   `@media` block at the bottom of this section is a defence-in-depth fallback.
+
+   Stacking inside `.aquarium-wallpaper` (back → front):
+     z 0 → caustic light shafts
+     z 1 → fish (largest count, biggest motion)
+     z 2 → bubbles (in front of fish so they feel closer to the glass)
+     z 3 → coral + kelp (back layer of front decor)
+     z 4 → sand bed + oysters + tunicates (foreground floor)
+     z 5 → starfish (close-to-camera accent)
    ──────────────────────────────────────────────────────────────────────── */
-.ocean-wallpaper {
+.aquarium-wallpaper {
   position: absolute;
   inset: 0;
   pointer-events: none;
   overflow: hidden;
 }
-.ocean-fish {
+.aquarium-fish {
   position: absolute;
+  z-index: 1;
   will-change: transform;
   filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35));
 }
-.ocean-starfish {
-  position: absolute;
-  right: 4%;
-  bottom: 8%;
-  opacity: 0.45;
-  will-change: transform;
-  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.4));
-}
-.ocean-seaweed {
-  position: absolute;
-  bottom: -8px;
-  opacity: 0.30;
-  transform-origin: bottom center;
-  will-change: transform;
-}
-.ocean-seaweed-left  { left: 3%; }
-.ocean-seaweed-right { right: 9%; }
-.ocean-bubble {
+.aquarium-bubble {
   position: absolute;
   bottom: -20px;
+  z-index: 2;
   border-radius: 50%;
   background: radial-gradient(
     circle at 30% 30%,
@@ -382,20 +398,76 @@
   box-shadow: inset 0 0 4px rgba(255, 255, 255, 0.6);
   will-change: transform, opacity;
 }
-.ocean-light-shaft {
+.aquarium-coral {
+  position: absolute;
+  z-index: 3;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.45));
+  will-change: opacity;
+}
+.aquarium-kelp {
+  position: absolute;
+  z-index: 3;
+  opacity: 0.55;
+  transform-origin: bottom center;
+  will-change: transform;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.4));
+}
+.aquarium-sand {
+  position: absolute;
+  z-index: 4;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 6vh;
+  min-height: 36px;
+  background: linear-gradient(
+    180deg,
+    rgba(201, 169, 106, 0.55) 0%,
+    rgba(138, 115, 64, 0.85) 60%,
+    rgba(90, 74, 38, 0.95) 100%
+  );
+  box-shadow: inset 0 2px 6px rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+}
+.aquarium-oyster {
+  position: absolute;
+  z-index: 4;
+  opacity: 0.85;
+  will-change: opacity;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.45));
+}
+.aquarium-tunicate {
+  position: absolute;
+  z-index: 4;
+  opacity: 0.85;
+  transform-origin: bottom center;
+  will-change: transform;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.4));
+}
+.aquarium-starfish {
+  position: absolute;
+  right: 4%;
+  bottom: 9%;
+  z-index: 5;
+  opacity: 0.55;
+  will-change: transform;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.45));
+}
+.aquarium-light-shaft {
   position: absolute;
   top: -20px;
+  z-index: 0;
   width: 60px;
   height: 50vh;
   background: linear-gradient(
     180deg,
-    rgba(255, 255, 255, 0.18) 0%,
+    rgba(255, 255, 255, 0.20) 0%,
     rgba(255, 255, 255, 0.04) 60%,
     transparent 100%
   );
   filter: blur(10px);
   transform: skewX(-8deg);
-  opacity: 0.06;
+  opacity: 0.08;
   pointer-events: none;
 }
 
@@ -452,11 +524,12 @@
    misses that hook (e.g. extension-injected media query), this freezes any
    leftover CSS transform animations as a belt-and-braces measure. */
 @media (prefers-reduced-motion: reduce) {
-  .ocean-fish,
-  .ocean-starfish,
-  .ocean-seaweed,
-  .ocean-bubble,
-  .ocean-light-shaft,
+  .aquarium-fish,
+  .aquarium-starfish,
+  .aquarium-kelp,
+  .aquarium-tunicate,
+  .aquarium-bubble,
+  .aquarium-light-shaft,
   .northern-ribbon,
   .northern-star {
     animation: none !important;

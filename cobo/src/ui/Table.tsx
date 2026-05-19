@@ -16,7 +16,7 @@ import { botMove, ingestReveals, resetBotKnowledge } from "../ai/bot";
 import { clearReveals as clearRevealsEngine } from "../engine/game";
 import { Audio } from "../audio/sounds";
 import { useTheme } from "../state/theme";
-import { OceanWallpaper } from "./OceanWallpaper";
+import { AquariumWallpaper } from "./AquariumWallpaper";
 import { NorthernLightsWallpaper } from "./NorthernLightsWallpaper";
 
 export function Table() {
@@ -185,7 +185,10 @@ export function Table() {
             pure gradient. The current value is local-only and persisted via
             `cabo:theme` in localStorage. */}
         <div className="table-bg" data-theme={tableTheme} aria-hidden="true">
-          {tableTheme === "ocean" && <OceanWallpaper />}
+          {/* Ocean = pure dark-blue gradient (no overlay).
+              Aquarium = full animated underwater scene (fish, kelp, etc).
+              Northern Lights = aurora ribbons + stars overlay. */}
+          {tableTheme === "aquarium" && <AquariumWallpaper />}
           {tableTheme === "northern" && <NorthernLightsWallpaper />}
         </div>
 

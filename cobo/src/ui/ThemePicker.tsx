@@ -27,7 +27,14 @@ import {
  * spacing already used by the audio + chat FABs.
  */
 
-const THEMES: TableTheme[] = ["emerald", "ocean", "crimson", "northern", "cosmic"];
+const THEMES: TableTheme[] = [
+  "emerald",
+  "ocean",
+  "crimson",
+  "northern",
+  "cosmic",
+  "aquarium",
+];
 
 export function ThemePicker() {
   const theme = useTheme();
