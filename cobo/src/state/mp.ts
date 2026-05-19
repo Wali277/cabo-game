@@ -1,13 +1,20 @@
 import { io, type Socket } from "socket.io-client";
 import { useStore } from "./store";
 
-// In a production build the Node server serves both the static client and the
-// Socket.IO endpoint, so we connect to the same origin (works behind any
+// In a production web build the Node server serves both the static client and
+// the Socket.IO endpoint, so we connect to the same origin (works behind any
 // tunnel / cloud deployment without configuration).
 // In dev (Vite at :5173) the server runs separately on :8787 — connect by
 // hostname so phones on the LAN get the right address.
+// In the Electron desktop app the renderer loads from file://, so
+// window.location.host is empty. We fall back to VITE_SERVER_URL which is
+// baked into the electron build from cobo/.env.electron at build time.
 function defaultServerUrl(): string {
   if (typeof window === "undefined") return "http://localhost:8787";
+  // Electron: file:// protocol means window.location.host is empty.
+  if (window.location.protocol === "file:") {
+    return import.meta.env.VITE_SERVER_URL ?? "";
+  }
   if (import.meta.env.PROD) {
     return `${window.location.protocol}//${window.location.host}`;
   }

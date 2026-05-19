@@ -2,12 +2,49 @@
   "name": "cobo-game",
   "version": "1.0.0",
   "private": true,
+  "main": "electron/main.js",
   "scripts": {
     "postinstall": "npm install --prefix cobo && npm install --prefix server",
     "build": "npm run build --prefix cobo",
-    "start": "npm start --prefix server"
+    "start": "npm start --prefix server",
+    "electron:build-client": "cd cobo && npx vite build --mode electron",
+    "electron:make-icon": "node scripts/make-icon.mjs",
+    "electron:dev": "npm run electron:build-client && npx electron electron/main.js",
+    "electron:build": "npm run electron:make-icon && npm run electron:build-client && npx electron-builder --win --x64 --publish never"
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8",
+    "sharp": "^0.33.5"
+  },
+  "build": {
+    "appId": "com.cobo.game",
+    "productName": "Cobo",
+    "copyright": "Copyright © 2025",
+    "directories": {
+      "output": "dist-electron",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron/**/*",
+      "cobo/dist/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.png",
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Cobo"
+    }
   }
 }
