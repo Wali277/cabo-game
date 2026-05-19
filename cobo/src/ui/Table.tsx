@@ -15,6 +15,7 @@ import { MpNotices } from "./MpNotices";
 import { botMove, ingestReveals, resetBotKnowledge } from "../ai/bot";
 import { clearReveals as clearRevealsEngine } from "../engine/game";
 import { Audio } from "../audio/sounds";
+import { useTheme } from "../state/theme";
 
 export function Table() {
   const game = useStore((s) => s.game!);
@@ -23,6 +24,10 @@ export function Table() {
   const toast = useStore((s) => s.toast);
   const setToast = useStore((s) => s.setToast);
   const consumeAnimations = useStore((s) => s.consumeAnimations);
+  // Current user-selected table background theme (persisted in localStorage).
+  // The `<div className="table-bg" />` below uses its `data-theme` attribute
+  // to pick which gradient stack renders behind the table.
+  const tableTheme = useTheme();
 
   // Reveals that the human can tap-anywhere to dismiss early
   // (peek_own / peek_other only — peek_and_swap stays until user decides)
@@ -170,6 +175,13 @@ export function Table() {
   return (
     <LayoutGroup>
       <div className={`table-root players-${game.players.length}${training ? " training-active" : ""}`}>
+        {/* Themed background layer (first child so it sits visually at z=0; all
+            sibling UI is bumped to z=1 via CSS). The `data-theme` attribute
+            selects which gradient renders — see `.table-bg[data-theme=…]` in
+            App.css. The current value is local-only and persisted via
+            `cabo:theme` in localStorage. */}
+        <div className="table-bg" data-theme={tableTheme} aria-hidden="true" />
+
         {/* Compact top bar */}
         <div className="top-bar">
           <button className="btn ghost menu-back" onClick={handleQuit}>← Menu</button>

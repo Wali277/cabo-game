@@ -8,6 +8,7 @@ import { CoinToss } from "./ui/CoinToss";
 import { StrawDraw } from "./ui/StrawDraw";
 import { AudioControls } from "./ui/AudioControls";
 import { ChatPanel } from "./ui/ChatPanel";
+import { ThemePicker } from "./ui/ThemePicker";
 import { EliminatedOverlay } from "./ui/EliminatedOverlay";
 import { BUSTED_ROOM_KEY } from "./ui/BustedOverlay";
 import { getSocket } from "./state/mp";
@@ -112,6 +113,9 @@ function App() {
       {screen === "game" && <Table />}
       <AudioControls />
       <ChatPanel />
+      {/* Theme picker is in-game only — it changes the table background,
+          which doesn't exist on the menu or lobby. */}
+      {screen === "game" && <ThemePicker />}
       <EliminatedOverlay />
     </>
   );

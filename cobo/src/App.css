@@ -80,6 +80,249 @@
 @media (prefers-reduced-motion: reduce) {
   .menu-wallpaper-glow { animation: none; }
 }
+
+/* ────────────────────────────────────────────────────────────────────────────
+   IN-GAME TABLE THEME (.table-bg)
+
+   The Table screen lays a `<div className="table-bg" data-theme="…" />` as
+   its first child. That layer is `position: fixed; inset: 0;` so it covers
+   the viewport — its only job is to mask the body's cosmic gradient with the
+   user's chosen background while the in-game screen is mounted.
+
+   `.table-root` is forced into its own stacking context via
+   `isolation: isolate;` so negative z-index on the bg is contained (the bg
+   sits behind every sibling inside the table but never bleeds below the body).
+   This mirrors the same first-child-bg pattern used by `.menu-wallpaper`.
+   ──────────────────────────────────────────────────────────────────────── */
+.table-root {
+  isolation: isolate;
+  position: relative;
+}
+.table-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  /* All themes lay their gradient on top of a deep neutral so any partial
+     transparency in a layer doesn't reveal the body cosmic bg underneath. */
+  background-color: #050610;
+  /* Smooth fade when the user picks a new theme. */
+  transition: background 600ms ease;
+}
+
+/* 1. Emerald Felt — DEFAULT. Classic casino felt; gold cards pop best here. */
+.table-bg[data-theme="emerald"] {
+  background:
+    radial-gradient(ellipse at center, transparent 35%, rgba(0, 0, 0, 0.55) 100%),
+    linear-gradient(160deg, #0f3d2e 0%, #155a3f 45%, #0c2e21 100%);
+}
+
+/* 2. Midnight Velvet — near-black with a warm gold halo behind centre play. */
+.table-bg[data-theme="velvet"] {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 216, 107, 0.10) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 50%, #1a1428 0%, #07060c 75%);
+}
+
+/* 3. Royal Crimson — deep wine + black with subtle gold radial. */
+.table-bg[data-theme="crimson"] {
+  background:
+    radial-gradient(circle at 50% 28%, rgba(255, 216, 107, 0.10) 0%, transparent 60%),
+    linear-gradient(160deg, #2a0712 0%, #4a0e1a 50%, #1a0509 100%);
+}
+
+/* 4. Aurora Drift — animated teal/blue/indigo blend. Re-uses bgDrift. */
+.table-bg[data-theme="aurora"] {
+  background:
+    radial-gradient(circle at 18% 22%, rgba(26, 92, 67, 0.45) 0 420px, transparent 420px),
+    radial-gradient(circle at 82% 28%, rgba(35, 60, 121, 0.45) 0 440px, transparent 440px),
+    radial-gradient(circle at 70% 88%, rgba(59, 36, 115, 0.40) 0 460px, transparent 460px),
+    linear-gradient(160deg, #07182a 0%, #102a4a 50%, #1a1530 100%);
+  background-attachment: fixed;
+  animation: bgDrift 45s ease-in-out infinite alternate;
+}
+
+/* 5. Cosmic Legacy — preserved exactly from the current body gradient. */
+.table-bg[data-theme="cosmic"] {
+  background:
+    radial-gradient(circle at 12% 8%, rgba(168, 123, 255, 0.35) 0 380px, transparent 380px),
+    radial-gradient(circle at 90% 18%, rgba(60, 100, 220, 0.30) 0 400px, transparent 400px),
+    radial-gradient(circle at 80% 95%, rgba(168, 123, 255, 0.25) 0 420px, transparent 420px),
+    linear-gradient(160deg, #0d1638 0%, #1a1a4a 40%, #3b2473 100%);
+  background-attachment: fixed;
+  animation: bgDrift 30s ease-in-out infinite alternate;
+}
+
+/* Reduced-motion: drop the slow drift on the two animated themes. */
+@media (prefers-reduced-motion: reduce) {
+  .table-bg[data-theme="aurora"],
+  .table-bg[data-theme="cosmic"] {
+    animation: none;
+  }
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   THEME PICKER FAB + POPOVER
+
+   The FAB lives ABOVE the chat button on the bottom-right:
+     audio  → bottom: 18px   (existing)
+     chat   → bottom: 96px   (existing — 26px gap)
+     theme  → bottom: 174px  (this — 26px gap, matches the stack)
+   The popover anchors above-left of the FAB and shows live gradient swatches.
+   ──────────────────────────────────────────────────────────────────────── */
+.theme-picker {
+  position: fixed;
+  bottom: 174px;
+  right: 18px;
+  z-index: 250;
+}
+.theme-fab {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 216, 107, 0.55);
+  background: linear-gradient(160deg, #1a1a4a 0%, #2a1f5a 100%);
+  color: #ffd86b;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  box-shadow:
+    0 6px 18px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+.theme-fab:hover {
+  border-color: rgba(255, 216, 107, 0.85);
+  box-shadow:
+    0 8px 22px rgba(0, 0, 0, 0.5),
+    0 0 14px rgba(255, 216, 107, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+.theme-fab.open {
+  border-color: #ffd86b;
+  box-shadow:
+    0 8px 22px rgba(0, 0, 0, 0.5),
+    0 0 16px rgba(255, 216, 107, 0.4);
+}
+.theme-fab-icon {
+  line-height: 1;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.4));
+}
+
+.theme-popover {
+  position: absolute;
+  bottom: 64px;          /* 52 (fab) + 12 (gap) */
+  right: 0;
+  width: 240px;
+  padding: 12px;
+  background: rgba(13, 22, 56, 0.96);
+  border: 2px solid rgba(168, 123, 255, 0.5);
+  border-radius: 14px;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.5);
+  transform-origin: bottom right;
+}
+.theme-popover-title {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: #a87bff;
+  margin-bottom: 10px;
+  font-weight: 700;
+}
+.theme-popover-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.theme-swatch {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 2px solid transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  color: #f4ebff;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+.theme-swatch:hover {
+  background: rgba(168, 123, 255, 0.12);
+  border-color: rgba(168, 123, 255, 0.35);
+}
+.theme-swatch.selected {
+  border-color: #ffd86b;
+  background: rgba(255, 216, 107, 0.10);
+}
+.theme-swatch-preview {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 36px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+/* Preview swatches re-use the same gradient stacks as the live backgrounds.
+   We don't run the bgDrift animation on the previews — it would distract
+   from the picker. */
+.theme-swatch-preview[data-theme="emerald"] {
+  background:
+    radial-gradient(ellipse at center, transparent 35%, rgba(0, 0, 0, 0.55) 100%),
+    linear-gradient(160deg, #0f3d2e 0%, #155a3f 45%, #0c2e21 100%);
+}
+.theme-swatch-preview[data-theme="velvet"] {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 216, 107, 0.10) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 50%, #1a1428 0%, #07060c 75%);
+}
+.theme-swatch-preview[data-theme="crimson"] {
+  background:
+    radial-gradient(circle at 50% 28%, rgba(255, 216, 107, 0.10) 0%, transparent 60%),
+    linear-gradient(160deg, #2a0712 0%, #4a0e1a 50%, #1a0509 100%);
+}
+.theme-swatch-preview[data-theme="aurora"] {
+  background:
+    radial-gradient(circle at 18% 22%, rgba(26, 92, 67, 0.55) 0 60%, transparent 60%),
+    radial-gradient(circle at 82% 28%, rgba(35, 60, 121, 0.55) 0 60%, transparent 60%),
+    radial-gradient(circle at 70% 88%, rgba(59, 36, 115, 0.55) 0 60%, transparent 60%),
+    linear-gradient(160deg, #07182a 0%, #102a4a 50%, #1a1530 100%);
+}
+.theme-swatch-preview[data-theme="cosmic"] {
+  background:
+    radial-gradient(circle at 12% 8%, rgba(168, 123, 255, 0.55) 0 60%, transparent 60%),
+    radial-gradient(circle at 90% 18%, rgba(60, 100, 220, 0.50) 0 60%, transparent 60%),
+    radial-gradient(circle at 80% 95%, rgba(168, 123, 255, 0.45) 0 60%, transparent 60%),
+    linear-gradient(160deg, #0d1638 0%, #1a1a4a 40%, #3b2473 100%);
+}
+.theme-swatch-label {
+  flex: 1 1 auto;
+}
+.theme-swatch-check {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  color: #ffd86b;
+  font-size: 14px;
+  font-weight: 900;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+/* On narrow viewports, slide the popover so it fits even when anchored
+   from the right edge of a tiny screen. */
+@media (max-width: 380px) {
+  .theme-popover {
+    width: calc(100vw - 36px);
+    right: 0;
+  }
+}
+
 .title {
   font-size: clamp(64px, 14vw, 160px);
   font-weight: 900;
