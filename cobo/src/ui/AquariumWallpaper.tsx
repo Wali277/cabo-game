@@ -321,10 +321,12 @@ function applyTransform(
   facing: number,
   tiltDeg: number,
 ) {
-  // Note CSS transform order is right-to-left: rotate is applied first to the
-  // element-local frame, then scaleX mirrors, then translate positions. The
-  // tilt formula in TICK already accounts for this (multiplied by `facing`).
-  el.style.transform = `translate(${xVw}vw, ${yVh}vh) scaleX(${facing}) rotate(${tiltDeg}deg)`;
+  // All fish SVGs are drawn facing LEFT (eye near x=0, tail at high x). We
+  // flip them with scaleX(-1) so they face RIGHT. When `facing = 1` (moving
+  // right) we want scaleX(-1); when `facing = -1` (moving left) we want
+  // scaleX(1). Hence the negation: scaleX(-facing).
+  // CSS transform order is right-to-left: rotate first, then scaleX, then translate.
+  el.style.transform = `translate(${xVw}vw, ${yVh}vh) scaleX(${-facing}) rotate(${tiltDeg}deg)`;
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -395,7 +397,11 @@ export function AquariumWallpaper() {
     statesRef.current.forEach((fish, i) => {
       const el = fishElsRef.current[i];
       if (!el) return;
-      const tilt = Math.sin(fish.heading) * 15 * fish.facing;
+      // Tilt = vertical component of heading (positive → nose dips down).
+      // No `facing` factor here: the scaleX(-facing) in applyTransform already
+      // handles mirroring, so a positive sin always means "nose tilts down" for
+      // both left- and right-facing fish after the flip is applied.
+      const tilt = Math.sin(fish.heading) * 15;
       applyTransform(el, fish.pos.x, fish.pos.y, fish.facing, tilt);
     });
   }, []);
@@ -523,10 +529,10 @@ export function AquariumWallpaper() {
         const fish = states[i];
         const el = fishElsRef.current[i];
         if (!el) continue;
-        // Tilt formula: sin(heading) gives the vertical component. Multiplied
-        // by `facing` because scaleX(-1) is applied AFTER rotate (CSS reads
-        // right-to-left), which would otherwise invert the visual tilt.
-        const tilt = Math.sin(fish.heading) * 15 * fish.facing;
+        // Tilt: positive sin(heading) → fish is moving downward → nose dips
+        // down. The scaleX(-facing) flip in applyTransform handles mirroring,
+        // so a positive tilt always reads as "nose down" regardless of facing.
+        const tilt = Math.sin(fish.heading) * 15;
         applyTransform(el, fish.pos.x, fish.pos.y, fish.facing, tilt);
       }
 
