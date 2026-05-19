@@ -1,35 +1,49 @@
-import type { ReactElement } from "react";
+import { useEffect, useLayoutEffect, useRef, type ReactElement } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 
 /**
  * Live aquarium wallpaper for the Aquarium table theme.
  *
- * Replaces the v2.15 OceanWallpaper. Key upgrades over v2.15:
+ * v2.17 — autonomous fish simulation
+ * ===================================
  *
- *  - Fish now face the direction they're swimming. Each fish's path is
- *    described as an array of waypoints; we pre-compute a `scaleX` (and a
- *    small `rotate` tilt) per leg so the fish flips horizontally at the
- *    waypoint where the heading changes — never moonwalking on the return
- *    leg.
- *  - 9 fish across 6 species (vs 3 fish across 3 species).
- *  - Multi-directional motion: horizontal cruises, diagonal sweeps, looping
- *    figure-8s, hovering, slow drifts — every fish has a unique path.
- *  - Richer decor: 3 kelp strands, 3 sea-tunicate clusters, 2 oysters, 2
- *    coral pieces, a sand bed band, plus the existing starfish, bubbles
- *    and caustic light shafts.
+ * The previous waypoint-keyframe approach couldn't guarantee that fish faced
+ * forward — Framer Motion smoothly interpolates `scaleX` between keyframes,
+ * which caused the moonwalking / sideways-swimming glitch even with step-end
+ * easing tricks.
  *
- * Everything is inline SVG + Framer Motion. `pointer-events: none` is
- * inherited from `.table-bg`; per-element animations stay on the compositor
- * (transform/opacity only). `useReducedMotion()` collapses all keyframes to
- * a still tableau when the user prefers reduced motion.
+ * This version replaces the entire fish motion system with a small physics
+ * simulation driven by `requestAnimationFrame`:
+ *
+ *   1. Each fish has its own `(pos, heading, facing)` state stored in a ref.
+ *   2. Per frame we compute steering forces:
+ *        • patrol whim    — gentle random heading changes over time
+ *        • edge repulsion — push back inward when close to the viewport edges
+ *        • fish repulsion — push away from any nearby fish (no overlap)
+ *      Combined into a desired heading vector.
+ *   3. The fish smoothly turns toward the desired heading, but turn rate is
+ *      clamped (big fish turn slow, neon tetras turn fast).
+ *   4. Position is ALWAYS updated forward along the current heading — there
+ *      is no mechanism that can produce backwards motion. The worst case is
+ *      a U-turn, which is a wide arc the fish swims out (not an instant flip).
+ *   5. `facing` (+1 / -1) is derived from `cos(heading)` with a small dead
+ *      zone around vertical so the fish doesn't jitter-flip mid-dive.
+ *
+ * The DOM transform is applied imperatively (`el.style.transform = ...`) so
+ * the motion runs entirely on the compositor and never triggers a React
+ * re-render. `useReducedMotion()` collapses everything to a still tableau.
+ *
+ * Decor (kelp, tunicates, oysters, coral, bubbles, starfish, sand bed, light
+ * shafts) is unchanged from v2.16, except the starfish has been moved down
+ * to actually sit on the sand bed instead of floating mid-tank.
  *
  * Layering (z-index inside `.aquarium-wallpaper`):
- *   0 light shafts → 1 fish → 2 bubbles → 3 coral/kelp → 4 sand/oyster/tunicate → 5 starfish
+ *   0 sand + light shafts → 1 fish → 2 bubbles → 3 coral/kelp → 4 oyster/tunicate → 5 starfish
  */
 
 // ────────────────────────────────────────────────────────────────────────────
-// SVG SPECIES — each fish is a small inline SVG facing RIGHT by default. The
-// per-fish `scaleX` keyframes from waypoint computation flip them visually.
+// SVG SPECIES — each fish is drawn FACING RIGHT in its SVG. We mirror with
+// `scaleX(-1)` at the wrapper level when the fish is moving leftward.
 // ────────────────────────────────────────────────────────────────────────────
 
 function ClownFish({ size = 70 }: { size?: number }) {
@@ -79,20 +93,14 @@ function YellowTang({ size = 65 }: { size?: number }) {
 function Angelfish({ size = 75 }: { size?: number }) {
   return (
     <svg viewBox="0 0 90 100" width={size * 0.9} height={size} aria-hidden="true">
-      {/* Disc-shaped body */}
       <path d="M 26 50 Q 18 22 50 22 Q 78 30 78 50 Q 78 70 50 78 Q 18 78 26 50 Z" fill="#dfe6f0" />
-      {/* Vertical stripes */}
       <path d="M 34 28 Q 36 50 30 72 L 38 70 Q 40 50 38 30 Z" fill="#1c1d2b" opacity="0.65" />
       <path d="M 50 24 Q 52 50 48 76 L 56 74 Q 58 50 54 26 Z" fill="#1c1d2b" opacity="0.65" />
       <path d="M 64 30 Q 66 50 62 70 L 70 68 Q 72 50 68 32 Z" fill="#1c1d2b" opacity="0.55" />
-      {/* Top/bottom long fins */}
       <path d="M 38 22 Q 50 -2 70 14 Q 56 20 46 26 Z" fill="#bcc6d6" />
       <path d="M 38 78 Q 50 102 70 86 Q 56 80 46 74 Z" fill="#bcc6d6" />
-      {/* Tail */}
       <path d="M 78 50 L 92 36 Q 88 50 92 64 Z" fill="#dfe6f0" />
-      {/* Pelvic feelers */}
       <path d="M 36 64 L 26 92" stroke="#bcc6d6" strokeWidth="1.6" fill="none" />
-      {/* Eye */}
       <circle cx="38" cy="44" r="3" fill="#1c1d2b" />
       <circle cx="36.8" cy="42.8" r="1" fill="#fff" />
       <path d="M 26 50 Q 18 22 50 22 Q 78 30 78 50 Q 78 70 50 78 Q 18 78 26 50 Z" fill="none" stroke="#7a8597" strokeWidth="1.2" />
@@ -104,15 +112,10 @@ function Angelfish({ size = 75 }: { size?: number }) {
 function NeonTetra({ size = 45 }: { size?: number }) {
   return (
     <svg viewBox="0 0 100 40" width={size} height={size * 0.4} aria-hidden="true">
-      {/* Slim silver body */}
       <path d="M 10 20 Q 20 6 60 8 Q 86 12 88 20 Q 86 28 60 32 Q 20 34 10 20 Z" fill="#e8eef5" />
-      {/* Neon blue stripe (top) */}
       <path d="M 18 16 Q 40 10 78 14 Q 80 18 78 20 Q 40 18 18 22 Z" fill="#39bdf2" />
-      {/* Red stripe (bottom-rear) */}
       <path d="M 52 22 Q 70 22 84 24 L 86 26 Q 70 30 52 28 Z" fill="#ff4b6e" />
-      {/* Tail */}
       <path d="M 88 20 L 98 12 L 96 20 L 98 28 Z" fill="#cfd6e0" />
-      {/* Eye */}
       <circle cx="20" cy="17" r="2" fill="#1c1d2b" />
       <circle cx="19.4" cy="16.4" r="0.6" fill="#fff" />
       <path d="M 10 20 Q 20 6 60 8 Q 86 12 88 20 Q 86 28 60 32 Q 20 34 10 20 Z" fill="none" stroke="#7a8597" strokeWidth="0.8" />
@@ -124,22 +127,16 @@ function NeonTetra({ size = 45 }: { size?: number }) {
 function Gourami({ size = 80 }: { size?: number }) {
   return (
     <svg viewBox="0 0 110 70" width={size} height={size * 0.64} aria-hidden="true">
-      {/* Body */}
       <path d="M 18 36 Q 28 10 66 10 Q 94 16 94 36 Q 94 54 66 60 Q 28 60 18 36 Z" fill="#c8a4d6" />
-      {/* Mottled spots */}
       <circle cx="40" cy="26" r="3" fill="#a07ab4" opacity="0.65" />
       <circle cx="56" cy="36" r="2.4" fill="#a07ab4" opacity="0.65" />
       <circle cx="70" cy="22" r="3" fill="#a07ab4" opacity="0.6" />
       <circle cx="80" cy="42" r="2.6" fill="#a07ab4" opacity="0.6" />
       <circle cx="50" cy="48" r="2" fill="#a07ab4" opacity="0.6" />
-      {/* Tail */}
       <path d="M 94 36 L 108 22 L 102 36 L 108 50 Z" fill="#b294c6" />
-      {/* Dorsal fin */}
       <path d="M 48 10 Q 62 0 78 10 Z" fill="#a07ab4" />
-      {/* Long pelvic feelers */}
       <path d="M 40 50 L 28 68" stroke="#c8a4d6" strokeWidth="1.4" fill="none" />
       <path d="M 44 52 L 36 70" stroke="#c8a4d6" strokeWidth="1.4" fill="none" />
-      {/* Eye */}
       <circle cx="30" cy="30" r="3.5" fill="#1c1d2b" />
       <circle cx="28.8" cy="28.8" r="1.2" fill="#fff" />
       <path d="M 18 36 Q 28 10 66 10 Q 94 16 94 36 Q 94 54 66 60 Q 28 60 18 36 Z" fill="none" stroke="#6a4a82" strokeWidth="1.4" />
@@ -170,7 +167,6 @@ function Starfish({ size = 80 }: { size?: number }) {
   );
 }
 
-/** A single kelp strand — long stalk with rounded paddle leaves alternating. */
 function Kelp({ height = 200 }: { height?: number }) {
   const w = 60;
   return (
@@ -188,7 +184,6 @@ function Kelp({ height = 200 }: { height?: number }) {
         fill="none"
         strokeLinecap="round"
       />
-      {/* Paddle leaves alternating on either side */}
       <ellipse cx="38" cy="200" rx="10" ry="5" fill="#3aa867" />
       <ellipse cx="22" cy="170" rx="11" ry="5" fill="#2d8e54" />
       <ellipse cx="40" cy="135" rx="11" ry="5" fill="#3aa867" />
@@ -200,46 +195,34 @@ function Kelp({ height = 200 }: { height?: number }) {
   );
 }
 
-/** A cluster of 4 tunicate tubes on a rock base. */
 function Tunicates({ size = 80 }: { size?: number }) {
   return (
     <svg viewBox="0 0 100 100" width={size} height={size} aria-hidden="true">
-      {/* Rock base */}
       <ellipse cx="50" cy="92" rx="40" ry="8" fill="#3a3a4a" />
-      {/* Tube 1 (tall, pink) */}
       <path d="M 26 90 Q 22 50 34 30 Q 40 26 38 30 Q 36 50 40 90 Z" fill="#ff7a9d" />
       <ellipse cx="32" cy="32" rx="5" ry="2.5" fill="#c44a6f" />
-      {/* Tube 2 (orange) */}
       <path d="M 44 90 Q 42 60 50 44 Q 56 42 54 44 Q 52 60 56 90 Z" fill="#ff9d4a" />
       <ellipse cx="49" cy="46" rx="4.5" ry="2.2" fill="#c46a1e" />
-      {/* Tube 3 (cyan) */}
       <path d="M 60 90 Q 56 56 66 38 Q 72 34 70 38 Q 68 56 72 90 Z" fill="#5bd8e0" />
       <ellipse cx="65" cy="40" rx="4.8" ry="2.3" fill="#2ea0a8" />
-      {/* Tube 4 (purple, short) */}
       <path d="M 76 90 Q 76 70 82 60 Q 86 58 84 60 Q 82 70 84 90 Z" fill="#b07bff" />
       <ellipse cx="80" cy="62" rx="3.6" ry="1.8" fill="#7a4ad6" />
     </svg>
   );
 }
 
-/** A closed oyster with a pearl peeking at the seam. */
 function Oyster({ size = 70 }: { size?: number }) {
   return (
     <svg viewBox="0 0 100 70" width={size} height={size * 0.7} aria-hidden="true">
-      {/* Lower half */}
       <path d="M 8 38 Q 6 64 50 66 Q 94 64 92 38 Q 90 28 50 32 Q 10 28 8 38 Z" fill="#cfc4a8" stroke="#7a6a3a" strokeWidth="1.4" />
-      {/* Upper half */}
       <path d="M 8 38 Q 6 14 50 12 Q 94 14 92 38 Q 90 30 50 30 Q 10 30 8 38 Z" fill="#e8dfc4" stroke="#7a6a3a" strokeWidth="1.4" />
-      {/* Inner shell highlight */}
       <path d="M 14 38 Q 50 26 86 38" stroke="#ffd86b" strokeWidth="0.8" fill="none" opacity="0.7" />
-      {/* Pearl */}
       <circle cx="50" cy="38" r="4" fill="#fff8ee" />
       <circle cx="48.6" cy="36.6" r="1.4" fill="#ffffff" opacity="0.8" />
     </svg>
   );
 }
 
-/** Staghorn coral — branching upward fingers. */
 function CoralStaghorn({ size = 100 }: { size?: number }) {
   return (
     <svg viewBox="0 0 120 110" width={size} height={size * 0.92} aria-hidden="true">
@@ -259,7 +242,6 @@ function CoralStaghorn({ size = 100 }: { size?: number }) {
   );
 }
 
-/** Brain coral — rounded mound with internal squiggles. */
 function CoralBrain({ size = 110 }: { size?: number }) {
   return (
     <svg viewBox="0 0 140 90" width={size} height={size * 0.64} aria-hidden="true">
@@ -273,175 +255,84 @@ function CoralBrain({ size = 110 }: { size?: number }) {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// FISH PATH SYSTEM
-//
-// Each fish gets a closed loop of waypoints (in vw / vh). At each leg we
-// derive the heading and set `scaleX` so the fish ALWAYS faces forward, and
-// `rotate` so it tilts up/down a few degrees to match. The motion.div then
-// receives synchronised keyframe arrays — flips happen exactly at waypoints
-// so there's no on-leg moonwalking.
+// FISH SIMULATION
 // ────────────────────────────────────────────────────────────────────────────
 
-interface Waypoint { x: number; y: number; }
-
-interface FishConfig {
+interface FishDef {
   id: string;
   Component: (props: { size?: number }) => ReactElement;
   size: number;
-  waypoints: Waypoint[];
-  /** Full-loop duration in seconds (covers all legs). */
-  duration: number;
-  delay: number;
+  /** Starting position (vw, vh). */
+  startX: number;
+  startY: number;
+  /** Initial heading in radians (0 = facing right, π = facing left). */
+  startHeading: number;
+  /** Cruise speed in vw/sec (vertical is dampened — see TICK below). */
+  baseSpeed: number;
+  /** Max turning rate in rad/sec. Big fish turn slowly; tetras snap. */
+  turnRate: number;
   opacity: number;
-  /** Max tilt amplitude in degrees applied to direction-based rotate. */
-  tilt: number;
 }
 
-interface FishKeyframes {
-  x: string[];
-  y: string[];
-  scaleX: number[];
-  rotate: number[];
-  times: number[];
+interface FishState {
+  pos: { x: number; y: number };
+  heading: number;
+  /** Last committed left/right facing (only flips when heading clearly horizontal). */
+  facing: 1 | -1;
+  /** Where the fish is currently choosing to swim toward. */
+  patrolHeading: number;
+  /** Seconds until next patrol decision. */
+  patrolTimer: number;
 }
 
-/**
- * Walk the waypoint loop and produce parallel keyframe arrays for the
- * Framer Motion `animate` config. Each waypoint produces one keyframe.
- * The final keyframe duplicates the first so the animation loops cleanly.
- */
-function buildKeyframes(wp: Waypoint[], tilt: number): FishKeyframes {
-  const n = wp.length;
-  const x: string[] = [];
-  const y: string[] = [];
-  const scaleX: number[] = [];
-  const rotate: number[] = [];
-
-  for (let i = 0; i < n; i++) {
-    const here = wp[i];
-    // Next point (wrap to first to close the loop) — defines heading FROM
-    // this waypoint, since framer holds the keyframe value until the next.
-    const next = wp[(i + 1) % n];
-    const dx = next.x - here.x;
-    const dy = next.y - here.y;
-    x.push(`${here.x}vw`);
-    y.push(`${here.y}vh`);
-    // Heading right → scaleX = 1, left → -1. Vertical-only legs keep the
-    // previous facing.
-    scaleX.push(dx > 0.5 ? 1 : dx < -0.5 ? -1 : (scaleX[i - 1] ?? 1));
-    // Tilt the nose up/down a bit when the fish is climbing or diving.
-    // dy positive (downward) means tilt DOWN visually → positive rotate for
-    // right-facing fish, but since we apply scaleX first, a single positive
-    // value works for both directions because the rotate is in element-local
-    // space after the flip. Clamp.
-    const tiltAmt = Math.max(-tilt, Math.min(tilt, (dy / 6) * tilt));
-    rotate.push(tiltAmt);
-  }
-
-  // Close the loop by repeating the first keyframe so x/y/scaleX/rotate
-  // return to their starting values smoothly (Framer reads the array
-  // top-to-bottom and tweens between consecutive entries).
-  x.push(x[0]);
-  y.push(y[0]);
-  scaleX.push(scaleX[0]);
-  rotate.push(rotate[0]);
-
-  // Evenly distribute keyframe times across the loop.
-  const times: number[] = [];
-  const step = 1 / (n);
-  for (let i = 0; i <= n; i++) times.push(Math.min(1, i * step));
-
-  return { x, y, scaleX, rotate, times };
-}
-
-// ── Per-fish path scripts ───────────────────────────────────────────────────
-// Coordinates in (vw, vh). Fish stay in the outer ~22% bands so they never
-// crowd the centre play area. Each fish has its own pattern.
-
-const FISH: FishConfig[] = [
-  // 1. Clownfish — slow horizontal cruise across the very top
-  {
-    id: "clown1", Component: ClownFish, size: 70,
-    waypoints: [
-      { x: -10, y: 14 }, { x: 30, y: 12 }, { x: 70, y: 16 }, { x: 110, y: 14 },
-      { x: 70, y: 18 }, { x: 30, y: 16 },
-    ],
-    duration: 60, delay: 0, opacity: 0.45, tilt: 4,
-  },
-  // 2. Clownfish — opposite direction, bottom band
-  {
-    id: "clown2", Component: ClownFish, size: 60,
-    waypoints: [
-      { x: 105, y: 78 }, { x: 70, y: 82 }, { x: 30, y: 76 }, { x: -8, y: 80 },
-      { x: 30, y: 84 }, { x: 70, y: 78 },
-    ],
-    duration: 72, delay: 8, opacity: 0.42, tilt: 4,
-  },
-  // 3. Blue Tang — diagonal sweep upper-left to lower-right and back
-  {
-    id: "blue1", Component: BlueTang, size: 78,
-    waypoints: [
-      { x: -8, y: 24 }, { x: 18, y: 36 }, { x: 0, y: 58 }, { x: -10, y: 42 },
-    ],
-    duration: 55, delay: 3, opacity: 0.42, tilt: 6,
-  },
-  // 4. Blue Tang — wide oval right edge
-  {
-    id: "blue2", Component: BlueTang, size: 72,
-    waypoints: [
-      { x: 90, y: 30 }, { x: 100, y: 48 }, { x: 92, y: 66 }, { x: 84, y: 48 },
-    ],
-    duration: 50, delay: 10, opacity: 0.40, tilt: 6,
-  },
-  // 5. Yellow Tang — lazy oval upper-right
-  {
-    id: "yellow", Component: YellowTang, size: 60,
-    waypoints: [
-      { x: 78, y: 22 }, { x: 92, y: 32 }, { x: 84, y: 44 }, { x: 70, y: 32 },
-    ],
-    duration: 42, delay: 1.5, opacity: 0.42, tilt: 5,
-  },
-  // 6. Angelfish — slow hover bottom-left
-  {
-    id: "angel", Component: Angelfish, size: 68,
-    waypoints: [
-      { x: 6, y: 62 }, { x: 12, y: 60 }, { x: 8, y: 66 }, { x: 2, y: 64 },
-    ],
-    duration: 28, delay: 4, opacity: 0.42, tilt: 3,
-  },
-  // 7. Neon Tetra — tight figure-8 upper-left
-  {
-    id: "tetra1", Component: NeonTetra, size: 40,
-    waypoints: [
-      { x: 4, y: 30 }, { x: 16, y: 26 }, { x: 22, y: 34 }, { x: 16, y: 42 },
-      { x: 4, y: 38 }, { x: 0, y: 32 },
-    ],
-    duration: 22, delay: 0.6, opacity: 0.50, tilt: 8,
-  },
-  // 8. Neon Tetra — tight figure-8 lower-right
-  {
-    id: "tetra2", Component: NeonTetra, size: 38,
-    waypoints: [
-      { x: 90, y: 60 }, { x: 78, y: 64 }, { x: 72, y: 72 }, { x: 80, y: 80 },
-      { x: 92, y: 76 }, { x: 96, y: 68 },
-    ],
-    duration: 24, delay: 5, opacity: 0.50, tilt: 8,
-  },
-  // 9. Gourami — slow rightward drift across mid-left band with vertical bob
-  {
-    id: "gourami", Component: Gourami, size: 76,
-    waypoints: [
-      { x: -10, y: 48 }, { x: 12, y: 44 }, { x: 22, y: 52 }, { x: 8, y: 56 },
-    ],
-    duration: 64, delay: 7, opacity: 0.40, tilt: 5,
-  },
+// 9 fish, varied sizes/speeds, spread across the viewport. Starting positions
+// are well separated so the simulation doesn't begin with collisions.
+const FISH_DEFS: FishDef[] = [
+  { id: "clown1",  Component: ClownFish,  size: 60, startX: 12, startY: 22, startHeading: 0,             baseSpeed: 3.0, turnRate: 0.55, opacity: 0.60 },
+  { id: "clown2",  Component: ClownFish,  size: 54, startX: 82, startY: 76, startHeading: Math.PI,       baseSpeed: 3.2, turnRate: 0.60, opacity: 0.58 },
+  { id: "blue1",   Component: BlueTang,   size: 70, startX: 30, startY: 38, startHeading: 0.4,           baseSpeed: 3.6, turnRate: 0.65, opacity: 0.60 },
+  { id: "blue2",   Component: BlueTang,   size: 64, startX: 68, startY: 52, startHeading: Math.PI + 0.3, baseSpeed: 3.4, turnRate: 0.60, opacity: 0.60 },
+  { id: "yellow",  Component: YellowTang, size: 54, startX: 76, startY: 28, startHeading: -0.2,          baseSpeed: 4.2, turnRate: 0.80, opacity: 0.65 },
+  { id: "angel",   Component: Angelfish,  size: 60, startX: 18, startY: 62, startHeading: 0.2,           baseSpeed: 1.8, turnRate: 0.45, opacity: 0.60 },
+  { id: "tetra1",  Component: NeonTetra,  size: 36, startX: 24, startY: 30, startHeading: 0.2,           baseSpeed: 5.8, turnRate: 1.4,  opacity: 0.70 },
+  { id: "tetra2",  Component: NeonTetra,  size: 34, startX: 72, startY: 66, startHeading: Math.PI + 0.3, baseSpeed: 6.2, turnRate: 1.5,  opacity: 0.70 },
+  { id: "gourami", Component: Gourami,    size: 66, startX: 44, startY: 46, startHeading: 0.1,           baseSpeed: 2.0, turnRate: 0.50, opacity: 0.55 },
 ];
 
-// ── Decor positions ────────────────────────────────────────────────────────
+// Viewport bounds in (vw, vh). Fish are softly repelled before reaching the
+// hard edges, then clamped as a last resort. Top/bottom leave room for the
+// top-bar UI and the sand/decor strip respectively.
+const X_MIN = -2;
+const X_MAX = 102;
+const Y_MIN = 10;
+const Y_MAX = 82;
+const EDGE_BUFFER = 12; // distance over which the soft-repel ramps up
+
+function wrapAngle(a: number): number {
+  while (a > Math.PI) a -= 2 * Math.PI;
+  while (a < -Math.PI) a += 2 * Math.PI;
+  return a;
+}
+
+function applyTransform(
+  el: HTMLElement,
+  xVw: number,
+  yVh: number,
+  facing: number,
+  tiltDeg: number,
+) {
+  // Note CSS transform order is right-to-left: rotate is applied first to the
+  // element-local frame, then scaleX mirrors, then translate positions. The
+  // tilt formula in TICK already accounts for this (multiplied by `facing`).
+  el.style.transform = `translate(${xVw}vw, ${yVh}vh) scaleX(${facing}) rotate(${tiltDeg}deg)`;
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// DECOR LAYOUT (positions/sizes static)
+// ────────────────────────────────────────────────────────────────────────────
 
 interface DecorPosition {
   id: string;
-  /** Either a left or right inset percentage. */
   side: "left" | "right";
   inset: number;
   bottom: number;
@@ -477,10 +368,174 @@ const BUBBLES = [
   { id: "b5", left: "50%", size: 8,  duration: 20, delay: 12.6 },
 ];
 
-// ── Component ──────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────────────────
+// COMPONENT
+// ────────────────────────────────────────────────────────────────────────────
 
 export function AquariumWallpaper() {
   const reduceMotion = useReducedMotion();
+  const fishElsRef = useRef<(HTMLDivElement | null)[]>([]);
+  const statesRef = useRef<FishState[]>([]);
+
+  // Lazily initialise simulation state once. Stored in a ref so the animation
+  // frame loop can mutate it without triggering React re-renders.
+  if (statesRef.current.length === 0) {
+    statesRef.current = FISH_DEFS.map((def) => ({
+      pos: { x: def.startX, y: def.startY },
+      heading: def.startHeading,
+      facing: Math.cos(def.startHeading) >= 0 ? 1 : -1,
+      patrolHeading: def.startHeading,
+      patrolTimer: 1 + Math.random() * 3,
+    }));
+  }
+
+  // Set initial DOM transforms before paint so fish don't flash at (0,0) on
+  // the first frame.
+  useLayoutEffect(() => {
+    statesRef.current.forEach((fish, i) => {
+      const el = fishElsRef.current[i];
+      if (!el) return;
+      const tilt = Math.sin(fish.heading) * 15 * fish.facing;
+      applyTransform(el, fish.pos.x, fish.pos.y, fish.facing, tilt);
+    });
+  }, []);
+
+  // Main simulation loop. Updates physics + writes transforms each frame.
+  useEffect(() => {
+    if (reduceMotion) return;
+
+    let lastT = performance.now();
+    let frameId = 0;
+
+    function tick(t: number) {
+      // Cap dt so a backgrounded tab doesn't catapult fish across the screen
+      // when it returns to the foreground.
+      const dt = Math.min(0.05, (t - lastT) / 1000);
+      lastT = t;
+
+      const states = statesRef.current;
+      const n = states.length;
+
+      // Pass 1 — update each fish's physics.
+      for (let i = 0; i < n; i++) {
+        const fish = states[i];
+        const def = FISH_DEFS[i];
+
+        // Patrol whim: occasional small heading change. Rare U-turn so a fish
+        // doesn't only ever drift in one direction.
+        fish.patrolTimer -= dt;
+        if (fish.patrolTimer <= 0) {
+          if (Math.random() < 0.12) {
+            // U-turn (smoothly executed by the turn-rate limiter)
+            fish.patrolHeading = wrapAngle(fish.heading + Math.PI);
+          } else {
+            // Small perturbation up to ±60°
+            fish.patrolHeading = wrapAngle(
+              fish.heading + (Math.random() * 2 - 1) * (Math.PI / 3),
+            );
+          }
+          fish.patrolTimer = 3 + Math.random() * 4;
+        }
+
+        const patrolX = Math.cos(fish.patrolHeading);
+        const patrolY = Math.sin(fish.patrolHeading);
+
+        // Edge repulsion: push back toward the inside of the viewport whenever
+        // the fish gets within EDGE_BUFFER of a wall.
+        let edgeRepelX = 0;
+        let edgeRepelY = 0;
+        if (fish.pos.x < X_MIN + EDGE_BUFFER) {
+          edgeRepelX += (X_MIN + EDGE_BUFFER - fish.pos.x) / EDGE_BUFFER;
+        }
+        if (fish.pos.x > X_MAX - EDGE_BUFFER) {
+          edgeRepelX -= (fish.pos.x - (X_MAX - EDGE_BUFFER)) / EDGE_BUFFER;
+        }
+        if (fish.pos.y < Y_MIN + EDGE_BUFFER) {
+          edgeRepelY += (Y_MIN + EDGE_BUFFER - fish.pos.y) / EDGE_BUFFER;
+        }
+        if (fish.pos.y > Y_MAX - EDGE_BUFFER) {
+          edgeRepelY -= (fish.pos.y - (Y_MAX - EDGE_BUFFER)) / EDGE_BUFFER;
+        }
+
+        // Fish-to-fish repulsion: any other fish within the sum-of-radii
+        // pushes us away with a force proportional to overlap. Prevents
+        // overlap and produces natural-looking swim-arounds.
+        let fishRepelX = 0;
+        let fishRepelY = 0;
+        for (let j = 0; j < n; j++) {
+          if (i === j) continue;
+          const other = states[j];
+          const odef = FISH_DEFS[j];
+          const dx = fish.pos.x - other.pos.x;
+          const dy = fish.pos.y - other.pos.y;
+          const dist = Math.hypot(dx, dy);
+          // Effective radius in vw-ish units; the /28 divisor was tuned by
+          // eye so the personal-space bubble matches the visual fish size.
+          const radius = (def.size + odef.size) / 28;
+          if (dist > 0.01 && dist < radius) {
+            const force = (radius - dist) / radius;
+            fishRepelX += (dx / dist) * force;
+            fishRepelY += (dy / dist) * force;
+          }
+        }
+
+        // Combine: patrol (gentle preference) + edge repulsion (medium) +
+        // fish repulsion (strongest — collisions take priority). The result
+        // vector's angle is the desired heading.
+        const totalX = patrolX * 1.0 + edgeRepelX * 4 + fishRepelX * 6;
+        const totalY = patrolY * 1.0 + edgeRepelY * 4 + fishRepelY * 6;
+        const desiredHeading = Math.atan2(totalY, totalX);
+
+        // Turn smoothly toward desired heading, capped by turnRate so big
+        // fish don't snap-rotate.
+        const diff = wrapAngle(desiredHeading - fish.heading);
+        const maxTurn = def.turnRate * dt;
+        fish.heading = wrapAngle(
+          fish.heading + Math.sign(diff) * Math.min(Math.abs(diff), maxTurn),
+        );
+
+        // Slow down on sharp turns (mimics a real fish bracing into a curve).
+        const speedScale = 1 - Math.min(0.4, (Math.abs(diff) / Math.PI) * 0.4);
+        const moveDist = def.baseSpeed * dt * speedScale;
+
+        // ALWAYS move FORWARD along current heading. There is no code path
+        // that could move the fish backwards relative to its facing.
+        fish.pos.x += Math.cos(fish.heading) * moveDist;
+        // Dampen vertical so fish prefer horizontal motion (aquarium feel).
+        fish.pos.y += Math.sin(fish.heading) * moveDist * 0.7;
+
+        // Hard clamp — should rarely trigger thanks to edge repulsion.
+        if (fish.pos.x < X_MIN) fish.pos.x = X_MIN;
+        else if (fish.pos.x > X_MAX) fish.pos.x = X_MAX;
+        if (fish.pos.y < Y_MIN) fish.pos.y = Y_MIN;
+        else if (fish.pos.y > Y_MAX) fish.pos.y = Y_MAX;
+
+        // Update facing only when heading is clearly horizontal. The dead
+        // zone around ±90° prevents jittering during steep dives/climbs.
+        const cosH = Math.cos(fish.heading);
+        if (cosH > 0.15) fish.facing = 1;
+        else if (cosH < -0.15) fish.facing = -1;
+        // else keep last facing
+      }
+
+      // Pass 2 — flush physics into the DOM (single write phase).
+      for (let i = 0; i < n; i++) {
+        const fish = states[i];
+        const el = fishElsRef.current[i];
+        if (!el) continue;
+        // Tilt formula: sin(heading) gives the vertical component. Multiplied
+        // by `facing` because scaleX(-1) is applied AFTER rotate (CSS reads
+        // right-to-left), which would otherwise invert the visual tilt.
+        const tilt = Math.sin(fish.heading) * 15 * fish.facing;
+        applyTransform(el, fish.pos.x, fish.pos.y, fish.facing, tilt);
+      }
+
+      frameId = requestAnimationFrame(tick);
+    }
+
+    frameId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frameId);
+  }, [reduceMotion]);
 
   return (
     <div className="aquarium-wallpaper" aria-hidden="true">
@@ -498,7 +553,7 @@ export function AquariumWallpaper() {
         transition={reduceMotion ? undefined : { duration: 11, delay: 3, repeat: Infinity, ease: "easeInOut" }}
       />
 
-      {/* Sand bed at the very bottom (static) */}
+      {/* z=0 — sand bed at the very bottom */}
       <div className="aquarium-sand" />
 
       {/* z=3 — coral (back layer of foreground) */}
@@ -515,7 +570,7 @@ export function AquariumWallpaper() {
         );
       })}
 
-      {/* z=3 — kelp strands (back layer of foreground), gentle sway */}
+      {/* z=3 — kelp strands, gentle sway */}
       {KELP.map((k) => {
         const sideStyle = k.side === "left" ? { left: `${k.inset}%` } : { right: `${k.inset}%` };
         return (
@@ -531,7 +586,7 @@ export function AquariumWallpaper() {
         );
       })}
 
-      {/* z=4 — tunicates (very front of foreground) */}
+      {/* z=4 — tunicates */}
       {TUNICATES.map((t) => {
         const sideStyle = t.side === "left" ? { left: `${t.inset}%` } : { right: `${t.inset}%` };
         return (
@@ -547,7 +602,7 @@ export function AquariumWallpaper() {
         );
       })}
 
-      {/* z=4 — oysters on the sand bed (static) */}
+      {/* z=4 — oysters on the sand bed */}
       {OYSTERS.map((o) => {
         const sideStyle = o.side === "left" ? { left: `${o.inset}%` } : { right: `${o.inset}%` };
         return (
@@ -561,84 +616,31 @@ export function AquariumWallpaper() {
         );
       })}
 
-      {/* z=5 — starfish (close to camera) */}
+      {/* z=5 — starfish sitting ON the sand (very gentle rotation) */}
       <motion.div
         className="aquarium-starfish"
         animate={reduceMotion ? undefined : { rotate: [0, 360] }}
-        transition={reduceMotion ? undefined : { duration: 90, repeat: Infinity, ease: "linear" }}
+        transition={reduceMotion ? undefined : { duration: 120, repeat: Infinity, ease: "linear" }}
       >
         <Starfish />
       </motion.div>
 
-      {/* z=1 — fish (between background and decor) */}
-      {FISH.map((f) => {
-        const kf = buildKeyframes(f.waypoints, f.tilt);
-        return (
-          <motion.div
-            key={f.id}
-            className="aquarium-fish"
-            style={{ opacity: f.opacity, left: 0, top: 0 }}
-            initial={{
-              x: kf.x[0],
-              y: kf.y[0],
-              scaleX: kf.scaleX[0],
-              rotate: kf.rotate[0],
-            }}
-            animate={
-              reduceMotion
-                ? { x: kf.x[0], y: kf.y[0], scaleX: kf.scaleX[0], rotate: kf.rotate[0] }
-                : {
-                    x: kf.x,
-                    y: kf.y,
-                    scaleX: kf.scaleX,
-                    rotate: kf.rotate,
-                  }
-            }
-            transition={
-              reduceMotion
-                ? { duration: 0 }
-                : {
-                    // Per-property transitions let us snap scaleX at each
-                    // waypoint without affecting the smooth x/y/rotate glide.
-                    x: {
-                      duration: f.duration,
-                      delay: f.delay,
-                      repeat: Infinity,
-                      ease: "easeInOut",
-                      times: kf.times,
-                    },
-                    y: {
-                      duration: f.duration,
-                      delay: f.delay,
-                      repeat: Infinity,
-                      ease: "easeInOut",
-                      times: kf.times,
-                    },
-                    rotate: {
-                      duration: f.duration,
-                      delay: f.delay,
-                      repeat: Infinity,
-                      ease: "easeInOut",
-                      times: kf.times,
-                    },
-                    // Step-at-end: hold the current facing for the entire leg,
-                    // snap to the new facing only when the fish arrives at the
-                    // next waypoint — eliminates the moonwalk / squish artifact
-                    // caused by Framer smoothly interpolating 1 → -1.
-                    scaleX: {
-                      duration: f.duration,
-                      delay: f.delay,
-                      repeat: Infinity,
-                      ease: (t: number) => (t > 0.9999 ? 1 : 0),
-                      times: kf.times,
-                    },
-                  }
-            }
-          >
-            <f.Component size={f.size} />
-          </motion.div>
-        );
-      })}
+      {/* z=1 — autonomous fish. Note: NO transform is set via React style here.
+          The transform is applied imperatively in the simulation loop so
+          React re-renders don't reset the fish positions. The opacity stays
+          in JSX since it never changes per fish. */}
+      {FISH_DEFS.map((def, i) => (
+        <div
+          key={def.id}
+          ref={(el) => {
+            fishElsRef.current[i] = el;
+          }}
+          className="aquarium-fish"
+          style={{ opacity: def.opacity }}
+        >
+          <def.Component size={def.size} />
+        </div>
+      ))}
 
       {/* z=2 — bubbles in front of the fish */}
       {BUBBLES.map((b) => (

@@ -380,7 +380,16 @@
 }
 .aquarium-fish {
   position: absolute;
+  /* Anchor at the wallpaper's top-left — the simulation loop applies the
+     `translate(Xvw, Yvh)` from this origin. Without these, an absolute
+     element drops to its static-flow position before transforms apply, so
+     all fish would stack in random spots. */
+  top: 0;
+  left: 0;
   z-index: 1;
+  /* Pivot rotation and scaleX from the centre of the fish so U-turns look
+     like the fish swinging its body, not whipping around a corner. */
+  transform-origin: 50% 50%;
   will-change: transform;
   filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35));
 }
@@ -446,10 +455,13 @@
 }
 .aquarium-starfish {
   position: absolute;
-  right: 4%;
-  bottom: 9%;
+  /* Sits on the sand bed (which is `height: 3vh` at the bottom). A small
+     positive `bottom` so the starfish's body overlaps the sand strip and
+     looks like it's resting on it, not floating mid-water. */
+  right: 6%;
+  bottom: 0.5vh;
   z-index: 5;
-  opacity: 0.55;
+  opacity: 0.7;
   will-change: transform;
   filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.45));
 }
