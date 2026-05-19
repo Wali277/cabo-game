@@ -57,28 +57,28 @@ interface WallpaperCard {
 const CARDS: WallpaperCard[] = [
   // ───────── LEFT PILE ─────────
   // Outermost (closest to viewport edge) — receding, slightly transparent.
-  { id: "L1", side: "left",  inset: -3,  top: 12, rotate: -22, size: "md", faceUp: false,                       duration: 11, delay: 0.4, driftScale: 1.0, opacity: 0.82 },
-  { id: "L2", side: "left",  inset: -2,  top: 78, rotate:  18, size: "md", faceUp: true, rank: "5",  suit: "H", duration: 13, delay: 1.2, driftScale: 1.1, opacity: 0.85 },
-  { id: "L3", side: "left",  inset:  4,  top: 28, rotate:  12, size: "md", faceUp: true, rank: "K",  suit: "S", duration: 9,  delay: 0.0, driftScale: 1.0, opacity: 0.92 },
-  { id: "L4", side: "left",  inset:  3,  top: 62, rotate: -28, size: "md", faceUp: true, rank: "2",  suit: "D", duration: 10, delay: 2.1, driftScale: 0.9, opacity: 0.9 },
+  { id: "L1", side: "left",  inset: -6,  top: 10, rotate: -22, size: "lg", faceUp: false,                       duration: 11, delay: 0.4, driftScale: 1.0, opacity: 0.82 },
+  { id: "L2", side: "left",  inset: -5,  top: 76, rotate:  18, size: "lg", faceUp: true, rank: "5",  suit: "H", duration: 13, delay: 1.2, driftScale: 1.1, opacity: 0.85 },
+  { id: "L3", side: "left",  inset:  2,  top: 26, rotate:  12, size: "lg", faceUp: true, rank: "K",  suit: "S", duration: 9,  delay: 0.0, driftScale: 1.0, opacity: 0.92 },
+  { id: "L4", side: "left",  inset:  1,  top: 60, rotate: -28, size: "lg", faceUp: true, rank: "2",  suit: "D", duration: 10, delay: 2.1, driftScale: 0.9, opacity: 0.9 },
   // Mid-layer
-  { id: "L5", side: "left",  inset:  9,  top: 46, rotate:   6, size: "sm", faceUp: false,                       duration: 14, delay: 0.7, driftScale: 1.2, opacity: 0.95, pulse: true },
-  { id: "L6", side: "left",  inset: 11,  top: 18, rotate: -14, size: "sm", faceUp: true, rank: "A",  suit: "H", duration: 8,  delay: 1.8, driftScale: 1.0, opacity: 1 },
+  { id: "L5", side: "left",  inset:  8,  top: 44, rotate:   6, size: "md", faceUp: false,                       duration: 14, delay: 0.7, driftScale: 1.2, opacity: 0.95, pulse: true },
+  { id: "L6", side: "left",  inset:  9,  top: 16, rotate: -14, size: "md", faceUp: true, rank: "A",  suit: "H", duration: 8,  delay: 1.8, driftScale: 1.0, opacity: 1 },
   // Innermost (closest to UI — hide on narrow screens)
-  { id: "L7", side: "left",  inset: 17,  top: 72, rotate:  22, size: "sm", faceUp: true, rank: "7",  suit: "C", duration: 12, delay: 0.3, driftScale: 1.1, opacity: 1, inner: true },
-  { id: "L8", side: "left",  inset: 19,  top: 38, rotate: -10, size: "sm", faceUp: false,                       duration: 9,  delay: 2.6, driftScale: 0.8, opacity: 0.95, inner: true, pulse: true },
+  { id: "L7", side: "left",  inset: 14,  top: 70, rotate:  22, size: "md", faceUp: true, rank: "7",  suit: "C", duration: 12, delay: 0.3, driftScale: 1.1, opacity: 1, inner: true },
+  { id: "L8", side: "left",  inset: 16,  top: 36, rotate: -10, size: "md", faceUp: false,                       duration: 9,  delay: 2.6, driftScale: 0.8, opacity: 0.95, inner: true, pulse: true },
 
   // ───────── RIGHT PILE (mirrored) ─────────
-  { id: "R1", side: "right", inset: -3,  top: 14, rotate:  24, size: "md", faceUp: true, rank: "10", suit: "S", duration: 12, delay: 0.9, driftScale: 1.0, opacity: 0.83 },
-  { id: "R2", side: "right", inset: -1,  top: 80, rotate: -20, size: "md", faceUp: false,                       duration: 14, delay: 0.2, driftScale: 1.1, opacity: 0.85 },
-  { id: "R3", side: "right", inset:  3,  top: 30, rotate: -16, size: "md", faceUp: true, rank: "J",  suit: "H", duration: 9,  delay: 1.5, driftScale: 0.9, opacity: 0.92 },
-  { id: "R4", side: "right", inset:  4,  top: 60, rotate:  28, size: "md", faceUp: true, rank: "9",  suit: "C", duration: 11, delay: 0.6, driftScale: 1.0, opacity: 0.9 },
+  { id: "R1", side: "right", inset: -6,  top: 12, rotate:  24, size: "lg", faceUp: true, rank: "10", suit: "S", duration: 12, delay: 0.9, driftScale: 1.0, opacity: 0.83 },
+  { id: "R2", side: "right", inset: -4,  top: 78, rotate: -20, size: "lg", faceUp: false,                       duration: 14, delay: 0.2, driftScale: 1.1, opacity: 0.85 },
+  { id: "R3", side: "right", inset:  2,  top: 28, rotate: -16, size: "lg", faceUp: true, rank: "J",  suit: "H", duration: 9,  delay: 1.5, driftScale: 0.9, opacity: 0.92 },
+  { id: "R4", side: "right", inset:  3,  top: 58, rotate:  28, size: "lg", faceUp: true, rank: "9",  suit: "C", duration: 11, delay: 0.6, driftScale: 1.0, opacity: 0.9 },
   // Mid-layer
-  { id: "R5", side: "right", inset: 10,  top: 44, rotate:  -8, size: "sm", faceUp: true, rank: "Joker", suit: "H", duration: 13, delay: 2.3, driftScale: 1.3, opacity: 0.95, pulse: true },
-  { id: "R6", side: "right", inset: 12,  top: 20, rotate:  14, size: "sm", faceUp: false,                       duration: 10, delay: 1.1, driftScale: 1.0, opacity: 1 },
+  { id: "R5", side: "right", inset:  9,  top: 42, rotate:  -8, size: "md", faceUp: true, rank: "Joker", suit: "H", duration: 13, delay: 2.3, driftScale: 1.3, opacity: 0.95, pulse: true },
+  { id: "R6", side: "right", inset: 10,  top: 18, rotate:  14, size: "md", faceUp: false,                       duration: 10, delay: 1.1, driftScale: 1.0, opacity: 1 },
   // Innermost
-  { id: "R7", side: "right", inset: 18,  top: 70, rotate: -24, size: "sm", faceUp: true, rank: "3",  suit: "D", duration: 8,  delay: 2.0, driftScale: 1.1, opacity: 1, inner: true },
-  { id: "R8", side: "right", inset: 20,  top: 36, rotate:  10, size: "sm", faceUp: true, rank: "Q",  suit: "S", duration: 12, delay: 0.5, driftScale: 0.9, opacity: 0.95, inner: true, pulse: true },
+  { id: "R7", side: "right", inset: 15,  top: 68, rotate: -24, size: "md", faceUp: true, rank: "3",  suit: "D", duration: 8,  delay: 2.0, driftScale: 1.1, opacity: 1, inner: true },
+  { id: "R8", side: "right", inset: 17,  top: 34, rotate:  10, size: "md", faceUp: true, rank: "Q",  suit: "S", duration: 12, delay: 0.5, driftScale: 0.9, opacity: 0.95, inner: true, pulse: true },
 ];
 
 function makeCard(rank: Rank, suit: Suit, id: string): Card {

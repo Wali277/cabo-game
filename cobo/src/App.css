@@ -39,40 +39,40 @@
 .menu-wallpaper-card {
   position: absolute;
   will-change: transform;
-  /* Double drop-shadow for richer depth: large soft + tight ground shadow */
+  /* Stronger double drop-shadow to complement the bigger cards */
   filter:
-    drop-shadow(0 12px 24px rgba(0, 0, 0, 0.55))
-    drop-shadow(0 4px 8px rgba(0, 0, 0, 0.35));
+    drop-shadow(0 16px 32px rgba(0, 0, 0, 0.60))
+    drop-shadow(0 6px 12px rgba(0, 0, 0, 0.40));
 }
 /* Soft ambient under-glow beneath each pile — purple to match brand. */
 .menu-wallpaper-glow {
   position: absolute;
-  width: 55%;
-  height: 70%;
-  top: 15%;
+  width: 65%;
+  height: 80%;
+  top: 10%;
   pointer-events: none;
   background: radial-gradient(
     ellipse at center,
-    rgba(168, 123, 255, 0.18) 0%,
-    rgba(168, 123, 255, 0.08) 35%,
+    rgba(168, 123, 255, 0.20) 0%,
+    rgba(168, 123, 255, 0.09) 35%,
     transparent 65%
   );
-  filter: blur(30px);
+  filter: blur(40px);
   animation: menuGlowBreathe 10s ease-in-out infinite alternate;
 }
-.menu-wallpaper-glow-left { left: -12%; }
-.menu-wallpaper-glow-right { right: -12%; animation-delay: -5s; }
+.menu-wallpaper-glow-left { left: -16%; }
+.menu-wallpaper-glow-right { right: -16%; animation-delay: -5s; }
 
 @keyframes menuGlowBreathe {
   0%   { opacity: 0.7; transform: scale(0.95); }
   100% { opacity: 1;   transform: scale(1.05); }
 }
 
-/* On narrow viewports, hide the innermost cards so the wallpaper doesn't
-   crowd the centered menu-card UI. */
-@media (max-width: 720px) {
+/* On narrow/medium viewports, hide the innermost cards so the larger
+   wallpaper cards don't crowd the centered menu-card UI. */
+@media (max-width: 900px) {
   .menu-wallpaper-card.inner { display: none; }
-  .menu-wallpaper-glow { width: 40%; }
+  .menu-wallpaper-glow { width: 50%; }
 }
 
 /* Respect users' reduced-motion preference: cards stay in place with no
