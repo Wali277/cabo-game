@@ -18,30 +18,23 @@ export type TableTheme =
   | "crimson"
   | "northern"
   | "cosmic"
-  | "aquarium"
-  | "waterfall"
-  | "windmill"
-  | "neon";
+  | "aquarium";
 export const DEFAULT_THEME: TableTheme = "emerald";
 
 const STORAGE_KEY = "cabo:theme";
 const EVENT_NAME = "cabo:theme-change";
 const VALID: ReadonlyArray<TableTheme> = [
   "emerald", "ocean", "crimson", "northern", "cosmic", "aquarium",
-  "waterfall", "windmill", "neon",
 ];
 
 /** Labels shown in the picker UI. */
 export const THEME_LABELS: Record<TableTheme, string> = {
-  emerald:   "Emerald Felt",
-  ocean:     "Midnight Ocean",
-  crimson:   "Royal Crimson",
-  northern:  "Northern Lights",
-  cosmic:    "Cosmic Legacy",
-  aquarium:  "Aquarium",
-  waterfall: "Waterfall",
-  windmill:  "Windmill",
-  neon:      "Neon City",
+  emerald:  "Emerald Felt",
+  ocean:    "Midnight Ocean",
+  crimson:  "Royal Crimson",
+  northern: "Northern Lights",
+  cosmic:   "Cosmic Legacy",
+  aquarium: "Aquarium",
 };
 
 /**
@@ -54,9 +47,12 @@ export const THEME_LABELS: Record<TableTheme, string> = {
  *    DEFAULT_THEME via loadFromStorage's normal validation path)
  */
 function migrateLegacyId(v: string | null): string | null {
-  if (v === "velvet") return "ocean";
-  if (v === "aurora") return "northern";
-  if (v === "dawn")   return null; // retired in v2.19 — fall back to default
+  if (v === "velvet")    return "ocean";
+  if (v === "aurora")    return "northern";
+  if (v === "dawn")      return null; // retired in v2.19
+  if (v === "waterfall") return null; // retired in v2.20
+  if (v === "windmill")  return null; // retired in v2.20
+  if (v === "neon")      return null; // retired in v2.20
   return v;
 }
 

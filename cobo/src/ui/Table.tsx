@@ -18,9 +18,10 @@ import { Audio } from "../audio/sounds";
 import { useTheme } from "../state/theme";
 import { AquariumWallpaper } from "./AquariumWallpaper";
 import { NorthernLightsWallpaper } from "./NorthernLightsWallpaper";
-import { WaterfallWallpaper } from "./WaterfallWallpaper";
-import { WindmillWallpaper } from "./WindmillWallpaper";
-import { NeonCityWallpaper } from "./NeonCityWallpaper";
+import { EmeraldWallpaper } from "./EmeraldWallpaper";
+import { OceanWallpaper } from "./OceanWallpaper";
+import { CrimsonWallpaper } from "./CrimsonWallpaper";
+import { CosmicWallpaper } from "./CosmicWallpaper";
 
 export function Table() {
   const game = useStore((s) => s.game!);
@@ -191,11 +192,12 @@ export function Table() {
           {/* Ocean = pure dark-blue gradient (no overlay).
               Aquarium = full animated underwater scene (fish, kelp, etc).
               Northern Lights = aurora ribbons + stars overlay. */}
-          {tableTheme === "aquarium" && <AquariumWallpaper />}
+          {tableTheme === "emerald"  && <EmeraldWallpaper />}
+          {tableTheme === "ocean"    && <OceanWallpaper />}
+          {tableTheme === "crimson"  && <CrimsonWallpaper />}
+          {tableTheme === "cosmic"   && <CosmicWallpaper />}
           {tableTheme === "northern" && <NorthernLightsWallpaper />}
-          {tableTheme === "waterfall" && <WaterfallWallpaper />}
-          {tableTheme === "windmill" && <WindmillWallpaper />}
-          {tableTheme === "neon" && <NeonCityWallpaper />}
+          {tableTheme === "aquarium" && <AquariumWallpaper />}
         </div>
 
         {/* Compact top bar */}

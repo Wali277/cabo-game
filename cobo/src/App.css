@@ -162,37 +162,6 @@
     linear-gradient(180deg, #04304f 0%, #0a5478 40%, #052e44 100%);
 }
 
-/* (v2.18 Dawn Clouds theme retired in v2.19 — replaced by Waterfall /
-   Windmill / Neon City. The slot is intentionally left empty so the
-   surrounding theme numbering reads continuously.) */
-
-/* 7. Waterfall — painterly forest cliff with falling water + rising vapor.
-   Base gradient is the sky strip at top transitioning through cliff-gray
-   to the dark pool teal at the bottom; the <WaterfallWallpaper /> overlay
-   paints the rocks, trees, water streams, mist, and pool ripples. */
-.table-bg[data-theme="waterfall"] {
-  background:
-    linear-gradient(180deg, #7eb4d8 0%, #5a7a96 12%, #3a3a42 28%, #2a3038 70%, #1a3848 95%, #2a8aa8 100%);
-}
-
-/* 8. Windmill — alpine valley with bright daytime sky + distant mountains +
-   green hills. The <WindmillWallpaper /> overlay paints the mountains,
-   river, windmill structure + rotating blades, and drifting clouds. */
-.table-bg[data-theme="windmill"] {
-  background:
-    radial-gradient(ellipse at 78% 22%, rgba(255, 232, 168, 0.22) 0%, transparent 55%),
-    linear-gradient(180deg, #7eb4d8 0%, #b4d5e8 38%, #c8e0f0 56%, #6a9a6a 72%, #3a6a2a 100%);
-}
-
-/* 9. Neon City — wet-street Times-Square night with neon billboards. Base
-   gradient is the dark sky transitioning into a deeper wet-asphalt band at
-   the bottom; the <NeonCityWallpaper /> overlay paints buildings, windows,
-   billboards, and the reflective wet street. */
-.table-bg[data-theme="neon"] {
-  background:
-    radial-gradient(ellipse at 50% 110%, rgba(255, 80, 200, 0.10) 0%, transparent 60%),
-    linear-gradient(180deg, #0a0a1e 0%, #1a1438 35%, #1a1a2e 78%, #050510 100%);
-}
 
 /* Reduced-motion: only Cosmic still drifts via bgDrift. The two wallpaper
    themes (Aquarium, Northern Lights) honour reduced-motion at the React
@@ -363,50 +332,6 @@
     radial-gradient(circle at 18% 88%, rgba(58, 168, 103, 0.55) 0 18%, transparent 26%),
     radial-gradient(ellipse at 50% -10%, rgba(140, 220, 240, 0.45) 0%, transparent 60%),
     linear-gradient(180deg, #04304f 0%, #0a5478 40%, #052e44 100%);
-}
-/* Waterfall — small painterly cliff + waterfall + pool stack, tiny pine
-   silhouettes on the edges so the chip reads "forest waterfall" at a glance. */
-.theme-swatch-preview[data-theme="waterfall"] {
-  background:
-    /* Tiny white waterfall stream */
-    linear-gradient(180deg, transparent 18%, rgba(255, 255, 255, 0.92) 22%, rgba(255, 255, 255, 0.88) 70%, transparent 78%) 50% 0 / 14% 100% no-repeat,
-    /* Cliff face */
-    radial-gradient(ellipse 60% 50% at 50% 50%, rgba(58, 58, 66, 0.95) 0 60%, transparent 65%),
-    /* Pine silhouettes on edges */
-    radial-gradient(ellipse 18% 38% at 6% 70%, rgba(10, 36, 16, 0.95) 0 60%, transparent 70%),
-    radial-gradient(ellipse 18% 38% at 94% 70%, rgba(10, 36, 16, 0.95) 0 60%, transparent 70%),
-    /* Pool teal at the bottom */
-    linear-gradient(180deg, transparent 78%, #2a8aa8 78%),
-    linear-gradient(180deg, #7eb4d8 0%, #5a7a96 30%, #3a3a42 55%, #2a3038 78%, #2a8aa8 100%);
-}
-
-/* Windmill — bright sky + green valley + a tiny silhouette of the mill. */
-.theme-swatch-preview[data-theme="windmill"] {
-  background:
-    /* Windmill blob */
-    radial-gradient(ellipse 8% 16% at 50% 56%, rgba(196, 184, 160, 0.95) 0 70%, transparent 78%),
-    radial-gradient(ellipse 16% 4% at 50% 47%, rgba(232, 228, 208, 0.92) 0 70%, transparent 80%),
-    radial-gradient(ellipse 4% 14% at 50% 47%, rgba(232, 228, 208, 0.92) 0 70%, transparent 80%),
-    /* Tiny cloud */
-    radial-gradient(ellipse 18% 8% at 24% 22%, rgba(255, 255, 255, 0.9) 0 70%, transparent 78%),
-    radial-gradient(ellipse 14% 6% at 76% 18%, rgba(255, 255, 255, 0.85) 0 70%, transparent 78%),
-    /* River band */
-    linear-gradient(180deg, transparent 74%, rgba(74, 144, 196, 0.85) 74%, rgba(74, 144, 196, 0.85) 84%, transparent 84%),
-    linear-gradient(180deg, #7eb4d8 0%, #c8e0f0 38%, #6a9a6a 70%, #3a6a2a 100%);
-}
-
-/* Neon City — dark sky + glowing billboard accent + wet-street reflection. */
-.theme-swatch-preview[data-theme="neon"] {
-  background:
-    /* Pink billboard glow */
-    radial-gradient(ellipse 22% 14% at 26% 38%, rgba(255, 58, 168, 0.9) 0 60%, transparent 72%),
-    /* Cyan billboard glow */
-    radial-gradient(ellipse 18% 18% at 74% 32%, rgba(58, 232, 232, 0.85) 0 60%, transparent 72%),
-    /* Building silhouettes (bottom rectangles) */
-    linear-gradient(180deg, transparent 60%, #0a1422 60%, #131a2a 72%, transparent 72%),
-    /* Wet street reflection */
-    linear-gradient(180deg, transparent 78%, rgba(255, 58, 168, 0.25) 80%, rgba(58, 232, 232, 0.20) 86%, transparent 92%),
-    linear-gradient(180deg, #0a0a1e 0%, #1a1438 50%, #050510 100%);
 }
 .theme-swatch-label {
   flex: 1 1 auto;
@@ -608,178 +533,114 @@
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
-   WATERFALL WALLPAPER
+   EMERALD FELT WALLPAPER
 
-   Painterly forest cliff scene: tall waterfall streams cascading down a
-   rocky cliff face, mist rising at the base, pool ripples below, pine
-   silhouettes framing both edges. All elements honour reduced-motion at
-   the React level via useReducedMotion; the @media block below freezes
-   any leftover CSS transform animations as a belt-and-braces fallback.
+   Floating card suit symbols drift upward and fade; diagonal shimmer sweeps
+   across the felt surface; subtle corner vignette. All Framer Motion.
    ──────────────────────────────────────────────────────────────────────── */
-.waterfall-wallpaper {
+.emerald-wallpaper {
   position: absolute;
   inset: 0;
   pointer-events: none;
   overflow: hidden;
 }
-.waterfall-cliff,
-.waterfall-mountains,
-.waterfall-tree,
-.waterfall-pool {
+.emerald-suit {
   position: absolute;
-  will-change: opacity;
-}
-.waterfall-stream {
-  position: absolute;
-  will-change: transform;
-  /* Soft glow so the water reads as luminous, not a flat band. */
-  filter: blur(0.4px) brightness(1.08) drop-shadow(0 0 6px rgba(220, 240, 248, 0.45));
-}
-.waterfall-vapor {
-  position: absolute;
-  will-change: transform, opacity;
-  filter: blur(8px);
-  pointer-events: none;
-}
-.waterfall-ripple {
-  position: absolute;
-  border-radius: 50%;
-  border: 1.5px solid rgba(220, 240, 248, 0.55);
   pointer-events: none;
   will-change: transform, opacity;
+  user-select: none;
 }
-
-/* ────────────────────────────────────────────────────────────────────────────
-   WINDMILL WALLPAPER
-
-   Painterly alpine valley with bright sky, layered mountains, a green
-   valley with a river, a stone windmill with rotating blades, and a few
-   slow-drifting clouds.
-   ──────────────────────────────────────────────────────────────────────── */
-.windmill-wallpaper {
+.emerald-shimmer {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  overflow: hidden;
-}
-.windmill-mountains,
-.windmill-grass,
-.windmill-forest,
-.windmill-mill,
-.windmill-sun {
-  position: absolute;
-  pointer-events: none;
-}
-.windmill-river {
-  position: absolute;
-  pointer-events: none;
-  /* Animated wave-stripe pattern flows horizontally — supplies the
-     "river is moving" feel without needing per-frame React updates. */
-  background:
-    repeating-linear-gradient(
-      90deg,
-      rgba(255, 255, 255, 0.16) 0 8px,
-      transparent 8px 32px
-    ),
-    linear-gradient(180deg, #4a90c4 0%, #6ab0d8 50%, #4a90c4 100%);
-  background-size: 80px 100%, 100% 100%;
-  animation: river-flow 6s linear infinite;
-  filter: drop-shadow(0 4px 10px rgba(20, 40, 60, 0.45));
-}
-@keyframes river-flow {
-  from { background-position: 0 0, 0 0; }
-  to   { background-position: 80px 0, 0 0; }
-}
-.windmill-rotor {
-  position: absolute;
-  will-change: transform;
-  transform-origin: center center;
-  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.45));
-}
-.windmill-cloud {
-  position: absolute;
-  left: 0;
   will-change: transform;
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
-   NEON CITY WALLPAPER
+   MIDNIGHT OCEAN WALLPAPER
 
-   Dark wet-street city scene with neon billboards cycling through goofy
-   bean-creature card-playing scenes. Random window-light flickers, a
-   reflective wet street, and street-lamp accents complete the vibe.
+   Bioluminescent particles pulse, rising bubbles drift upward, horizontal
+   wave-light bands sweep across the deep-sea mid-layer.
    ──────────────────────────────────────────────────────────────────────── */
-.neon-wallpaper {
+.ocean-wallpaper {
   position: absolute;
   inset: 0;
   pointer-events: none;
   overflow: hidden;
 }
-.neon-building {
+.ocean-bubble {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+.ocean-wave {
   position: absolute;
   pointer-events: none;
+  will-change: transform, opacity;
 }
-.neon-window {
+.ocean-particle {
   position: absolute;
-  border-radius: 1px;
+  border-radius: 50%;
+  pointer-events: none;
+  will-change: opacity, transform;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   ROYAL CRIMSON WALLPAPER
+
+   Glowing embers rise from the base; pulsing warm candlelight orbs fill
+   the corners; a golden diagonal shimmer sweeps the velvet.
+   ──────────────────────────────────────────────────────────────────────── */
+.crimson-wallpaper {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.crimson-ember {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+.crimson-shimmer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  will-change: transform;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   COSMIC LEGACY WALLPAPER
+
+   Twinkling stars, drifting nebula colour washes, floating cosmic dust,
+   and occasional shooting stars across the deep-space gradient.
+   ──────────────────────────────────────────────────────────────────────── */
+.cosmic-wallpaper {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.cosmic-star {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
   will-change: opacity;
 }
-.neon-billboard {
-  position: absolute;
-  border-radius: 6px;
-  overflow: hidden;
-  /* Per-billboard neon glow set inline via style; this is the base ring. */
-  box-shadow:
-    0 0 0 2px rgba(255, 255, 255, 0.12) inset,
-    0 0 24px var(--neon-glow, rgba(255, 58, 168, 0.55));
-  background: #0a0a18;
-}
-.neon-billboard-text {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 6px;
-  text-align: center;
-  font-weight: 900;
-  font-size: 18px;
-  letter-spacing: 0.04em;
-  color: #fff;
-  text-shadow: 0 0 6px var(--neon-glow, rgba(255, 58, 168, 0.75));
-  font-family: ui-sans-serif, system-ui, sans-serif;
-  pointer-events: none;
-}
-.neon-street {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 25vh;
-  pointer-events: none;
-  background:
-    /* Faint vertical neon reflection streaks */
-    linear-gradient(180deg, transparent 0%, rgba(255, 58, 168, 0.10) 25%, transparent 50%) 18% 0 / 6vw 100% no-repeat,
-    linear-gradient(180deg, transparent 0%, rgba(58, 232, 232, 0.10) 25%, transparent 50%) 48% 0 / 5vw 100% no-repeat,
-    linear-gradient(180deg, transparent 0%, rgba(255, 216, 58, 0.08) 25%, transparent 50%) 78% 0 / 6vw 100% no-repeat,
-    /* Asphalt gradient */
-    linear-gradient(180deg, rgba(20, 22, 38, 0) 0%, #1a1a2e 25%, #050510 100%);
-}
-.neon-puddle {
+.cosmic-nebula {
   position: absolute;
   border-radius: 50%;
-  filter: blur(2px);
   pointer-events: none;
-  opacity: 0.55;
+  will-change: opacity, transform;
 }
-.neon-lamp {
-  position: absolute;
-  pointer-events: none;
-}
-.neon-lamp-glow {
+.cosmic-particle {
   position: absolute;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 218, 130, 0.55) 0%, transparent 70%);
-  filter: blur(8px);
   pointer-events: none;
+  will-change: transform, opacity;
 }
 
 /* Wallpaper-side reduced-motion safety net. Components already swap to
@@ -795,15 +656,16 @@
   .aquarium-light-shaft,
   .northern-ribbon,
   .northern-star,
-  .waterfall-stream,
-  .waterfall-vapor,
-  .waterfall-ripple,
-  .windmill-rotor,
-  .windmill-cloud,
-  .windmill-river,
-  .neon-window,
-  .neon-billboard,
-  .neon-lamp-glow {
+  .emerald-suit,
+  .emerald-shimmer,
+  .ocean-bubble,
+  .ocean-wave,
+  .ocean-particle,
+  .crimson-ember,
+  .crimson-shimmer,
+  .cosmic-star,
+  .cosmic-nebula,
+  .cosmic-particle {
     animation: none !important;
   }
 }
