@@ -598,11 +598,40 @@ export function AquariumWallpaper() {
               reduceMotion
                 ? { duration: 0 }
                 : {
-                    duration: f.duration,
-                    delay: f.delay,
-                    repeat: Infinity,
-                    ease: "easeInOut",
-                    times: kf.times,
+                    // Per-property transitions let us snap scaleX at each
+                    // waypoint without affecting the smooth x/y/rotate glide.
+                    x: {
+                      duration: f.duration,
+                      delay: f.delay,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                      times: kf.times,
+                    },
+                    y: {
+                      duration: f.duration,
+                      delay: f.delay,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                      times: kf.times,
+                    },
+                    rotate: {
+                      duration: f.duration,
+                      delay: f.delay,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                      times: kf.times,
+                    },
+                    // Step-at-end: hold the current facing for the entire leg,
+                    // snap to the new facing only when the fish arrives at the
+                    // next waypoint — eliminates the moonwalk / squish artifact
+                    // caused by Framer smoothly interpolating 1 → -1.
+                    scaleX: {
+                      duration: f.duration,
+                      delay: f.delay,
+                      repeat: Infinity,
+                      ease: (t: number) => (t > 0.9999 ? 1 : 0),
+                      times: kf.times,
+                    },
                   }
             }
           >
