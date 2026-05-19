@@ -2,151 +2,219 @@ import type { ReactElement } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 
 /**
- * Dawn Clouds wallpaper for the v2.18 table theme.
+ * Dawn Clouds wallpaper — saturated cerulean sky with volumetric cumulus.
  *
- * Architecture parallels `NorthernLightsWallpaper` and `AquariumWallpaper`:
- * a single `.dawn-wallpaper` absolute layer hosting multiple `<motion.div>`
- * cloud instances that drift left → right across the viewport. Each cloud
- * picks one of four SVG silhouettes (small tuft, fluffy, wispy, towering)
- * so the scene doesn't look stamped from one shape.
+ * v2.18.1 retune (from a REMATCH-style reference the user shared):
+ * the v2.18 version was washed out — pale sky + flat white-on-white cloud
+ * shapes that disappeared against the gradient. The new design:
  *
- * Motion is intentionally slow (90–140 second screen crossings) and steady
- * (linear easing — clouds shouldn't accelerate). Per-cloud `delay` offsets
- * stagger them so the screen is never empty and never simultaneously busy.
+ *   • Sky stays in the saturated-blue family (handled by App.css).
+ *   • Each cloud carries built-in three-tone volumetric shading rendered as
+ *     stacked layers within the SVG:
+ *        1. SHADOW BASE      — dark blue-gray silhouette
+ *        2. MID TONE         — lighter blue-gray, offset up
+ *        3. HIGHLIGHT        — off-white tufts catching the light
+ *        4. SPECULAR ACCENTS — pure-white spots on the highest tufts
+ *     This gives each cloud the same "puffy with dark underside" look the
+ *     reference image carries — clouds read as round and three-dimensional
+ *     instead of flat watermarks.
+ *   • Sizes vary dramatically (one hero cloud + supporting puffs +
+ *     distant strips) so the scene has clear visual hierarchy.
  *
- * `useReducedMotion()` collapses every `animate` prop to its initial value
- * so the scene becomes a still tableau when the user requests it.
+ * Motion is unchanged from v2.18: each cloud drifts steadily left → right
+ * on a long linear loop, staggered by per-cloud delays. `useReducedMotion`
+ * collapses everything to a still tableau.
  */
-
-// ────────────────────────────────────────────────────────────────────────────
-// CLOUD SVG VARIANTS — four distinct silhouettes so 10 clouds look varied
-// rather than ten copies of the same shape. All use pure-white fills with a
-// soft inner highlight + a faint pale-blue shadow band underneath so each
-// cloud reads as solid + sunlit (not flat).
-// ────────────────────────────────────────────────────────────────────────────
 
 interface CloudProps { size?: number }
 
-/** Small 3-blob tuft — ~80×40px at size=1. */
-function CloudSmallTuft({ size = 80 }: CloudProps): ReactElement {
+// ────────────────────────────────────────────────────────────────────────────
+// CLOUD VARIANTS
+//
+// Each cloud is built from three (sometimes four) stacked groups of
+// overlapping ellipses/circles, each in a darker→lighter shade. The shadow
+// group sits lowest, the highlight group sits highest, producing a
+// "bottom-shadowed cumulus" silhouette.
+//
+// Palette (consistent across variants so the sky reads as one scene):
+//   shadow  #4d6a8c   — muted blue-gray underside
+//   mid     #8aa6c4   — transitional sky-shadow
+//   light   #e8eff8   — off-white tufts
+//   white   #ffffff   — specular accents on the highest puffs
+// ────────────────────────────────────────────────────────────────────────────
+
+/** The headline cloud — large dominant cumulus, ~460×280 base. */
+function CloudHero({ size = 460 }: CloudProps): ReactElement {
   return (
-    <svg viewBox="0 0 120 60" width={size} height={size * 0.5} aria-hidden="true">
-      <defs>
-        <radialGradient id="tuftLite" cx="30%" cy="30%" r="70%">
-          <stop offset="0%" stopColor="#ffffff" />
-          <stop offset="60%" stopColor="#f6f9ff" />
-          <stop offset="100%" stopColor="#d8e6f3" />
-        </radialGradient>
-      </defs>
-      {/* Faint pale-blue shadow band along the bottom edge */}
-      <ellipse cx="60" cy="48" rx="48" ry="6" fill="#cbdcec" opacity="0.5" />
-      {/* Three overlapping blobs */}
-      <circle cx="32" cy="34" r="20" fill="url(#tuftLite)" />
-      <circle cx="60" cy="26" r="24" fill="url(#tuftLite)" />
-      <circle cx="92" cy="36" r="18" fill="url(#tuftLite)" />
+    <svg viewBox="0 0 480 280" width={size} height={size * 0.583} aria-hidden="true">
+      {/* SHADOW BASE — full puffy silhouette in dark blue-gray. Extends
+          slightly below the upper layers so the underside is visible. */}
+      <g fill="#4d6a8c">
+        <ellipse cx="100" cy="206" rx="60" ry="38" />
+        <ellipse cx="170" cy="200" rx="68" ry="44" />
+        <ellipse cx="240" cy="196" rx="74" ry="48" />
+        <ellipse cx="312" cy="200" rx="68" ry="44" />
+        <ellipse cx="378" cy="206" rx="58" ry="38" />
+        <ellipse cx="240" cy="226" rx="180" ry="22" />
+      </g>
+
+      {/* MID TONE — offset upward, slightly inset horizontally. */}
+      <g fill="#8aa6c4">
+        <circle cx="108" cy="174" r="48" />
+        <circle cx="160" cy="158" r="58" />
+        <circle cx="222" cy="148" r="64" />
+        <circle cx="284" cy="154" r="62" />
+        <circle cx="346" cy="166" r="52" />
+        <circle cx="396" cy="186" r="36" />
+      </g>
+
+      {/* HIGHLIGHT — off-white tufts forming the top of the cloud. */}
+      <g fill="#e8eff8">
+        <circle cx="118" cy="156" r="38" />
+        <circle cx="172" cy="134" r="50" />
+        <circle cx="226" cy="120" r="56" />
+        <circle cx="282" cy="128" r="52" />
+        <circle cx="338" cy="146" r="42" />
+        <circle cx="386" cy="172" r="28" />
+      </g>
+
+      {/* SPECULAR — bright-white pop on the tallest tufts only. */}
+      <g fill="#ffffff">
+        <ellipse cx="180" cy="118" rx="28" ry="22" />
+        <ellipse cx="230" cy="104" rx="34" ry="26" />
+        <ellipse cx="282" cy="116" rx="28" ry="22" />
+      </g>
     </svg>
   );
 }
 
-/** Wide multi-blob fluffy cumulus — ~160×70px at size=1. */
-function CloudFluffy({ size = 160 }: CloudProps): ReactElement {
+/** Medium fluffy cumulus, ~260×170 base. */
+function CloudFluffy({ size = 260 }: CloudProps): ReactElement {
   return (
-    <svg viewBox="0 0 240 110" width={size} height={size * 0.46} aria-hidden="true">
-      <defs>
-        <radialGradient id="fluffyLite" cx="32%" cy="28%" r="75%">
-          <stop offset="0%" stopColor="#ffffff" />
-          <stop offset="55%" stopColor="#f4f8ff" />
-          <stop offset="100%" stopColor="#cfe0f1" />
-        </radialGradient>
-      </defs>
-      <ellipse cx="120" cy="92" rx="100" ry="9" fill="#bdd0e3" opacity="0.55" />
-      {/* Five overlapping blobs along a gentle arc */}
-      <circle cx="50"  cy="64" r="30" fill="url(#fluffyLite)" />
-      <circle cx="92"  cy="48" r="38" fill="url(#fluffyLite)" />
-      <circle cx="140" cy="42" r="42" fill="url(#fluffyLite)" />
-      <circle cx="186" cy="52" r="34" fill="url(#fluffyLite)" />
-      <circle cx="218" cy="66" r="22" fill="url(#fluffyLite)" />
+    <svg viewBox="0 0 280 170" width={size} height={size * 0.607} aria-hidden="true">
+      <g fill="#4d6a8c">
+        <ellipse cx="64"  cy="120" r="36" />
+        <ellipse cx="118" cy="116" r="46" />
+        <ellipse cx="178" cy="118" r="44" />
+        <ellipse cx="222" cy="126" r="34" />
+        <ellipse cx="140" cy="142" rx="110" ry="14" />
+      </g>
+      <g fill="#8aa6c4">
+        <circle cx="72"  cy="98"  r="30" />
+        <circle cx="118" cy="86"  r="40" />
+        <circle cx="170" cy="92"  r="38" />
+        <circle cx="216" cy="106" r="28" />
+      </g>
+      <g fill="#e8eff8">
+        <circle cx="80"  cy="82" r="22" />
+        <circle cx="122" cy="68" r="34" />
+        <circle cx="170" cy="76" r="30" />
+        <circle cx="212" cy="92" r="22" />
+      </g>
+      <g fill="#ffffff">
+        <ellipse cx="126" cy="62" rx="20" ry="16" />
+        <ellipse cx="168" cy="68" rx="16" ry="13" />
+      </g>
     </svg>
   );
 }
 
-/** Long horizontal smear — ~240×60px at size=1. */
-function CloudWispy({ size = 240 }: CloudProps): ReactElement {
+/** Long thin cloud strip — distant horizontal band, ~320×100 base. */
+function CloudStrip({ size = 320 }: CloudProps): ReactElement {
   return (
-    <svg viewBox="0 0 320 80" width={size} height={size * 0.25} aria-hidden="true">
-      <defs>
-        <radialGradient id="wispyLite" cx="40%" cy="40%" r="70%">
-          <stop offset="0%" stopColor="#ffffff" />
-          <stop offset="60%" stopColor="#f7faff" />
-          <stop offset="100%" stopColor="#d4e2f1" />
-        </radialGradient>
-      </defs>
-      <ellipse cx="160" cy="64" rx="148" ry="6" fill="#c2d2e3" opacity="0.4" />
-      <ellipse cx="60"  cy="44" rx="38" ry="22" fill="url(#wispyLite)" />
-      <ellipse cx="120" cy="38" rx="50" ry="26" fill="url(#wispyLite)" />
-      <ellipse cx="190" cy="42" rx="58" ry="22" fill="url(#wispyLite)" />
-      <ellipse cx="260" cy="48" rx="44" ry="18" fill="url(#wispyLite)" />
+    <svg viewBox="0 0 340 100" width={size} height={size * 0.294} aria-hidden="true">
+      <g fill="#4d6a8c">
+        <ellipse cx="60"  cy="68" rx="40" ry="20" />
+        <ellipse cx="130" cy="64" rx="50" ry="22" />
+        <ellipse cx="210" cy="66" rx="48" ry="20" />
+        <ellipse cx="280" cy="68" rx="40" ry="18" />
+        <ellipse cx="170" cy="78" rx="150" ry="8" />
+      </g>
+      <g fill="#8aa6c4">
+        <ellipse cx="72"  cy="54" rx="32" ry="16" />
+        <ellipse cx="138" cy="48" rx="42" ry="20" />
+        <ellipse cx="210" cy="52" rx="40" ry="16" />
+        <ellipse cx="278" cy="56" rx="32" ry="14" />
+      </g>
+      <g fill="#e8eff8">
+        <ellipse cx="82"  cy="44" rx="24" ry="12" />
+        <ellipse cx="140" cy="38" rx="34" ry="14" />
+        <ellipse cx="208" cy="42" rx="30" ry="12" />
+        <ellipse cx="274" cy="48" rx="22" ry="10" />
+      </g>
+      <g fill="#ffffff">
+        <ellipse cx="140" cy="34" rx="20" ry="8" />
+      </g>
     </svg>
   );
 }
 
-/** Taller cumulus tower — ~140×100px at size=1. */
-function CloudTowering({ size = 140 }: CloudProps): ReactElement {
+/** Small distant cloud — slightly muted (atmospheric perspective), ~140×80 base. */
+function CloudDistant({ size = 140 }: CloudProps): ReactElement {
   return (
-    <svg viewBox="0 0 180 150" width={size} height={size * 0.83} aria-hidden="true">
-      <defs>
-        <radialGradient id="towerLite" cx="28%" cy="22%" r="80%">
-          <stop offset="0%" stopColor="#ffffff" />
-          <stop offset="55%" stopColor="#f3f7ff" />
-          <stop offset="100%" stopColor="#c7daed" />
-        </radialGradient>
-      </defs>
-      <ellipse cx="90" cy="130" rx="74" ry="8" fill="#b5c8db" opacity="0.55" />
-      {/* Stacked tiers forming a cumulus-tower silhouette */}
-      <circle cx="60"  cy="100" r="34" fill="url(#towerLite)" />
-      <circle cx="110" cy="96"  r="40" fill="url(#towerLite)" />
-      <circle cx="148" cy="108" r="26" fill="url(#towerLite)" />
-      <circle cx="80"  cy="62"  r="34" fill="url(#towerLite)" />
-      <circle cx="120" cy="50"  r="32" fill="url(#towerLite)" />
-      <circle cx="100" cy="22"  r="24" fill="url(#towerLite)" />
+    <svg viewBox="0 0 160 80" width={size} height={size * 0.5} aria-hidden="true">
+      <g fill="#6e89ab" opacity="0.85">
+        <ellipse cx="38"  cy="56" rx="28" ry="14" />
+        <ellipse cx="80"  cy="54" rx="32" ry="16" />
+        <ellipse cx="120" cy="58" rx="26" ry="13" />
+        <ellipse cx="80"  cy="64" rx="74" ry="7" />
+      </g>
+      <g fill="#a3bcd6">
+        <circle cx="44" cy="44" r="20" />
+        <circle cx="82" cy="38" r="26" />
+        <circle cx="120" cy="46" r="20" />
+      </g>
+      <g fill="#e8eff8">
+        <circle cx="52" cy="36" r="14" />
+        <circle cx="84" cy="28" r="20" />
+        <circle cx="118" cy="40" r="14" />
+      </g>
     </svg>
   );
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// CLOUD ROSTER — 10 instances, varied silhouette / size / y-position / speed
-// / delay. Order in the array maps to z-order (later = on top). Y values
-// sweep across the whole vertical range so the sky never has dead zones.
+// CLOUD ROSTER — 8 instances, with one HERO cloud, several mid-sized fluffies,
+// a couple of strips low on the horizon, and distant puffs for depth.
+//
+// Y values sweep across the vertical range so the sky has clear depth bands:
+//   12–28vh → distant/strip clouds (smaller, lighter — feel "far away")
+//   30–55vh → mid-tier fluffies + the hero cloud (the focal layer)
+//   60–80vh → low strips drifting near the horizon
 // ────────────────────────────────────────────────────────────────────────────
 
 interface CloudConfig {
   id: string;
   Component: (p: CloudProps) => ReactElement;
-  /** Pixel size of the underlying SVG (drift scales render proportionally). */
   size: number;
   /** Vertical position in vh. */
   y: number;
-  /** Seconds for a full left-to-right traversal. */
+  /** Seconds for a full left → right traversal. */
   duration: number;
-  /** Per-cloud delay offset (seconds) so they don't align. */
+  /** Per-cloud delay offset so they don't all align. */
   delay: number;
+  /** Per-cloud opacity (distant clouds get lower values for atmospheric depth). */
   opacity: number;
 }
 
 const CLOUDS: CloudConfig[] = [
-  { id: "c1",  Component: CloudFluffy,    size: 160, y: 12, duration: 90,  delay: 0,  opacity: 0.92 },
-  { id: "c2",  Component: CloudSmallTuft, size: 56,  y: 24, duration: 110, delay: 18, opacity: 0.85 },
-  { id: "c3",  Component: CloudWispy,     size: 264, y: 38, duration: 130, delay: 6,  opacity: 0.88 },
-  { id: "c4",  Component: CloudTowering,  size: 133, y: 52, duration: 105, delay: 32, opacity: 0.95 },
-  { id: "c5",  Component: CloudFluffy,    size: 192, y: 64, duration: 120, delay: 14, opacity: 0.90 },
-  { id: "c6",  Component: CloudSmallTuft, size: 48,  y: 78, duration: 95,  delay: 40, opacity: 0.82 },
-  { id: "c7",  Component: CloudWispy,     size: 216, y: 18, duration: 140, delay: 55, opacity: 0.80 },
-  { id: "c8",  Component: CloudTowering,  size: 112, y: 44, duration: 100, delay: 70, opacity: 0.92 },
-  { id: "c9",  Component: CloudFluffy,    size: 112, y: 72, duration: 115, delay: 22, opacity: 0.88 },
-  { id: "c10", Component: CloudSmallTuft, size: 80,  y: 30, duration: 125, delay: 60, opacity: 0.85 },
+  // Hero cloud — large, focal layer
+  { id: "hero",  Component: CloudHero,    size: 460, y: 30, duration: 140, delay: 0,  opacity: 1.0 },
+  // Mid-tier fluffies — sprinkled at varied heights
+  { id: "f1",    Component: CloudFluffy,  size: 280, y: 14, duration: 120, delay: 30, opacity: 0.96 },
+  { id: "f2",    Component: CloudFluffy,  size: 220, y: 55, duration: 130, delay: 65, opacity: 0.94 },
+  { id: "f3",    Component: CloudFluffy,  size: 240, y: 72, duration: 115, delay: 18, opacity: 0.92 },
+  // Long strips — horizon band
+  { id: "s1",    Component: CloudStrip,   size: 340, y: 44, duration: 155, delay: 80, opacity: 0.85 },
+  { id: "s2",    Component: CloudStrip,   size: 280, y: 82, duration: 140, delay: 48, opacity: 0.78 },
+  // Distant puffs — small + muted for depth
+  { id: "d1",    Component: CloudDistant, size: 130, y: 22, duration: 165, delay: 12, opacity: 0.75 },
+  { id: "d2",    Component: CloudDistant, size: 110, y: 64, duration: 150, delay: 95, opacity: 0.70 },
 ];
 
-// ── Component ──────────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────────────────
+// COMPONENT
+// ────────────────────────────────────────────────────────────────────────────
 
 export function DawnCloudsWallpaper() {
   const reduceMotion = useReducedMotion();
