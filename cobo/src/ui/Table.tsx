@@ -18,7 +18,9 @@ import { Audio } from "../audio/sounds";
 import { useTheme } from "../state/theme";
 import { AquariumWallpaper } from "./AquariumWallpaper";
 import { NorthernLightsWallpaper } from "./NorthernLightsWallpaper";
-import { DawnCloudsWallpaper } from "./DawnCloudsWallpaper";
+import { WaterfallWallpaper } from "./WaterfallWallpaper";
+import { WindmillWallpaper } from "./WindmillWallpaper";
+import { NeonCityWallpaper } from "./NeonCityWallpaper";
 
 export function Table() {
   const game = useStore((s) => s.game!);
@@ -191,7 +193,9 @@ export function Table() {
               Northern Lights = aurora ribbons + stars overlay. */}
           {tableTheme === "aquarium" && <AquariumWallpaper />}
           {tableTheme === "northern" && <NorthernLightsWallpaper />}
-          {tableTheme === "dawn" && <DawnCloudsWallpaper />}
+          {tableTheme === "waterfall" && <WaterfallWallpaper />}
+          {tableTheme === "windmill" && <WindmillWallpaper />}
+          {tableTheme === "neon" && <NeonCityWallpaper />}
         </div>
 
         {/* Compact top bar */}

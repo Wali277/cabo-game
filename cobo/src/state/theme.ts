@@ -19,34 +19,44 @@ export type TableTheme =
   | "northern"
   | "cosmic"
   | "aquarium"
-  | "dawn";
+  | "waterfall"
+  | "windmill"
+  | "neon";
 export const DEFAULT_THEME: TableTheme = "emerald";
 
 const STORAGE_KEY = "cabo:theme";
 const EVENT_NAME = "cabo:theme-change";
 const VALID: ReadonlyArray<TableTheme> = [
-  "emerald", "ocean", "crimson", "northern", "cosmic", "aquarium", "dawn",
+  "emerald", "ocean", "crimson", "northern", "cosmic", "aquarium",
+  "waterfall", "windmill", "neon",
 ];
 
 /** Labels shown in the picker UI. */
 export const THEME_LABELS: Record<TableTheme, string> = {
-  emerald:  "Emerald Felt",
-  ocean:    "Midnight Ocean",
-  crimson:  "Royal Crimson",
-  northern: "Northern Lights",
-  cosmic:   "Cosmic Legacy",
-  aquarium: "Aquarium",
-  dawn:     "Dawn Clouds",
+  emerald:   "Emerald Felt",
+  ocean:     "Midnight Ocean",
+  crimson:   "Royal Crimson",
+  northern:  "Northern Lights",
+  cosmic:    "Cosmic Legacy",
+  aquarium:  "Aquarium",
+  waterfall: "Waterfall",
+  windmill:  "Windmill",
+  neon:      "Neon City",
 };
 
 /**
- * Map deprecated v2.14 theme IDs to their v2.15 replacements so anyone who
- * picked "velvet" / "aurora" before the rename lands on the equivalent new
- * theme transparently. Returns the same value if no migration is needed.
+ * Map deprecated theme IDs to their replacements so a saved preference from
+ * an older build lands on a still-valid value rather than tripping the
+ * "invalid theme" reject and silently falling back to default.
+ *
+ *  - v2.14 → v2.15: velvet → ocean, aurora → northern
+ *  - v2.18 → v2.19: dawn → null (Dawn Clouds was retired; fall through to
+ *    DEFAULT_THEME via loadFromStorage's normal validation path)
  */
 function migrateLegacyId(v: string | null): string | null {
   if (v === "velvet") return "ocean";
   if (v === "aurora") return "northern";
+  if (v === "dawn")   return null; // retired in v2.19 — fall back to default
   return v;
 }
 
