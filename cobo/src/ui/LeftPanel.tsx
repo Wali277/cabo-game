@@ -15,7 +15,13 @@ const ACTION_META: Record<string, { label: string; emoji: string; desc: string; 
   "K":  { label: "Peek & Swap", emoji: "👑", desc: "Peek an opponent's card, then decide swap.", color: "#ffd86b" },
 };
 
-export function LeftPanel() {
+interface LeftPanelProps {
+  /** Extra class names — used by Table.tsx to add `.open` in phone mode so
+   *  CSS can slide the panel up as a bottom sheet. */
+  className?: string;
+}
+
+export function LeftPanel({ className = "" }: LeftPanelProps = {}) {
   const game = useStore((s) => s.game!);
   const humanId = useStore((s) => s.humanId);
   const targeting = useStore((s) => s.targeting);
@@ -273,7 +279,7 @@ export function LeftPanel() {
   }
 
   return (
-    <div className="left-panel">
+    <div className={`left-panel ${className}`.trim()}>
       <AnimatePresence mode="wait">
         <motion.div
           key={instruction}

@@ -12,6 +12,7 @@ import { ThemePicker } from "./ui/ThemePicker";
 import { EliminatedOverlay } from "./ui/EliminatedOverlay";
 import { BUSTED_ROOM_KEY } from "./ui/BustedOverlay";
 import { getSocket } from "./state/mp";
+import { useViewMode } from "./state/viewmode";
 
 function getRoomFromPath(): string | null {
   const m = window.location.pathname.match(/\/room\/([A-Za-z0-9]{4,8})/);
@@ -25,6 +26,14 @@ function App() {
   // so re-reading getRoomFromPath() on each Lobby mount gives the correct value
   // (null after a game ends, real code only on a fresh direct-link visit).
   const [hydrated, setHydrated] = useState(false);
+
+  // Phone-mode toggle (set via the button in the main menu). Adds a single
+  // `mobile-mode` class to <body> that drives every layout override in App.css.
+  const viewMode = useViewMode();
+  useEffect(() => {
+    document.body.classList.toggle("mobile-mode", viewMode === "mobile");
+    return () => { document.body.classList.remove("mobile-mode"); };
+  }, [viewMode]);
 
   const prevScreenRef = useRef(screen);
   const firstRender = useRef(true);

@@ -4,10 +4,12 @@ import { useStore } from "../state/store";
 import { Tutorial } from "./Tutorial";
 import { Audio } from "../audio/sounds";
 import { MenuWallpaper } from "./MenuWallpaper";
+import { useViewMode, setViewMode } from "../state/viewmode";
 
 export function Menu() {
   const init = useStore((s) => s.init);
   const trainInit = useStore((s) => s.trainInit);
+  const viewMode = useViewMode();
   const [bots, setBots] = useState(1);
   const [showTutorial, setShowTutorial] = useState(false);
 
@@ -66,6 +68,22 @@ export function Menu() {
           onClick={() => setShowTutorial(true)}
         >
           ? How to play
+        </button>
+        <button
+          className="btn ghost-light viewmode-toggle"
+          onClick={() => {
+            Audio.playSfx("click");
+            setViewMode(viewMode === "mobile" ? "desktop" : "mobile");
+          }}
+          aria-label={
+            viewMode === "mobile"
+              ? "Switch to desktop layout"
+              : "Switch to phone layout"
+          }
+        >
+          {viewMode === "mobile"
+            ? "🖥️  Switch to desktop layout"
+            : "📱 Switch to phone layout"}
         </button>
         <div className="divider"><span>dev</span></div>
         <button

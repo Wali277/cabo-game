@@ -1,6 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 import { useStore } from "../state/store";
+import { useViewMode } from "../state/viewmode";
 import { PlayerSeat } from "./PlayerSeat";
 import { Center } from "./Center";
 import { LeftPanel } from "./LeftPanel";
@@ -34,6 +35,13 @@ export function Table() {
   // The `<div className="table-bg" />` below uses its `data-theme` attribute
   // to pick which gradient stack renders behind the table.
   const tableTheme = useTheme();
+
+  // Phone-mode layout state. When `isMobile`, two extra buttons appear in the
+  // top bar that slide the LeftPanel and right-sidebar up as bottom sheets.
+  const viewMode = useViewMode();
+  const isMobile = viewMode === "mobile";
+  const [leftDrawerOpen, setLeftDrawerOpen] = useState(false);
+  const [rightDrawerOpen, setRightDrawerOpen] = useState(false);
 
   // Reveals that the human can tap-anywhere to dismiss early
   // (peek_own / peek_other only — peek_and_swap stays until user decides)
@@ -204,11 +212,42 @@ export function Table() {
         <div className="top-bar">
           <button className="btn ghost menu-back" onClick={handleQuit}>← Menu</button>
           <span className="top-round-label">Round {game.roundNumber}</span>
+          {/* Phone-mode only: drawer toggles for the two side panels.
+              In desktop mode the panels are always visible; on phones they
+              slide up as bottom sheets when toggled here. */}
+          {isMobile && (
+            <>
+              <button
+                className={`btn ghost mobile-drawer-btn ${leftDrawerOpen ? "active" : ""}`}
+                onClick={() => {
+                  Audio.playSfx("click");
+                  setRightDrawerOpen(false);
+                  setLeftDrawerOpen((o) => !o);
+                }}
+                aria-label="Toggle actions panel"
+                aria-expanded={leftDrawerOpen}
+              >
+                ☰ Actions
+              </button>
+              <button
+                className={`btn ghost mobile-drawer-btn ${rightDrawerOpen ? "active" : ""}`}
+                onClick={() => {
+                  Audio.playSfx("click");
+                  setLeftDrawerOpen(false);
+                  setRightDrawerOpen((o) => !o);
+                }}
+                aria-label="Toggle scores panel"
+                aria-expanded={rightDrawerOpen}
+              >
+                📊 Scores
+              </button>
+            </>
+          )}
         </div>
 
         {/* Three-column game body: left panel | table grid | right sidebar */}
         <div className="game-body">
-          <LeftPanel />
+          <LeftPanel className={isMobile && leftDrawerOpen ? "open" : ""} />
 
           {/* Table grid — players sit on each side of the deck */}
           <div className="table-grid">
@@ -276,11 +315,24 @@ export function Table() {
           </div>
 
           {/* Right sidebar: scoreboard + action log */}
-          <div className="right-sidebar">
+          <div className={`right-sidebar ${isMobile && rightDrawerOpen ? "open" : ""}`}>
             <Scoreboard />
             <ActionLog />
           </div>
         </div>
+
+        {/* Phone-mode drawer backdrop — tap outside to dismiss. Only rendered
+            when at least one drawer is open. */}
+        {isMobile && (leftDrawerOpen || rightDrawerOpen) && (
+          <div
+            className="drawer-backdrop"
+            onClick={() => {
+              setLeftDrawerOpen(false);
+              setRightDrawerOpen(false);
+            }}
+            aria-hidden="true"
+          />
+        )}
 
         <AnimatePresence>
           {toast && (

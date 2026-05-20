@@ -2881,3 +2881,423 @@
 .end-scoreboard-lost .end-score-round-tie {
   color: #c8d0db !important;
 }
+
+/* ╔════════════════════════════════════════════════════════════════════════╗
+   ║  v3.0  PHONE / MOBILE MODE                                              ║
+   ║                                                                         ║
+   ║  Every rule below is scoped under `body.mobile-mode`, applied via JS    ║
+   ║  whenever the user picks the phone layout from the main menu (or the   ║
+   ║  autodetect heuristic flips it on for first-time phone visitors).       ║
+   ║  Desktop users (no `.mobile-mode` on body) see ZERO of these overrides. ║
+   ║                                                                         ║
+   ║  Reflows:                                                               ║
+   ║    - Menu / Lobby: tighter padding, full-width buttons, smaller title   ║
+   ║    - Table: 3-column desktop grid → single column                       ║
+   ║    - Player slots: top → opponents stacked → centre → human at bottom   ║
+   ║    - Left panel + right sidebar: become slide-up bottom sheets          ║
+   ║    - FAB stack moves from bottom-right → top-right (clear of cards)     ║
+   ║    - Card / pile sizes shrink for opponents, stay tap-friendly for you  ║
+   ║    - All overlays: max-width: calc(100vw - 24px)                        ║
+   ╚════════════════════════════════════════════════════════════════════════╝ */
+
+/* ── Global menu / lobby cards ──────────────────────────────────────────── */
+body.mobile-mode .menu {
+  padding: 24px 12px 60px;
+}
+body.mobile-mode .title {
+  font-size: clamp(56px, 16vw, 96px) !important;
+  letter-spacing: -1px;
+}
+body.mobile-mode .subtitle {
+  font-size: 16px;
+}
+body.mobile-mode .menu-card {
+  width: calc(100vw - 24px);
+  min-width: 0;
+  max-width: 420px;
+  padding: 18px;
+  gap: 12px;
+}
+body.mobile-mode .menu-card .btn {
+  min-height: 48px;
+  font-size: 17px;
+  padding: 12px 16px;
+}
+body.mobile-mode .bot-picker .pick {
+  min-height: 44px;
+  font-size: 15px;
+}
+body.mobile-mode .viewmode-toggle {
+  border-color: rgba(168, 123, 255, 0.6);
+}
+
+/* Lobby — already a centred column; tighten + full-width inputs */
+body.mobile-mode .lobby {
+  padding: 24px 12px 60px;
+}
+body.mobile-mode .lobby .lobby-card,
+body.mobile-mode .lobby .room-card {
+  width: calc(100vw - 24px);
+  max-width: 460px;
+  padding: 18px;
+}
+body.mobile-mode .lobby input[type="text"] {
+  width: 100%;
+  min-height: 44px;
+  font-size: 16px; /* prevents iOS zoom-on-focus */
+}
+body.mobile-mode .lobby .btn {
+  min-height: 48px;
+  font-size: 16px;
+  width: 100%;
+}
+
+/* ── In-game top bar with drawer-toggle buttons ─────────────────────────── */
+body.mobile-mode .top-bar {
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 10px;
+}
+body.mobile-mode .top-bar .menu-back {
+  font-size: 14px;
+  padding: 6px 10px;
+}
+body.mobile-mode .top-round-label {
+  font-size: 14px;
+  margin: 0;
+}
+body.mobile-mode .mobile-drawer-btn {
+  font-size: 13px;
+  padding: 6px 10px;
+  min-height: 36px;
+  border-radius: 18px;
+  transition: background 0.15s;
+}
+body.mobile-mode .mobile-drawer-btn.active {
+  background: rgba(168, 123, 255, 0.32);
+  border-color: rgba(168, 123, 255, 0.8);
+}
+
+/* ── Game body: single column ───────────────────────────────────────────── */
+body.mobile-mode .game-body {
+  grid-template-columns: 1fr !important;
+  gap: 6px;
+  padding: 0 6px;
+}
+
+/* ── Player slot reflow: opponents → centre → you (top to bottom) ───────── */
+body.mobile-mode .table-grid {
+  display: flex !important;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px;
+  grid-template-areas: none !important;
+  grid-template-columns: 1fr !important;
+  grid-template-rows: none !important;
+  justify-content: stretch !important;
+  column-gap: 0;
+  row-gap: 8px;
+}
+body.mobile-mode .tslot { grid-area: unset !important; }
+body.mobile-mode .tslot-top    { order: 1; }
+body.mobile-mode .tslot-left   { order: 2; }
+body.mobile-mode .tslot-right  { order: 3; }
+body.mobile-mode .tslot-center { order: 4; }
+body.mobile-mode .tslot-bottom { order: 5; }
+
+/* Kill the 90deg rotation on side-player hand rows in mobile mode —
+   instead they read left-to-right just like the top opponent. */
+body.mobile-mode .hand-row-side,
+body.mobile-mode .hand-row-side-md {
+  transform: none !important;
+  width: auto !important;
+  height: auto !important;
+  flex-direction: row !important;
+  gap: 6px;
+}
+body.mobile-mode .tslot-left .player-seat-wrapper,
+body.mobile-mode .tslot-right .player-seat-wrapper,
+body.mobile-mode .tslot-top .player-seat-wrapper {
+  flex-direction: row;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+}
+
+/* Opponent name labels: smaller and inline with cards */
+body.mobile-mode .tslot-top .player-name,
+body.mobile-mode .tslot-left .player-name,
+body.mobile-mode .tslot-right .player-name {
+  font-size: 13px;
+  min-width: 72px;
+  max-width: 80px;
+  flex: 0 0 auto;
+  text-align: left;
+}
+
+/* ── Compact card sizes for opponents (read pips, not interactive) ──────── */
+body.mobile-mode .tslot-top .card,
+body.mobile-mode .tslot-left .card,
+body.mobile-mode .tslot-right .card,
+body.mobile-mode .tslot-top .card-back,
+body.mobile-mode .tslot-left .card-back,
+body.mobile-mode .tslot-right .card-back {
+  width: 44px !important;
+  height: 64px !important;
+  font-size: 14px;
+  border-radius: 6px;
+}
+
+/* Centre deck / discard pile — small but visible */
+body.mobile-mode .tslot-center {
+  margin: 4px 0;
+}
+body.mobile-mode .center-area {
+  flex-direction: row;
+  gap: 12px;
+  justify-content: center;
+  align-items: center;
+}
+body.mobile-mode .deck-area {
+  padding: 10px;
+  border-width: 3px;
+  gap: 10px;
+}
+body.mobile-mode .pile-stack,
+body.mobile-mode .empty-pile {
+  width: 60px !important;
+  height: 86px !important;
+  font-size: 14px;
+}
+body.mobile-mode .pile-stack .card {
+  width: 60px !important;
+  height: 86px !important;
+}
+body.mobile-mode .drawn-slot {
+  width: 96px !important;
+  height: 134px !important;
+}
+body.mobile-mode .drawn-slot .card {
+  width: 96px !important;
+  height: 134px !important;
+}
+
+/* ── Human player at the bottom: full-size, tappable cards ──────────────── */
+body.mobile-mode .tslot-bottom {
+  padding-bottom: 8px;
+}
+body.mobile-mode .tslot-bottom .hand-row {
+  gap: 10px;
+  justify-content: center;
+}
+body.mobile-mode .tslot-bottom .card,
+body.mobile-mode .tslot-bottom .card-back {
+  width: 68px !important;
+  height: 98px !important;
+  font-size: 18px;
+  border-radius: 8px;
+}
+
+/* ── LeftPanel as a slide-up bottom sheet ───────────────────────────────── */
+body.mobile-mode .left-panel {
+  position: fixed !important;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  top: auto !important;
+  width: 100% !important;
+  max-width: none !important;
+  max-height: 62vh;
+  overflow-y: auto;
+  transform: translateY(105%);
+  transition: transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+  z-index: 270;
+  border-radius: 18px 18px 0 0;
+  padding: 18px 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
+  flex-direction: column !important;
+  gap: 12px !important;
+  box-shadow: 0 -16px 48px rgba(0, 0, 0, 0.55);
+  margin: 0 !important;
+}
+body.mobile-mode .left-panel.open {
+  transform: translateY(0);
+}
+body.mobile-mode .left-instruction {
+  flex-direction: column;
+  text-align: center;
+  gap: 8px;
+}
+body.mobile-mode .left-buttons {
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+body.mobile-mode .left-btn {
+  width: 100% !important;
+  min-height: 48px;
+  font-size: 16px;
+}
+
+/* ── Right sidebar (Scoreboard + ActionLog) as a slide-up bottom sheet ──── */
+body.mobile-mode .right-sidebar {
+  display: flex !important;
+  position: fixed !important;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  top: auto !important;
+  width: 100% !important;
+  max-width: none !important;
+  max-height: 72vh;
+  overflow-y: auto;
+  transform: translateY(105%);
+  transition: transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+  z-index: 270;
+  border-radius: 18px 18px 0 0;
+  padding: 18px 12px calc(env(safe-area-inset-bottom, 0px) + 24px);
+  background: rgba(13, 22, 56, 0.96);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 -16px 48px rgba(0, 0, 0, 0.55);
+  border: 2px solid rgba(168, 123, 255, 0.5);
+  border-bottom: none;
+  flex-direction: column;
+  gap: 12px;
+}
+body.mobile-mode .right-sidebar.open {
+  transform: translateY(0);
+}
+
+/* Drawer backdrop — dim layer behind the active drawer; tap dismisses */
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.42);
+  z-index: 265; /* below drawers (270), above everything else */
+  cursor: pointer;
+  animation: drawerBackdropFade 0.2s ease-out;
+}
+@keyframes drawerBackdropFade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── FABs: move from bottom-right to top-right so they don't overlap cards ─ */
+body.mobile-mode .audio-fab {
+  top: 12px !important;
+  right: 12px !important;
+  bottom: auto !important;
+  width: 44px !important;
+  height: 44px !important;
+}
+body.mobile-mode .audio-panel {
+  top: 62px !important;
+  right: 12px !important;
+  bottom: auto !important;
+  min-width: 200px;
+  max-width: calc(100vw - 24px);
+}
+body.mobile-mode .theme-picker {
+  top: 64px !important;
+  right: 12px !important;
+  bottom: auto !important;
+}
+body.mobile-mode .theme-picker.sp {
+  /* in single-player chat is hidden, so theme drops to chat's slot —
+     in mobile we override that since we're stacking from the top instead */
+  top: 64px !important;
+}
+body.mobile-mode .theme-fab {
+  width: 44px !important;
+  height: 44px !important;
+}
+body.mobile-mode .theme-popover {
+  top: 116px !important;
+  bottom: auto !important;
+  right: 12px !important;
+  width: calc(100vw - 24px);
+  max-width: 280px;
+}
+body.mobile-mode .chat-toggle {
+  top: 116px !important;
+  right: 12px !important;
+  bottom: auto !important;
+  width: 44px !important;
+  height: 44px !important;
+}
+body.mobile-mode .chat-panel {
+  top: 168px !important;
+  right: 12px !important;
+  bottom: auto !important;
+  width: calc(100vw - 24px) !important;
+  max-width: 380px;
+  height: 50vh !important;
+  max-height: 380px;
+}
+/* In mobile mode the theme picker doesn't need to swap slots — it's just
+   stacked from the top, so the .sp override stays at top: 64px. */
+
+/* ── ActionBanner: full-width strip with smaller text ───────────────────── */
+body.mobile-mode .action-banner {
+  font-size: 14px;
+  padding: 10px 12px;
+  width: calc(100vw - 16px);
+  max-width: 480px;
+  white-space: normal;
+  text-align: center;
+}
+
+/* ── Toast notifications: narrower, smaller text on phones ──────────────── */
+body.mobile-mode .toast {
+  font-size: 14px;
+  padding: 10px 16px;
+  width: calc(100vw - 32px);
+  max-width: 340px;
+  text-align: center;
+}
+
+/* ── All overlays / modals: cap width at viewport ───────────────────────── */
+body.mobile-mode .overlay-card,
+body.mobile-mode .modal-card,
+body.mobile-mode .tutorial-content,
+body.mobile-mode .tutorial-card,
+body.mobile-mode .glorious-card,
+body.mobile-mode .busted-overlay-card,
+body.mobile-mode .round-end-card,
+body.mobile-mode .game-lost-card,
+body.mobile-mode .end-scoreboard-card,
+body.mobile-mode .eliminated-card,
+body.mobile-mode .coin-toss-card,
+body.mobile-mode .straw-draw-card {
+  width: calc(100vw - 24px) !important;
+  max-width: 440px !important;
+  padding: 18px !important;
+  font-size: 15px;
+  box-sizing: border-box;
+}
+body.mobile-mode .tutorial-content,
+body.mobile-mode .tutorial-card {
+  max-height: 88vh;
+  overflow-y: auto;
+}
+
+/* End-game scoreboard table: smaller font + tighter cells on phones */
+body.mobile-mode .end-scoreboard,
+body.mobile-mode .end-scoreboard table {
+  font-size: 12px;
+}
+body.mobile-mode .end-scoreboard td,
+body.mobile-mode .end-scoreboard th {
+  padding: 4px 6px;
+}
+
+/* ── Training panel: hidden on phones (it's a dev tool, doesn't fit) ────── */
+body.mobile-mode .training-panel {
+  display: none !important;
+}
+
+/* ── Tap-target hint: anything `cursor: pointer` should be ≥44px tall ───── */
+body.mobile-mode .btn:not(.mobile-drawer-btn):not(.pick):not(.menu-back) {
+  min-height: 44px;
+}
+
