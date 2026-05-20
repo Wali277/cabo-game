@@ -2978,27 +2978,38 @@ body.mobile-mode .mobile-drawer-btn.active {
   border-color: rgba(168, 123, 255, 0.8);
 }
 
+/* Strip the desktop 16px side padding so every pixel is available for cards */
+body.mobile-mode .table-root {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
 /* ── Game body: single column ───────────────────────────────────────────── */
 body.mobile-mode .game-body {
   grid-template-columns: 1fr !important;
   gap: 6px;
-  padding: 0 6px;
+  padding: 0 4px;
 }
 
 /* ── Player slot reflow: opponents → centre → you (top to bottom) ───────── */
 body.mobile-mode .table-grid {
   display: flex !important;
   flex-direction: column;
-  gap: 8px;
-  padding: 4px;
+  gap: 6px;
+  padding: 0 2px;
   grid-template-areas: none !important;
   grid-template-columns: 1fr !important;
   grid-template-rows: none !important;
-  justify-content: stretch !important;
+  justify-items: stretch;
+  align-items: stretch;
   column-gap: 0;
-  row-gap: 8px;
+  row-gap: 6px;
 }
-body.mobile-mode .tslot { grid-area: unset !important; }
+body.mobile-mode .tslot {
+  grid-area: unset !important;
+  width: 100%;
+  overflow: hidden;
+}
 body.mobile-mode .tslot-top    { order: 1; }
 body.mobile-mode .tslot-left   { order: 2; }
 body.mobile-mode .tslot-right  { order: 3; }
@@ -3066,12 +3077,13 @@ body.mobile-mode .tslot-right .card-wrap {
   width: 52px !important;
   height: 75px !important;
 }
-/* Also reduce hand-row gap for the tighter opponent cards */
+/* Opponent hand-rows: tighter gap + constrained so they don't overflow */
 body.mobile-mode .tslot-top .hand-row,
 body.mobile-mode .tslot-left .hand-row,
 body.mobile-mode .tslot-right .hand-row {
-  gap: 5px;
-  padding: 4px 5px;
+  gap: 4px;
+  padding: 4px;
+  flex-shrink: 1;
 }
 
 /* Centre deck / discard pile — small but visible */
@@ -3117,20 +3129,29 @@ body.mobile-mode .drawn-slot .card-wrap {
 /* ── Human player at the bottom: full-size, tappable cards ──────────────── */
 body.mobile-mode .tslot-bottom {
   padding-bottom: 8px;
-}
-body.mobile-mode .tslot-bottom .hand-row {
-  gap: 10px;
+  width: 100%;
   justify-content: center;
+  overflow: hidden;
+}
+/* Force the player-seat to fill the tslot so cards are centered within it.
+   Without width:100%, the player-seat sizes to its content (the card row),
+   which then left-aligns and overflows instead of centering. */
+body.mobile-mode .tslot-bottom .player-seat {
+  width: 100%;
 }
 /* Human player cards: size="lg" (110×160px inline on .card-wrap).
-   4 cards × 72px + 3 × 7px gap + 12px hand-row padding = 321px — fits in 374px. */
+   With container padding removed, available width ≥ 344px on any phone.
+   4 × 76px + 3 × 6px gaps + 2 × 6px hand-row padding = 334px → fits. */
 body.mobile-mode .tslot-bottom .card-wrap {
-  width: 72px !important;
-  height: 104px !important;
+  width: 76px !important;
+  height: 110px !important;
 }
 body.mobile-mode .tslot-bottom .hand-row {
-  gap: 7px;
-  padding: 5px 7px;
+  gap: 6px;
+  padding: 5px 6px;
+  justify-content: center;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* ── LeftPanel as a slide-up bottom sheet ───────────────────────────────── */
