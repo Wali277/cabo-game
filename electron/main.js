@@ -21,13 +21,18 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: true,
+      // sandbox: true removed — contextIsolation + nodeIntegration:false is
+      // sufficient security for a game. Sandbox adds process overhead that
+      // makes animations feel sluggish.
+      backgroundThrottling: false, // keep RAF/animation loops running at full
+                                   // speed even when the window isn't focused
     },
   });
 
   // Content-Security-Policy: allow inline scripts/styles from the Vite build,
   // file:// and blob: assets, and WebSocket + HTTPS connections to the deployed
   // multiplayer server (both Render and Fly.io domains are whitelisted).
+  // Fonts are now self-hosted in /fonts/ so no external font CDN needed.
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {
@@ -41,7 +46,7 @@ function createWindow() {
           "wss://*.fly.dev https://*.fly.dev; " +
           "img-src 'self' file: data: blob:; " +
           "media-src 'self' file: data: blob:; " +
-          "font-src 'self' file: data:;"
+          "font-src 'self' file: data: blob:;"
         ],
       },
     });
