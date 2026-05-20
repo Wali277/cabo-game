@@ -10,7 +10,8 @@
     "electron:build-client": "cd cobo && npx vite build --mode electron",
     "electron:make-icon": "node scripts/make-icon.mjs",
     "electron:dev": "npm run electron:build-client && npx electron electron/main.js",
-    "electron:build": "npm run electron:make-icon && npm run electron:build-client && npx electron-builder --win --x64 --publish never"
+    "electron:build": "npm run electron:make-icon && npm run electron:build-client && npx electron-builder --win --x64 --publish never",
+    "electron:build-mac": "npm run electron:make-icon && npm run electron:build-client && npx electron-builder --mac --arm64 --publish never && mkdir -p \"$HOME/Downloads/Cabo Mac\" && cp dist-electron/*.dmg \"$HOME/Downloads/Cabo Mac/\""
   },
   "engines": {
     "node": ">=20"
@@ -32,6 +33,20 @@
       "electron/**/*",
       "cobo/dist/**/*"
     ],
+    "mac": {
+      "target": [{ "target": "dmg", "arch": "arm64" }],
+      "icon": "build/icon.png",
+      "category": "public.app-category.games"
+    },
+    "dmg": {
+      "title": "Cobo",
+      "icon": "build/icon.png",
+      "window": { "width": 540, "height": 380 },
+      "contents": [
+        { "x": 150, "y": 185, "type": "file" },
+        { "x": 390, "y": 185, "type": "link", "path": "/Applications" }
+      ]
+    },
     "win": {
       "target": "nsis",
       "icon": "build/icon.png",
