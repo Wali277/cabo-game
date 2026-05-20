@@ -3005,47 +3005,73 @@ body.mobile-mode .tslot-right  { order: 3; }
 body.mobile-mode .tslot-center { order: 4; }
 body.mobile-mode .tslot-bottom { order: 5; }
 
-/* Kill the 90deg rotation on side-player hand rows in mobile mode —
-   instead they read left-to-right just like the top opponent. */
+/* Kill the 90deg rotation on side-player hand rows in mobile mode.
+   IMPORTANT: .hand-row-side-wrap has a fixed 128×362 size + position:relative
+   and .hand-row-side is position:absolute inside it — both must be reset so
+   the card row flows as normal horizontal flex, same as the top opponent. */
+body.mobile-mode .hand-row-side-wrap {
+  width: auto !important;
+  height: auto !important;
+  position: static !important;
+  flex-shrink: 1 !important;
+}
 body.mobile-mode .hand-row-side,
 body.mobile-mode .hand-row-side-md {
+  position: static !important;
+  top: auto !important;
+  left: auto !important;
+  display: flex !important;
   transform: none !important;
   width: auto !important;
   height: auto !important;
   flex-direction: row !important;
-  gap: 6px;
+  gap: 5px;
 }
-body.mobile-mode .tslot-left .player-seat-wrapper,
-body.mobile-mode .tslot-right .player-seat-wrapper,
-body.mobile-mode .tslot-top .player-seat-wrapper {
+/* Player seat: switch from column to row so name badge sits left of cards */
+body.mobile-mode .tslot-left .player-seat,
+body.mobile-mode .tslot-right .player-seat,
+body.mobile-mode .tslot-top .player-seat {
   flex-direction: row;
   gap: 8px;
   align-items: center;
   width: 100%;
 }
 
-/* Opponent name labels: smaller and inline with cards */
-body.mobile-mode .tslot-top .player-name,
-body.mobile-mode .tslot-left .player-name,
-body.mobile-mode .tslot-right .player-name {
-  font-size: 13px;
-  min-width: 72px;
-  max-width: 80px;
-  flex: 0 0 auto;
-  text-align: left;
+/* Opponent name badges: compact pill, shrinks to fit next to card row */
+body.mobile-mode .tslot-top .player-tag,
+body.mobile-mode .tslot-left .player-tag,
+body.mobile-mode .tslot-right .player-tag {
+  font-size: 12px;
+  padding: 4px 6px;
+  flex-shrink: 0;
+  max-width: 78px;
+}
+body.mobile-mode .tslot-top .player-tag span,
+body.mobile-mode .tslot-left .player-tag span,
+body.mobile-mode .tslot-right .player-tag span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 58px;
+  display: block;
 }
 
-/* ── Compact card sizes for opponents (read pips, not interactive) ──────── */
-body.mobile-mode .tslot-top .card,
-body.mobile-mode .tslot-left .card,
-body.mobile-mode .tslot-right .card,
-body.mobile-mode .tslot-top .card-back,
-body.mobile-mode .tslot-left .card-back,
-body.mobile-mode .tslot-right .card-back {
-  width: 44px !important;
-  height: 64px !important;
-  font-size: 14px;
-  border-radius: 6px;
+/* ── Compact card sizes for opponents — MUST target .card-wrap (inline style) ─
+   The React CardView component sets width/height as inline styles on .card-wrap.
+   CSS !important overrides inline styles. Previous selector ".card" was wrong —
+   that class doesn't exist; the outer wrapper is .card-wrap. */
+body.mobile-mode .tslot-top .card-wrap,
+body.mobile-mode .tslot-left .card-wrap,
+body.mobile-mode .tslot-right .card-wrap {
+  width: 52px !important;
+  height: 75px !important;
+}
+/* Also reduce hand-row gap for the tighter opponent cards */
+body.mobile-mode .tslot-top .hand-row,
+body.mobile-mode .tslot-left .hand-row,
+body.mobile-mode .tslot-right .hand-row {
+  gap: 5px;
+  padding: 4px 5px;
 }
 
 /* Centre deck / discard pile — small but visible */
@@ -3063,23 +3089,29 @@ body.mobile-mode .deck-area {
   border-width: 3px;
   gap: 10px;
 }
-body.mobile-mode .pile-stack,
 body.mobile-mode .empty-pile {
-  width: 60px !important;
-  height: 86px !important;
-  font-size: 14px;
+  width: 58px !important;
+  height: 84px !important;
+  font-size: 12px;
 }
-body.mobile-mode .pile-stack .card {
-  width: 60px !important;
-  height: 86px !important;
+/* Deck and discard cards use size="md" (80×116px inline on .card-wrap) */
+body.mobile-mode .deck .card-wrap,
+body.mobile-mode .discard-card-area .card-wrap {
+  width: 58px !important;
+  height: 84px !important;
 }
+body.mobile-mode .discard-card-area {
+  width: 58px !important;
+  height: 84px !important;
+}
+/* Drawn card uses size="lg" (110×160px inline on .card-wrap) */
 body.mobile-mode .drawn-slot {
-  width: 96px !important;
-  height: 134px !important;
+  width: 84px !important;
+  height: 122px !important;
 }
-body.mobile-mode .drawn-slot .card {
-  width: 96px !important;
-  height: 134px !important;
+body.mobile-mode .drawn-slot .card-wrap {
+  width: 84px !important;
+  height: 122px !important;
 }
 
 /* ── Human player at the bottom: full-size, tappable cards ──────────────── */
@@ -3090,12 +3122,15 @@ body.mobile-mode .tslot-bottom .hand-row {
   gap: 10px;
   justify-content: center;
 }
-body.mobile-mode .tslot-bottom .card,
-body.mobile-mode .tslot-bottom .card-back {
-  width: 68px !important;
-  height: 98px !important;
-  font-size: 18px;
-  border-radius: 8px;
+/* Human player cards: size="lg" (110×160px inline on .card-wrap).
+   4 cards × 72px + 3 × 7px gap + 12px hand-row padding = 321px — fits in 374px. */
+body.mobile-mode .tslot-bottom .card-wrap {
+  width: 72px !important;
+  height: 104px !important;
+}
+body.mobile-mode .tslot-bottom .hand-row {
+  gap: 7px;
+  padding: 5px 7px;
 }
 
 /* ── LeftPanel as a slide-up bottom sheet ───────────────────────────────── */
@@ -3289,6 +3324,18 @@ body.mobile-mode .end-scoreboard table {
 body.mobile-mode .end-scoreboard td,
 body.mobile-mode .end-scoreboard th {
   padding: 4px 6px;
+}
+
+/* ── Prevent any overflow that could cause the "zoomed in" illusion ─────── */
+body.mobile-mode .table-root,
+body.mobile-mode .table-grid,
+body.mobile-mode .game-body {
+  overflow-x: hidden;
+}
+/* Drawn-card placeholder: shrink padding to fit the smaller 84×122px slot */
+body.mobile-mode .drawn-placeholder {
+  padding: 26px 10px;
+  font-size: 11px;
 }
 
 /* ── Training panel: hidden on phones (it's a dev tool, doesn't fit) ────── */
