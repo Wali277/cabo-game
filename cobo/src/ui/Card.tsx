@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import type React from "react";
 import type { Card as CardT } from "../engine/types";
+import { useViewMode } from "../state/viewmode";
 
 interface Props {
   card?: CardT | null;
@@ -21,6 +22,23 @@ const SUIT_COLOR: Record<string, string> = {
   D: "#e23a5e",
 };
 
+// Card pixel widths per size, split per view mode so phone users get cards
+// that actually fit on a 360px screen. The height is derived as w * 1.45.
+//
+// Desktop math (current behaviour):
+//   sm = 56 (side opponents pre-rotation), md = 80 (top + center), lg = 110 (human + drawn)
+// Mobile math (verified to fit a 360px viewport):
+//   sm = 44 (used by anything that asks for sm in mobile)
+//   md = 52 (opponents — 4×52 + name(78) + gaps = 314px ≤ 348px available)
+//   lg = 70 (human + drawn — 4×70 + gaps = 310px ≤ 348px available)
+// We avoid CSS overrides because framer-motion's layout engine reads the
+// inline width/height that React sets here — making the change at this level
+// guarantees it actually takes effect.
+const SIZE_PX: Record<"desktop" | "mobile", Record<"sm" | "md" | "lg", number>> = {
+  desktop: { sm: 56, md: 80, lg: 110 },
+  mobile:  { sm: 44, md: 52, lg: 70  },
+};
+
 export function CardView({
   card,
   faceUp,
@@ -31,7 +49,8 @@ export function CardView({
   shake = false,
   layoutId,
 }: Props) {
-  const w = size === "sm" ? 56 : size === "md" ? 80 : 110;
+  const viewMode = useViewMode();
+  const w = SIZE_PX[viewMode][size];
   const h = Math.round(w * 1.45);
 
   const isHl = highlight === "selectable" || highlight === "selected";

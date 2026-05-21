@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { CardView } from "./Card";
 import type { PlayerState } from "../engine/types";
 import { useStore, PLAYER_COLORS } from "../state/store";
+import { useViewMode } from "../state/viewmode";
 
 type TablePos = "top" | "left" | "right" | "bottom";
 
@@ -18,6 +19,8 @@ interface Props {
 const CARD_SPRING = { type: "spring" as const, stiffness: 300, damping: 26 };
 
 export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: Props) {
+  const viewMode = useViewMode();
+  const isMobile = viewMode === "mobile";
   const cardSize = isHuman ? "lg" : "md";
   const game = useStore((s) => s.game!);
   const targeting = useStore((s) => s.targeting);
@@ -123,7 +126,12 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
   // so CABO text faces the person sitting on that side.
   // sm card: 56×81 → row of 4: ~266px wide × 93px tall
   // After rotation: wrapper is 93px wide × 266px tall.
-  const isSide = tablePos === "left" || tablePos === "right";
+  //
+  // On MOBILE we skip the rotation entirely — all opponents sit in a single
+  // horizontal row at the top of the screen, so left/right players are
+  // rendered identically to the top player (no fixed-size wrapper, no
+  // absolute positioning, no 90° transform).
+  const isSide = !isMobile && (tablePos === "left" || tablePos === "right");
   const sideRotateDeg = tablePos === "right" ? -90 : 90;
 
   const cardSlots = player.hand.map((c, idx) => {

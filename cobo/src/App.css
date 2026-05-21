@@ -3067,17 +3067,9 @@ body.mobile-mode .tslot-right .player-tag span {
   display: block;
 }
 
-/* ── Compact card sizes for opponents — MUST target .card-wrap (inline style) ─
-   The React CardView component sets width/height as inline styles on .card-wrap.
-   CSS !important overrides inline styles. Previous selector ".card" was wrong —
-   that class doesn't exist; the outer wrapper is .card-wrap. */
-body.mobile-mode .tslot-top .card-wrap,
-body.mobile-mode .tslot-left .card-wrap,
-body.mobile-mode .tslot-right .card-wrap {
-  width: 52px !important;
-  height: 75px !important;
-}
-/* Opponent hand-rows: tighter gap + constrained so they don't overflow */
+/* Card sizes are now controlled at the React level (Card.tsx reads useViewMode
+   and picks smaller pixel values for mobile). No CSS overrides needed — leaving
+   only the hand-row gap/padding override below to keep the layout tight. */
 body.mobile-mode .tslot-top .hand-row,
 body.mobile-mode .tslot-left .hand-row,
 body.mobile-mode .tslot-right .hand-row {
@@ -3101,29 +3093,20 @@ body.mobile-mode .deck-area {
   border-width: 3px;
   gap: 10px;
 }
+/* Center pile container sizing — match the mobile card sizes from Card.tsx
+   (md = 52×75, lg = 70×101) so empty placeholders line up with rendered cards */
 body.mobile-mode .empty-pile {
-  width: 58px !important;
-  height: 84px !important;
-  font-size: 12px;
-}
-/* Deck and discard cards use size="md" (80×116px inline on .card-wrap) */
-body.mobile-mode .deck .card-wrap,
-body.mobile-mode .discard-card-area .card-wrap {
-  width: 58px !important;
-  height: 84px !important;
+  width: 52px !important;
+  height: 75px !important;
+  font-size: 11px;
 }
 body.mobile-mode .discard-card-area {
-  width: 58px !important;
-  height: 84px !important;
+  width: 52px !important;
+  height: 75px !important;
 }
-/* Drawn card uses size="lg" (110×160px inline on .card-wrap) */
 body.mobile-mode .drawn-slot {
-  width: 84px !important;
-  height: 122px !important;
-}
-body.mobile-mode .drawn-slot .card-wrap {
-  width: 84px !important;
-  height: 122px !important;
+  width: 74px !important;
+  height: 108px !important;
 }
 
 /* ── Human player at the bottom: full-size, tappable cards ──────────────── */
@@ -3139,16 +3122,11 @@ body.mobile-mode .tslot-bottom {
 body.mobile-mode .tslot-bottom .player-seat {
   width: 100%;
 }
-/* Human player cards: size="lg" (110×160px inline on .card-wrap).
-   With container padding removed, available width ≥ 344px on any phone.
-   4 × 76px + 3 × 6px gaps + 2 × 6px hand-row padding = 334px → fits. */
-body.mobile-mode .tslot-bottom .card-wrap {
-  width: 76px !important;
-  height: 110px !important;
-}
+/* Human card sizing now happens in Card.tsx (mobile.lg = 70×101).
+   4 × 70px + 3 × 7px gaps + 2 × 7px hand-row padding = 315px → fits ≥320px. */
 body.mobile-mode .tslot-bottom .hand-row {
-  gap: 6px;
-  padding: 5px 6px;
+  gap: 7px;
+  padding: 5px 7px;
   justify-content: center;
   width: 100%;
   box-sizing: border-box;
