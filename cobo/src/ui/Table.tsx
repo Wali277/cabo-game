@@ -23,8 +23,6 @@ import { EmeraldWallpaper } from "./EmeraldWallpaper";
 import { OceanWallpaper } from "./OceanWallpaper";
 import { CrimsonWallpaper } from "./CrimsonWallpaper";
 import { CosmicWallpaper } from "./CosmicWallpaper";
-import { CabinWallpaper } from "./CabinWallpaper";
-import { LibraryWallpaper } from "./LibraryWallpaper";
 
 export function Table() {
   const game = useStore((s) => s.game!);
@@ -209,8 +207,6 @@ export function Table() {
           {tableTheme === "cosmic"   && <CosmicWallpaper />}
           {tableTheme === "northern" && <NorthernLightsWallpaper />}
           {tableTheme === "aquarium" && <AquariumWallpaper />}
-          {tableTheme === "cabin"    && <CabinWallpaper />}
-          {tableTheme === "library"  && <LibraryWallpaper />}
         </div>
 
         {/* Compact top bar */}

@@ -34,8 +34,6 @@ const THEMES: TableTheme[] = [
   "northern",
   "cosmic",
   "aquarium",
-  "cabin",
-  "library",
 ];
 
 export function ThemePicker() {

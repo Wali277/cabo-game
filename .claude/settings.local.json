@@ -53,7 +53,22 @@
       "mcp__Desktop_Commander__read_file",
       "Bash(npx vite *)",
       "Bash(cat netlify.toml)",
-      "Bash(cat vercel.json)"
+      "Bash(cat vercel.json)",
+      "Bash(kill 3190)",
+      "Bash(md5 src/ui/Lobby.tsx)",
+      "Bash(kill 86024 87056 87603 87997)",
+      "mcp__Desktop_Commander__list_directory",
+      "mcp__Desktop_Commander__start_search",
+      "Bash(find /Users/wali/Downloads -name \"game.ts\" -type f 2>/dev/null)",
+      "Bash(curl -s \"https://cabo-online.com/rules\")",
+      "mcp__Claude_in_Chrome__switch_browser",
+      "Bash(xargs ls -la)",
+      "Bash(git reset *)",
+      "Bash(node scripts/make-icon.mjs)",
+      "Bash(npx electron-builder *)",
+      "Bash(curl -s -o \"fredoka-latin.woff2\" \"https://fonts.gstatic.com/s/fredoka/v17/X7n64b87HvSqjb_WIi2yDCRwoQ_k7367_DWu89XgHPyh.woff2\")",
+      "Bash(curl -s -o \"fredoka-latin-ext.woff2\" \"https://fonts.gstatic.com/s/fredoka/v17/X7n64b87HvSqjb_WIi2yDCRwoQ_k7367_DWg89XgHPyhRMw.woff2\")",
+      "Bash(curl -s -o \"fredoka-hebrew.woff2\" \"https://fonts.gstatic.com/s/fredoka/v17/X7n64b87HvSqjb_WIi2yDCRwoQ_k7367_DWs89XgHPyhRMw.woff2\")"
     ]
   }
 }
