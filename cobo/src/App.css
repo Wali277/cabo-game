@@ -162,6 +162,26 @@
     linear-gradient(180deg, #04304f 0%, #0a5478 40%, #052e44 100%);
 }
 
+/* 7. Cozy Cabin — deep starry-night sky base. <CabinWallpaper /> paints the
+   moon, stars, the cabin itself, and the chimney smoke on top. The base is
+   kept very dark so star/moon highlights pop. */
+.table-bg[data-theme="cabin"] {
+  background:
+    radial-gradient(ellipse at 50% 100%, rgba(0, 0, 0, 0.65) 0%, transparent 55%),
+    radial-gradient(ellipse at 85% 12%, rgba(255, 230, 140, 0.10) 0%, transparent 35%),
+    linear-gradient(180deg, #050818 0%, #0b1230 38%, #131a3a 70%, #1c2a3a 100%);
+}
+
+/* 8. Old Library — warm walnut-and-firelight base. <LibraryWallpaper />
+   paints the bookshelves, candles, lantern, and fireplace glow on top.
+   The base is a deep mahogany so the warm glows feel natural. */
+.table-bg[data-theme="library"] {
+  background:
+    radial-gradient(ellipse at 50% 110%, rgba(0, 0, 0, 0.5) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% -10%, rgba(120, 70, 30, 0.25) 0%, transparent 50%),
+    linear-gradient(180deg, #2a1408 0%, #3a1d0c 40%, #1a0c04 100%);
+}
+
 
 /* Reduced-motion: only Cosmic still drifts via bgDrift. The two wallpaper
    themes (Aquarium, Northern Lights) honour reduced-motion at the React
@@ -243,6 +263,11 @@
   border-radius: 14px;
   box-shadow: 0 14px 32px rgba(0, 0, 0, 0.5);
   transform-origin: bottom right;
+  /* With 8 themes the list runs taller than a short viewport (landscape
+     phone / split-screen). Cap height and allow scroll so the bottom
+     swatches stay reachable. */
+  max-height: calc(100vh - 140px);
+  overflow-y: auto;
 }
 .theme-popover-title {
   font-size: 12px;
@@ -332,6 +357,28 @@
     radial-gradient(circle at 18% 88%, rgba(58, 168, 103, 0.55) 0 18%, transparent 26%),
     radial-gradient(ellipse at 50% -10%, rgba(140, 220, 240, 0.45) 0%, transparent 60%),
     linear-gradient(180deg, #04304f 0%, #0a5478 40%, #052e44 100%);
+}
+/* Cozy Cabin — dark sky with a tiny moon dot top-right and a warm window
+   glow bottom-centre so the swatch reads "nighttime cabin". */
+.theme-swatch-preview[data-theme="cabin"] {
+  background:
+    radial-gradient(circle at 78% 22%, rgba(255, 240, 180, 0.85) 0 12%, transparent 18%),
+    radial-gradient(circle at 50% 78%, rgba(255, 200, 100, 0.55) 0 10%, transparent 22%),
+    radial-gradient(circle at 18% 30%, rgba(255, 255, 255, 0.8) 0 3%, transparent 5%),
+    radial-gradient(circle at 30% 18%, rgba(255, 255, 255, 0.7) 0 2%, transparent 4%),
+    radial-gradient(circle at 62% 38%, rgba(255, 255, 255, 0.7) 0 2%, transparent 4%),
+    linear-gradient(180deg, #050818 0%, #0b1230 50%, #131a3a 100%);
+}
+/* Old Library — warm wood base with a candle-glow hotspot so the swatch
+   reads "candlelit library" not "another dark brown theme". */
+.theme-swatch-preview[data-theme="library"] {
+  background:
+    radial-gradient(circle at 50% 30%, rgba(255, 200, 100, 0.55) 0 16%, transparent 28%),
+    radial-gradient(circle at 18% 70%, rgba(124, 40, 24, 0.7) 0 10%, transparent 14%),
+    radial-gradient(circle at 82% 70%, rgba(58, 60, 90, 0.7) 0 10%, transparent 14%),
+    radial-gradient(circle at 36% 70%, rgba(58, 80, 40, 0.7) 0 10%, transparent 14%),
+    radial-gradient(circle at 64% 70%, rgba(80, 50, 100, 0.7) 0 10%, transparent 14%),
+    linear-gradient(180deg, #2a1408 0%, #3a1d0c 50%, #1a0c04 100%);
 }
 .theme-swatch-label {
   flex: 1 1 auto;

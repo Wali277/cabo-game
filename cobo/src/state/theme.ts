@@ -18,13 +18,15 @@ export type TableTheme =
   | "crimson"
   | "northern"
   | "cosmic"
-  | "aquarium";
+  | "aquarium"
+  | "cabin"
+  | "library";
 export const DEFAULT_THEME: TableTheme = "emerald";
 
 const STORAGE_KEY = "cabo:theme";
 const EVENT_NAME = "cabo:theme-change";
 const VALID: ReadonlyArray<TableTheme> = [
-  "emerald", "ocean", "crimson", "northern", "cosmic", "aquarium",
+  "emerald", "ocean", "crimson", "northern", "cosmic", "aquarium", "cabin", "library",
 ];
 
 /** Labels shown in the picker UI. */
@@ -35,6 +37,8 @@ export const THEME_LABELS: Record<TableTheme, string> = {
   northern: "Northern Lights",
   cosmic:   "Cosmic Legacy",
   aquarium: "Aquarium",
+  cabin:    "Cozy Cabin",
+  library:  "Old Library",
 };
 
 /**
