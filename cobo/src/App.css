@@ -2991,29 +2991,43 @@ body.mobile-mode .game-body {
   padding: 0 4px;
 }
 
-/* ── Player slot reflow: opponents → centre → you (top to bottom) ───────── */
+/* ── Player slot reflow: opponents → centre → you (top to bottom) ──────────
+   The center tslot uses flex:1 so it absorbs whatever vertical space is left
+   over after fixed-height opponent rows + the human row. This gives natural
+   breathing space between the deck and the human's cards, and adapts to any
+   number of bots (1–3): with 1 bot there's lots of empty space around the
+   deck, with 3 bots the deck snaps closer to the centre with less padding. */
 body.mobile-mode .table-grid {
   display: flex !important;
   flex-direction: column;
-  gap: 6px;
-  padding: 0 2px;
+  gap: 8px;
+  padding: 4px 2px 0;
   grid-template-areas: none !important;
   grid-template-columns: 1fr !important;
   grid-template-rows: none !important;
   justify-items: stretch;
   align-items: stretch;
   column-gap: 0;
-  row-gap: 6px;
+  row-gap: 8px;
+  min-height: 100%;
 }
 body.mobile-mode .tslot {
   grid-area: unset !important;
   width: 100%;
   overflow: hidden;
+  flex: 0 0 auto;
 }
 body.mobile-mode .tslot-top    { order: 1; }
 body.mobile-mode .tslot-left   { order: 2; }
 body.mobile-mode .tslot-right  { order: 3; }
-body.mobile-mode .tslot-center { order: 4; }
+body.mobile-mode .tslot-center {
+  order: 4;
+  flex: 1 1 auto;
+  min-height: 130px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 body.mobile-mode .tslot-bottom { order: 5; }
 
 /* Kill the 90deg rotation on side-player hand rows in mobile mode.
@@ -3038,44 +3052,40 @@ body.mobile-mode .hand-row-side-md {
   flex-direction: row !important;
   gap: 5px;
 }
-/* Player seat: switch from column to row so name badge sits left of cards */
+/* Opponent layout: COLUMN with badge above cards, matching the human player's
+   layout exactly. This makes every player visually align on the same vertical
+   centreline (name pill + centered card row), which is what the user expects
+   when looking at the table top-down. Row layout left-aligned badges and
+   pushed cards to the side — the screenshot showed Beep at the left edge
+   with cards flowing right, while You was centered, so they didn't line up. */
 body.mobile-mode .tslot-left .player-seat,
 body.mobile-mode .tslot-right .player-seat,
 body.mobile-mode .tslot-top .player-seat {
-  flex-direction: row;
-  gap: 8px;
+  flex-direction: column;
+  gap: 4px;
   align-items: center;
   width: 100%;
 }
 
-/* Opponent name badges: compact pill, shrinks to fit next to card row */
+/* Opponent name pills: compact but full-shape pill (no truncation needed
+   since they sit above a card row, not squeezed beside it) */
 body.mobile-mode .tslot-top .player-tag,
 body.mobile-mode .tslot-left .player-tag,
 body.mobile-mode .tslot-right .player-tag {
   font-size: 12px;
-  padding: 4px 6px;
-  flex-shrink: 0;
-  max-width: 78px;
-}
-body.mobile-mode .tslot-top .player-tag span,
-body.mobile-mode .tslot-left .player-tag span,
-body.mobile-mode .tslot-right .player-tag span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 58px;
-  display: block;
+  padding: 3px 12px;
 }
 
 /* Card sizes are now controlled at the React level (Card.tsx reads useViewMode
-   and picks smaller pixel values for mobile). No CSS overrides needed — leaving
-   only the hand-row gap/padding override below to keep the layout tight. */
+   and picks smaller pixel values for mobile). The hand-row stays tight and
+   gets `justify-content: center` so each opponent's 4 cards line up on the
+   same vertical axis as the human's 4 cards below. */
 body.mobile-mode .tslot-top .hand-row,
 body.mobile-mode .tslot-left .hand-row,
 body.mobile-mode .tslot-right .hand-row {
-  gap: 4px;
-  padding: 4px;
-  flex-shrink: 1;
+  gap: 5px;
+  padding: 4px 6px;
+  justify-content: center;
 }
 
 /* Centre deck / discard pile — small but visible */
@@ -3094,39 +3104,42 @@ body.mobile-mode .deck-area {
   gap: 10px;
 }
 /* Center pile container sizing — match the mobile card sizes from Card.tsx
-   (md = 52×75, lg = 70×101) so empty placeholders line up with rendered cards */
+   (md = 46×67, lg = 66×96) so empty placeholders line up with rendered cards */
 body.mobile-mode .empty-pile {
-  width: 52px !important;
-  height: 75px !important;
-  font-size: 11px;
+  width: 46px !important;
+  height: 67px !important;
+  font-size: 10px;
 }
 body.mobile-mode .discard-card-area {
-  width: 52px !important;
-  height: 75px !important;
+  width: 46px !important;
+  height: 67px !important;
 }
 body.mobile-mode .drawn-slot {
-  width: 74px !important;
-  height: 108px !important;
+  width: 70px !important;
+  height: 102px !important;
 }
 
-/* ── Human player at the bottom: full-size, tappable cards ──────────────── */
+/* ── Human player at the bottom ──────────────────────────────────────────
+   Lifted off the bottom edge with safe-area-aware padding so cards have
+   breathing room from the phone's home-indicator bar / browser chrome.
+   The flex:1 on .tslot-center above guarantees there's also breathing
+   space ABOVE the human cards (between them and the deck). */
 body.mobile-mode .tslot-bottom {
-  padding-bottom: 8px;
   width: 100%;
   justify-content: center;
   overflow: hidden;
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
+  padding-top: 4px;
 }
-/* Force the player-seat to fill the tslot so cards are centered within it.
-   Without width:100%, the player-seat sizes to its content (the card row),
-   which then left-aligns and overflows instead of centering. */
 body.mobile-mode .tslot-bottom .player-seat {
   width: 100%;
+  gap: 6px;
 }
-/* Human card sizing now happens in Card.tsx (mobile.lg = 70×101).
-   4 × 70px + 3 × 7px gaps + 2 × 7px hand-row padding = 315px → fits ≥320px. */
+/* Human card sizing now happens in Card.tsx (mobile.lg = 66×96).
+   4 × 66px + 3 × 6px gaps + 2 × 6px hand-row padding = 294px → fits ≥320px. */
 body.mobile-mode .tslot-bottom .hand-row {
-  gap: 7px;
-  padding: 5px 7px;
+  gap: 6px;
+  padding: 5px 6px;
   justify-content: center;
   width: 100%;
   box-sizing: border-box;
@@ -3345,5 +3358,31 @@ body.mobile-mode .training-panel {
 /* ── Tap-target hint: anything `cursor: pointer` should be ≥44px tall ───── */
 body.mobile-mode .btn:not(.mobile-drawer-btn):not(.pick):not(.menu-back) {
   min-height: 44px;
+}
+
+/* ── Calmer animations on phones ─────────────────────────────────────────
+   The constant `cardLift` bobbing on selectable cards (1.6s loop, ±9px Y)
+   is fine on a desktop but reads as "shaking" on a phone where the cards
+   are smaller and closer together. We keep the highlight (yellow glow)
+   so the user knows what's selectable, but skip the perpetual translation
+   so the cards sit still until tapped. */
+body.mobile-mode .card-wrap.hl {
+  animation: none;
+}
+body.mobile-mode .card-wrap.hl::after {
+  /* Replace the bobbing motion with a gentle glow-only pulse */
+  animation: cardGlowMobile 2s ease-in-out infinite;
+}
+@keyframes cardGlowMobile {
+  0%, 100% {
+    box-shadow:
+      0 0 0 2px rgba(255, 216, 107, 0.7),
+      0 0 14px 3px rgba(255, 216, 107, 0.35);
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px rgba(255, 216, 107, 1),
+      0 0 22px 6px rgba(255, 216, 107, 0.6);
+  }
 }
 
