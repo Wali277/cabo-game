@@ -36,11 +36,12 @@ export function Table() {
   // to pick which gradient stack renders behind the table.
   const tableTheme = useTheme();
 
-  // Phone-mode layout state. When `isMobile`, two extra buttons appear in the
-  // top bar that slide the LeftPanel and right-sidebar up as bottom sheets.
+  // Phone-mode layout state. When `isMobile`, the LeftPanel renders INLINE
+  // in the table-grid (between deck and human cards) when it's the human's
+  // turn — no more drawer/toggle for actions. The right-sidebar still slides
+  // up as a bottom sheet via the 📊 Scores top-bar button.
   const viewMode = useViewMode();
   const isMobile = viewMode === "mobile";
-  const [leftDrawerOpen, setLeftDrawerOpen] = useState(false);
   const [rightDrawerOpen, setRightDrawerOpen] = useState(false);
 
   // Reveals that the human can tap-anywhere to dismiss early
@@ -212,42 +213,30 @@ export function Table() {
         <div className="top-bar">
           <button className="btn ghost menu-back" onClick={handleQuit}>← Menu</button>
           <span className="top-round-label">Round {game.roundNumber}</span>
-          {/* Phone-mode only: drawer toggles for the two side panels.
-              In desktop mode the panels are always visible; on phones they
-              slide up as bottom sheets when toggled here. */}
+          {/* Phone-mode: scoreboard still toggles as a bottom sheet.
+              The action panel is now rendered INLINE in the table-grid below,
+              so there's no Actions drawer toggle anymore. */}
           {isMobile && (
-            <>
-              <button
-                className={`btn ghost mobile-drawer-btn ${leftDrawerOpen ? "active" : ""}`}
-                onClick={() => {
-                  Audio.playSfx("click");
-                  setRightDrawerOpen(false);
-                  setLeftDrawerOpen((o) => !o);
-                }}
-                aria-label="Toggle actions panel"
-                aria-expanded={leftDrawerOpen}
-              >
-                ☰ Actions
-              </button>
-              <button
-                className={`btn ghost mobile-drawer-btn ${rightDrawerOpen ? "active" : ""}`}
-                onClick={() => {
-                  Audio.playSfx("click");
-                  setLeftDrawerOpen(false);
-                  setRightDrawerOpen((o) => !o);
-                }}
-                aria-label="Toggle scores panel"
-                aria-expanded={rightDrawerOpen}
-              >
-                📊 Scores
-              </button>
-            </>
+            <button
+              className={`btn ghost mobile-drawer-btn ${rightDrawerOpen ? "active" : ""}`}
+              onClick={() => {
+                Audio.playSfx("click");
+                setRightDrawerOpen((o) => !o);
+              }}
+              aria-label="Toggle scores panel"
+              aria-expanded={rightDrawerOpen}
+            >
+              📊 Scores
+            </button>
           )}
         </div>
 
-        {/* Three-column game body: left panel | table grid | right sidebar */}
+        {/* Three-column game body: left panel | table grid | right sidebar
+            In mobile mode the LeftPanel is rendered INSIDE the table-grid as
+            an extra slot (tslot-action) so it appears between the deck and
+            the human's cards. Only when it's the human's turn. */}
         <div className="game-body">
-          <LeftPanel className={isMobile && leftDrawerOpen ? "open" : ""} />
+          {!isMobile && <LeftPanel />}
 
           {/* Table grid — players sit on each side of the deck */}
           <div className="table-grid">
@@ -301,6 +290,20 @@ export function Table() {
               )}
             </div>
 
+            {/* Mobile-only: inline action panel between the deck and the
+                human's cards. Shows up only when it's the human's turn (or
+                during setup_peek where every player taps to start). Hidden
+                during bot turns and round_over so it doesn't take up screen
+                space when there's nothing to do. */}
+            {isMobile &&
+              (game.players[game.currentPlayer].id === humanId ||
+                game.phase === "setup_peek") &&
+              game.phase !== "round_over" && (
+                <div className="tslot tslot-action">
+                  <LeftPanel />
+                </div>
+              )}
+
             {/* Bottom — human player */}
             <div className="tslot tslot-bottom">
               <PlayerSeat
@@ -321,15 +324,12 @@ export function Table() {
           </div>
         </div>
 
-        {/* Phone-mode drawer backdrop — tap outside to dismiss. Only rendered
-            when at least one drawer is open. */}
-        {isMobile && (leftDrawerOpen || rightDrawerOpen) && (
+        {/* Phone-mode drawer backdrop — tap outside to dismiss. Only the
+            Scores sidebar uses drawer mode now; the Actions panel is inline. */}
+        {isMobile && rightDrawerOpen && (
           <div
             className="drawer-backdrop"
-            onClick={() => {
-              setLeftDrawerOpen(false);
-              setRightDrawerOpen(false);
-            }}
+            onClick={() => setRightDrawerOpen(false)}
             aria-hidden="true"
           />
         )}

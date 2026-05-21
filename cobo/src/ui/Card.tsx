@@ -22,26 +22,18 @@ const SUIT_COLOR: Record<string, string> = {
   D: "#e23a5e",
 };
 
-// Card pixel widths per size, split per view mode so phone users get cards
-// that actually fit on a 360px screen AND leave vertical room for up to 3
-// opponents stacked in column layout (each row ≈ 100px tall). Height = w*1.45.
+// Card pixel widths per size, split per view mode.
 //
-// Desktop math (current behaviour):
-//   sm = 56 (side opponents pre-rotation), md = 80 (top + center), lg = 110 (human + drawn)
+// Desktop math (unchanged):
+//   sm = 56, md = 80, lg = 110
 //
-// Mobile math (verified to fit 320×667 = iPhone SE — the tightest common phone):
-//   md = 46 (opponents — 4×46 + gaps = 207px, row height ≈ 76px)
-//   lg = 66 (human + drawn — 4×66 + gaps = 285px, row height ≈ 103px)
-// Vertical budget on iPhone SE (667px tall):
-//   top-bar (44) + 3 opponents column (3×102 + 16 gap = 322) + center (≥130)
-//   + human (≈135) + 8 padding = ~640 ✓ fits with margin
-//
-// We size at this React level instead of via CSS because framer-motion's
-// layout engine reads the inline width/height — CSS overrides were getting
-// re-applied during animations.
+// Mobile math: per user request, OPPONENT (md) and HUMAN (lg) cards are now
+// the same size so every player's row visually lines up. 60×87 fits 3
+// opponents on iPhone 12+ (375×812) with margin to spare, and any single
+// opponent row is the same width as the human's row — true symmetry.
 const SIZE_PX: Record<"desktop" | "mobile", Record<"sm" | "md" | "lg", number>> = {
   desktop: { sm: 56, md: 80, lg: 110 },
-  mobile:  { sm: 40, md: 46, lg: 66  },
+  mobile:  { sm: 40, md: 60, lg: 60  },
 };
 
 export function CardView({

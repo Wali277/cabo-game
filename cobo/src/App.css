@@ -3017,18 +3017,26 @@ body.mobile-mode .tslot {
   overflow: hidden;
   flex: 0 0 auto;
 }
-body.mobile-mode .tslot-top    { order: 1; }
-body.mobile-mode .tslot-left   { order: 2; }
-body.mobile-mode .tslot-right  { order: 3; }
-body.mobile-mode .tslot-center {
+body.mobile-mode .tslot-top     { order: 1; }
+body.mobile-mode .tslot-left    { order: 2; }
+body.mobile-mode .tslot-right   { order: 3; }
+body.mobile-mode .tslot-center  {
   order: 4;
-  flex: 1 1 auto;
-  min-height: 130px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
-body.mobile-mode .tslot-bottom { order: 5; }
+/* Inline action panel sits BETWEEN the deck and the human cards.
+   Reserves space when shown, collapses to 0px when no human action is
+   needed (bot turn / round_over). */
+body.mobile-mode .tslot-action  { order: 5; }
+body.mobile-mode .tslot-bottom  {
+  order: 6;
+  /* margin-top:auto sucks up all leftover vertical space so the human
+     cards stay glued to the bottom of the screen while opponents +
+     center + action panel cluster at the top */
+  margin-top: auto;
+}
 
 /* Kill the 90deg rotation on side-player hand rows in mobile mode.
    IMPORTANT: .hand-row-side-wrap has a fixed 128×362 size + position:relative
@@ -3104,19 +3112,19 @@ body.mobile-mode .deck-area {
   gap: 10px;
 }
 /* Center pile container sizing — match the mobile card sizes from Card.tsx
-   (md = 46×67, lg = 66×96) so empty placeholders line up with rendered cards */
+   (md = lg = 60×87) so empty placeholders line up with rendered cards */
 body.mobile-mode .empty-pile {
-  width: 46px !important;
-  height: 67px !important;
-  font-size: 10px;
+  width: 60px !important;
+  height: 87px !important;
+  font-size: 11px;
 }
 body.mobile-mode .discard-card-area {
-  width: 46px !important;
-  height: 67px !important;
+  width: 60px !important;
+  height: 87px !important;
 }
 body.mobile-mode .drawn-slot {
-  width: 70px !important;
-  height: 102px !important;
+  width: 64px !important;
+  height: 93px !important;
 }
 
 /* ── Human player at the bottom ──────────────────────────────────────────
@@ -3145,45 +3153,70 @@ body.mobile-mode .tslot-bottom .hand-row {
   box-sizing: border-box;
 }
 
-/* ── LeftPanel as a slide-up bottom sheet ───────────────────────────────── */
-body.mobile-mode .left-panel {
-  position: fixed !important;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  top: auto !important;
-  width: 100% !important;
-  max-width: none !important;
-  max-height: 62vh;
-  overflow-y: auto;
-  transform: translateY(105%);
-  transition: transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
-  z-index: 270;
-  border-radius: 18px 18px 0 0;
-  padding: 18px 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
+/* ── LeftPanel: INLINE action panel for mobile ──────────────────────────
+   The panel sits naturally in the table-grid between the deck and the
+   human's cards (tslot-action slot). No more slide-up drawer — actions
+   are always visible when relevant, hidden by React when not. */
+body.mobile-mode .tslot-action .left-panel {
+  position: static !important;
+  transform: none !important;
+  width: auto !important;
+  max-width: 480px !important;
+  max-height: none !important;
+  margin: 0 8px !important;
+  padding: 10px 14px !important;
+  border-radius: 16px !important;
+  background: rgba(13, 22, 56, 0.92) !important;
+  border: 2px solid rgba(168, 123, 255, 0.55) !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4) !important;
   flex-direction: column !important;
-  gap: 12px !important;
-  box-shadow: 0 -16px 48px rgba(0, 0, 0, 0.55);
-  margin: 0 !important;
+  gap: 8px !important;
+  overflow: hidden;
 }
-body.mobile-mode .left-panel.open {
-  transform: translateY(0);
-}
-body.mobile-mode .left-instruction {
-  flex-direction: column;
-  text-align: center;
+/* Compact instruction header — emoji + text inline to save vertical room */
+body.mobile-mode .tslot-action .left-instruction {
+  flex-direction: row !important;
+  align-items: center;
+  justify-content: center;
   gap: 8px;
+  text-align: left;
+  padding: 0;
 }
-body.mobile-mode .left-buttons {
-  flex-direction: column;
-  gap: 10px;
+body.mobile-mode .tslot-action .left-emoji {
+  font-size: 26px;
+  line-height: 1;
+}
+body.mobile-mode .tslot-action .left-text {
+  font-size: 13px;
+  line-height: 1.35;
+  margin: 0;
+}
+/* Buttons in a horizontal flex-wrap row to fit several actions side-by-side */
+body.mobile-mode .tslot-action .left-buttons {
+  flex-direction: row !important;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px !important;
   width: 100%;
 }
-body.mobile-mode .left-btn {
-  width: 100% !important;
-  min-height: 48px;
-  font-size: 16px;
+body.mobile-mode .tslot-action .left-btn {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto !important;
+  min-height: 40px;
+  padding: 8px 10px !important;
+  font-size: 13px !important;
+  text-align: center !important;
+  white-space: normal;
+  border-radius: 10px !important;
 }
+body.mobile-mode .tslot-action .left-divider {
+  display: none;
+}
+/* The previous bottom-sheet drawer rules for .left-instruction / .left-buttons /
+   .left-btn are no longer applied in mobile (the panel is now inline via
+   .tslot-action and styled with .tslot-action .left-* above). Removed to
+   prevent any conflicting cascade with the inline-mode rules. */
 
 /* ── Right sidebar (Scoreboard + ActionLog) as a slide-up bottom sheet ──── */
 body.mobile-mode .right-sidebar {
