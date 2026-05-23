@@ -156,12 +156,15 @@ function CardFace({
     );
   }
 
-  // Joker — yellow card baseline, jester centre, "JOKER" in corners.
-  // Joker keeps a fixed yellow face so the jester drawing stays recognisable
-  // across every skin; the skin still affects the back of the card.
+  // Joker — jester centre + "JOKER" in corners.
+  // Honors the active skin: the card bg, border, ink color (jester body),
+  // and jester face cutout all pull from the skin's tokens so a Joker
+  // looks consistent with the other ranks in every skin.
   if (card.rank === "Joker") {
-    const isRed = card.suit === "H" || card.suit === "D";
-    const faceColor = isRed ? "#e23a5e" : "#1c1d2b";
+    const faceColor = suitTextColor(card.suit, skin);
+    // The jester face cutout has to be a SOLID color (SVG fill), even
+    // when faceBg is a gradient — skin.jesterBg is precisely this.
+    const jesterCutoutBg = skin.jesterBg ?? "#ffd86b";
 
     const letterFs = w * 0.11;
     const letterStyle: React.CSSProperties = {
@@ -184,12 +187,12 @@ function CardFace({
           width: w, height: h,
           position: "absolute", inset: 0,
           backfaceVisibility: "hidden",
-          background: "#ffd86b",
+          background: skin.faceBg,
           borderRadius: 12,
-          border: "3px solid #1c1d2b",
+          border: `${skin.faceBorderWidth ?? 3}px solid ${skin.faceBorder}`,
           boxShadow: "0 6px 18px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.5)",
           overflow: "hidden",
-          fontFamily: "'Fredoka', system-ui, sans-serif",
+          fontFamily: skin.font ?? "'Fredoka', system-ui, sans-serif",
         }}
       >
         <div style={{ position: "absolute", top: 6, left: 8, ...letterStyle }}>
@@ -201,7 +204,7 @@ function CardFace({
           left: "50%",
           transform: "translate(-50%, -50%)",
         }}>
-          <JesterFace size={jesterSize} color={faceColor} />
+          <JesterFace size={jesterSize} color={faceColor} bg={jesterCutoutBg} />
         </div>
         <div style={{
           position: "absolute",
@@ -299,10 +302,11 @@ function CardFace({
 }
 
 /**
- * Inline SVG jester face — unchanged. Used only on Joker.
+ * Inline SVG jester face — used only on Joker. The `bg` is the solid
+ * color used to "punch out" the face area; it should match the skin's
+ * dominant face tone so the cutout reads as continuous with the card.
  */
-function JesterFace({ size, color }: { size: number; color: string }) {
-  const bg = "#ffd86b";
+function JesterFace({ size, color, bg = "#ffd86b" }: { size: number; color: string; bg?: string }) {
   return (
     <svg viewBox="0 0 100 110" width={size} height={size * 1.1} style={{ display: "block" }}>
       <path d="M 33 38 Q 4 30 12 58 Q 22 56 33 44 Z" fill={color} />

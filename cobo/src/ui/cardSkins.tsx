@@ -41,6 +41,10 @@ export interface SkinStyle {
   patternOverlay?: string;
   /** Same pattern overlay applied to the BACK (Hand-drawn). */
   backPatternOverlay?: string;
+  /** SOLID color used as the Joker's face cutout (it's an SVG fill —
+   *  gradients are not valid here). Should approximate the dominant
+   *  tone of faceBg so the jester face "cuts through" cleanly. */
+  jesterBg?: string;
 }
 
 // Every skin uses Fredoka (the project's self-hosted font) for type
@@ -59,6 +63,7 @@ export const SKIN_STYLES: Record<CardSkin, SkinStyle> = {
     faceBg: "#ffd86b",
     faceBorder: "#1c1d2b",
     font: FONT,
+    jesterBg: "#ffd86b",
     backBg: "#1c1d2b",
     backBorder: "#ffd86b",
     backCenter: "cabo",
@@ -73,6 +78,7 @@ export const SKIN_STYLES: Record<CardSkin, SkinStyle> = {
     faceBorder: "#d4af37",
     suitColor: { red: "#f4cf5b", black: "#f4cf5b" },
     font: FONT,
+    jesterBg: "#7c1a26",
     backBg:
       "radial-gradient(circle at 30% 18%, rgba(255,221,150,0.22) 0%, transparent 60%), linear-gradient(160deg, #7c1a26 0%, #4a0d15 100%)",
     backBorder: "#d4af37",
@@ -86,6 +92,7 @@ export const SKIN_STYLES: Record<CardSkin, SkinStyle> = {
     faceBorder: "#00e5ff",
     suitColor: { red: "#ff2dca", black: "#00e5ff" },
     font: FONT,
+    jesterBg: "#0a0a14",
     backBg:
       "repeating-linear-gradient(180deg, #050510 0px, #050510 3px, #08081a 3px, #08081a 4px)",
     backBorder: "#ff2dca",
@@ -98,6 +105,7 @@ export const SKIN_STYLES: Record<CardSkin, SkinStyle> = {
     faceBorder: "#262220",
     suitColor: { red: "#262220", black: "#262220" },
     font: FONT,
+    jesterBg: "#f3ead4",
     patternOverlay: CROSSHATCH,
     backBg:
       "linear-gradient(160deg, #f5ecd5 0%, #ede0bd 100%)",
@@ -112,6 +120,7 @@ export const SKIN_STYLES: Record<CardSkin, SkinStyle> = {
     faceBorder: "#0a0a0a",
     suitColor: { red: "#0a0a0a", black: "#0a0a0a" },
     font: FONT,
+    jesterBg: "#ffffff",
     backBg: "#ffffff",
     backBorder: "#0a0a0a",
     backCenter: "minimalist",
@@ -125,6 +134,7 @@ export const SKIN_STYLES: Record<CardSkin, SkinStyle> = {
     faceBorderWidth: 5,
     suitColor: { red: "#0a0a0a", black: "#0a0a0a" },
     font: FONT,
+    jesterBg: "#ff8000",
     patternOverlay: CARBON_PINSTRIPE,
     backBg:
       "radial-gradient(circle at 50% 30%, rgba(255,255,255,0.22) 0%, transparent 60%), radial-gradient(circle at 50% 110%, rgba(0,0,0,0.30) 0%, transparent 65%), linear-gradient(160deg, #ff8a14 0%, #ff8000 55%, #d96500 100%)",
@@ -141,6 +151,7 @@ export const SKIN_STYLES: Record<CardSkin, SkinStyle> = {
     faceBorderWidth: 5,
     suitColor: { red: "#002776", black: "#002776" },
     font: FONT,
+    jesterBg: "#ffdd00",
     backBg:
       "linear-gradient(180deg, #ffdd00 0%, #ffdd00 16%, #002776 16%, #002776 20%, #ffdd00 20%, #ffdd00 70%, #009739 70%, #009739 82%, #ffdd00 82%, #ffdd00 100%)",
     backBorder: "#002776",

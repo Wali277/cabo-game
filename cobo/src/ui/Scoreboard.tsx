@@ -262,15 +262,24 @@ export function RoundEndOverlay() {
         onClick={stage !== "modal" ? () => setStage("modal") : undefined}
         style={{ cursor: stage !== "modal" ? "pointer" : "default" }}
       >
-        {/* ── Beats 1–3: cinematic title + pill tally + winner stamp ── */}
-        <AnimatePresence>
+        {/* ── Beats 1–3: cinematic title + pill tally + winner stamp.
+              AnimatePresence mode="wait" makes the cinematic FULLY exit
+              before the modal mounts, so the two transitions don't
+              overlap into a hasty cut. The cinematic exit fades + scales
+              down slightly, the modal then rises from below. ── */}
+        <AnimatePresence mode="wait">
           {stage !== "modal" && (
             <motion.div
               key="cinematic"
               className="round-cinematic"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.25 } }}
+              exit={{
+                opacity: 0,
+                scale: 0.92,
+                y: -16,
+                transition: { duration: 0.45, ease: [0.16, 0.7, 0.32, 1] },
+              }}
             >
               <motion.h1
                 className="cinematic-title"
@@ -309,17 +318,19 @@ export function RoundEndOverlay() {
               <div className="cinematic-skip-hint">tap to skip</div>
             </motion.div>
           )}
-        </AnimatePresence>
 
-        {/* ── Beat 4: existing scoreboard modal, slides up from below ── */}
-        {stage === "modal" && (
-        <motion.div
-          className="modal"
-          initial={{ scale: 0.85, y: 60, opacity: 0 }}
-          animate={{ scale: 1, y: 0, opacity: 1 }}
-          transition={{ type: "spring", stiffness: 180, damping: 22 }}
-          onClick={(e) => e.stopPropagation()}
-        >
+          {/* ── Beat 4: existing scoreboard modal, rises after the
+                cinematic has finished its exit (mode="wait" sequences
+                this). Spring entry feels deliberate, not hasty. ── */}
+          {stage === "modal" && (
+          <motion.div
+            key="scoreboard-modal"
+            className="modal"
+            initial={{ scale: 0.9, y: 80, opacity: 0 }}
+            animate={{ scale: 1, y: 0, opacity: 1 }}
+            transition={{ type: "spring", stiffness: 160, damping: 24, mass: 1.1 }}
+            onClick={(e) => e.stopPropagation()}
+          >
           <div className="modal-burst">{isTie ? "🤝" : "🎉"}</div>
           {isTie ? (
             <h2>It&apos;s a tie!</h2>
@@ -383,13 +394,14 @@ export function RoundEndOverlay() {
               {mode === "mp" && iVoted
                 ? "Waiting for other player…"
                 : mode === "mp" && otherVoterName
-                ? `${otherVoterName} wants a rematch · Play again`
-                : "Play again"}
+                ? `${otherVoterName} ready · Continue`
+                : "Continue"}
             </button>
-            <button className="btn" onClick={backToMenu}>Main menu</button>
+            <button className="btn" onClick={backToMenu}>Return to main</button>
           </div>
         </motion.div>
         )}
+        </AnimatePresence>
       </motion.div>
     </AnimatePresence>
   );
