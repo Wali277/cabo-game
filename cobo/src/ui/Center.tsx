@@ -1,4 +1,5 @@
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { useMemo } from "react";
 import { CardView } from "./Card";
 import { useStore } from "../state/store";
 import type { GameState } from "../engine/types";
@@ -109,10 +110,47 @@ export function Center() {
   const pileBaseAbsoluteIdx = game.discard.length - visiblePile.length;
   const topDiscard = visiblePile[visiblePile.length - 1] ?? null;
 
-  const drawnTraj = drawnTrajectory(game);
-  const discardTraj = discardTrajectory(game);
-  const topRotation = topDiscard ? pileRotation(topDiscard.id, game.discard.length - 1) : 0;
-  const topOffset = topDiscard ? pileOffset(topDiscard.id, visiblePile.length - 1) : { x: 0, y: 0 };
+  // Stabilise the trajectories so framer-motion doesn't re-trigger
+  // animations on unrelated game state changes (animations consumed, bot
+  // turn ticks, reveals, etc.). The entrance trajectory is captured the
+  // moment a card lands in the slot; subsequent re-renders reuse the same
+  // object reference, so the motion.div animate prop stays stable.
+  const drawnTraj = useMemo(
+    () => drawnTrajectory(game),
+    // Re-compute only when the card occupying the slot changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [drawn?.id],
+  );
+  const discardTraj = useMemo(
+    () => discardTrajectory(game),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [topDiscard?.id],
+  );
+  const topRotation = useMemo(
+    () => topDiscard ? pileRotation(topDiscard.id, game.discard.length - 1) : 0,
+    [topDiscard?.id, game.discard.length],
+  );
+  const topOffset = useMemo(
+    () => topDiscard ? pileOffset(topDiscard.id, visiblePile.length - 1) : { x: 0, y: 0 },
+    [topDiscard?.id, visiblePile.length],
+  );
+
+  // Pre-compute the stable animate target arrays so framer-motion doesn't
+  // see "new array reference" on every render and restart the animation.
+  const drawnAnimate = useMemo(
+    () => drawn ? drawnTraj.animate : null,
+    [drawn?.id, drawnTraj],
+  );
+  const discardAnimate = useMemo(() => {
+    if (!topDiscard) return null;
+    return {
+      x: [...discardTraj.animate.x.slice(0, -1), topOffset.x],
+      y: [...discardTraj.animate.y.slice(0, -1), topOffset.y],
+      opacity: 1,
+      scale: 1,
+      rotate: topRotation,
+    };
+  }, [topDiscard?.id, discardTraj, topOffset, topRotation]);
 
   return (
     <div className="center-area">
@@ -135,7 +173,7 @@ export function Center() {
               <motion.div
                 key={drawn.id}
                 initial={reduced ? { opacity: 0 } : drawnTraj.initial}
-                animate={reduced ? { opacity: 1 } : drawnTraj.animate}
+                animate={reduced ? { opacity: 1 } : drawnAnimate!}
                 exit={{ opacity: 0, scale: 0.85, transition: { duration: 0.18 } }}
                 transition={reduced ? { duration: 0.15 } : CARD_SPRING}
                 style={{ position: "relative", zIndex: 5 }}
@@ -211,22 +249,20 @@ export function Center() {
                   );
                 })}
 
-                {/* Top card — animated entry from its source position. */}
-                {topDiscard && (
+                {/* Top card — animated entry from its source position.
+                    NOTE: layoutId intentionally OMITTED on the top card's
+                    CardView. The arc trajectory in discardAnimate already
+                    handles the visual entrance; keeping a layoutId here
+                    made framer-motion's LayoutGroup re-measure the card
+                    on every unrelated movement elsewhere on the table,
+                    producing a continuous twitch. The drawn card → discard
+                    transition still reads as a glide because the arc starts
+                    at the drawn-slot offset and animates to settle. */}
+                {topDiscard && discardAnimate && (
                   <motion.div
                     key={topDiscard.id}
                     initial={reduced ? { opacity: 0 } : discardTraj.initial}
-                    animate={reduced
-                      ? { opacity: 1 }
-                      : {
-                          // End at the pile-offset target so the top card
-                          // sits exactly where its under-pile slot would be.
-                          x: [...discardTraj.animate.x.slice(0, -1), topOffset.x],
-                          y: [...discardTraj.animate.y.slice(0, -1), topOffset.y],
-                          opacity: 1,
-                          scale: 1,
-                          rotate: topRotation,
-                        }}
+                    animate={reduced ? { opacity: 1 } : discardAnimate}
                     transition={reduced ? { duration: 0.15 } : CARD_SPRING}
                     style={{
                       position: "absolute",
@@ -241,7 +277,6 @@ export function Center() {
                       card={topDiscard}
                       faceUp={true}
                       size="md"
-                      layoutId={topDiscard.id}
                     />
                   </motion.div>
                 )}
