@@ -3749,3 +3749,156 @@ body.mobile-mode .skin-grid {
 }
 
 /* (Inner frame on McLaren backs removed per user — helmet floats clean) */
+
+/* ──────────────────────────────────────────────────────────────────────────
+   v3.1 — END-OF-ROUND CINEMATIC
+
+   Three beats before the existing scoreboard modal slides up:
+   1. Big "Round Over" title slams in (~0.7s)
+   2. Per-player pills appear with an animated count-up of their hand value
+      (~1.3s — pills stagger 140ms each)
+   3. Winner pill highlights gold, a confetti burst fires, a "WINS THE ROUND"
+      stamp slams in at a -4° tilt (~1.0s)
+   4. Cinematic fades out, scoreboard modal slides up from below
+
+   Tap anywhere during beats 1-3 to skip straight to the modal.
+   ────────────────────────────────────────────────────────────────────────── */
+
+.round-end-overlay {
+  /* Slightly heavier dim during the cinematic so the title + pills read */
+  background: rgba(8, 10, 28, 0.78);
+}
+
+.round-cinematic {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  width: min(880px, calc(100vw - 32px));
+  padding: 24px;
+  pointer-events: none; /* clicks pass through to overlay's skip handler */
+}
+
+.cinematic-title {
+  font-family: 'Fredoka', system-ui, sans-serif;
+  font-size: clamp(48px, 7vw, 92px);
+  font-weight: 900;
+  letter-spacing: -1px;
+  color: #ffd86b;
+  text-shadow:
+    0 4px 24px rgba(255, 216, 107, 0.35),
+    0 2px 0 rgba(0, 0, 0, 0.45);
+  margin: 0;
+  line-height: 1;
+}
+
+.cinematic-pills {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 100%;
+}
+
+.cinematic-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 22px;
+  min-width: 110px;
+  background:
+    linear-gradient(160deg, rgba(40, 44, 88, 0.96) 0%, rgba(22, 26, 56, 0.96) 100%);
+  border: 2px solid rgba(168, 123, 255, 0.4);
+  border-radius: 14px;
+  color: #f4ebff;
+  font-family: 'Fredoka', system-ui, sans-serif;
+  box-shadow:
+    0 12px 28px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transition: border-color 240ms ease, transform 240ms ease, box-shadow 240ms ease;
+}
+
+.cinematic-pill-name {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: rgba(244, 235, 255, 0.75);
+}
+
+.cinematic-pill-points {
+  font-size: 38px;
+  font-weight: 900;
+  line-height: 1;
+  color: #f4ebff;
+  font-variant-numeric: tabular-nums;
+}
+
+.cinematic-pill.winner {
+  border-color: rgba(255, 216, 107, 0.7);
+}
+
+.cinematic-pill.highlighted {
+  border-color: #ffd86b;
+  background:
+    linear-gradient(160deg, rgba(255, 216, 107, 0.18) 0%, rgba(120, 80, 0, 0.30) 100%);
+  transform: scale(1.08);
+  box-shadow:
+    0 16px 38px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(255, 216, 107, 0.45),
+    0 0 28px rgba(255, 216, 107, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.cinematic-pill.highlighted .cinematic-pill-points {
+  color: #ffd86b;
+  text-shadow: 0 2px 8px rgba(255, 216, 107, 0.5);
+}
+
+.cinematic-winner-stamp {
+  font-family: 'Fredoka', system-ui, sans-serif;
+  font-size: clamp(28px, 4vw, 48px);
+  font-weight: 900;
+  color: #1c1d2b;
+  background: linear-gradient(160deg, #ffd86b 0%, #ffba3d 100%);
+  padding: 12px 28px;
+  border-radius: 10px;
+  border: 3px solid #1c1d2b;
+  box-shadow:
+    0 14px 32px rgba(0, 0, 0, 0.5),
+    0 4px 0 #8c5a00,
+    inset 0 2px 0 rgba(255, 255, 255, 0.35);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.cinematic-skip-hint {
+  position: absolute;
+  bottom: -32px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: rgba(244, 235, 255, 0.42);
+  pointer-events: none;
+}
+
+/* Mobile: shrink everything proportionally so pills don't wrap to 3 rows */
+body.mobile-mode .cinematic-title {
+  font-size: clamp(36px, 9vw, 60px);
+}
+body.mobile-mode .cinematic-pill {
+  min-width: 86px;
+  padding: 10px 14px;
+}
+body.mobile-mode .cinematic-pill-points {
+  font-size: 30px;
+}
+body.mobile-mode .cinematic-winner-stamp {
+  font-size: clamp(22px, 5.5vw, 34px);
+  padding: 10px 20px;
+}

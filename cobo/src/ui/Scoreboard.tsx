@@ -1,5 +1,6 @@
-import { motion, AnimatePresence } from "framer-motion";
-import { useEffect, useRef } from "react";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
+import confetti from "canvas-confetti";
 import { useStore } from "../state/store";
 import { cardScore } from "../engine/game";
 import { Audio } from "../audio/sounds";
@@ -91,6 +92,55 @@ export function Scoreboard() {
   );
 }
 
+/**
+ * useCountUp — animates an integer from 0 to `target` over `durationMs`
+ * using ease-out cubic. `active` gates whether the animation has begun
+ * (so we hold at 0 during the title beat, then start once tally beat
+ * fires). `delayMs` staggers different pills.
+ */
+function useCountUp(target: number, durationMs: number, active: boolean, delayMs = 0): number {
+  const [value, setValue] = useState(0);
+  useEffect(() => {
+    if (!active) { setValue(0); return; }
+    let raf = 0;
+    const startAt = performance.now() + delayMs;
+    const tick = (now: number) => {
+      const elapsed = Math.max(0, now - startAt);
+      const t = Math.min(1, elapsed / durationMs);
+      const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic
+      setValue(Math.round(target * eased));
+      if (t < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target, durationMs, active, delayMs]);
+  return value;
+}
+
+/** Single player's pill in the cinematic tally row. */
+function CinematicPill({
+  name, total, active, delayMs, isWinner, isHighlighted,
+}: {
+  name: string; total: number;
+  active: boolean; delayMs: number;
+  isWinner: boolean; isHighlighted: boolean;
+}) {
+  const display = useCountUp(total, 700, active, delayMs);
+  return (
+    <motion.div
+      className={`cinematic-pill${isWinner ? " winner" : ""}${isHighlighted ? " highlighted" : ""}`}
+      initial={{ y: -40, opacity: 0, scale: 0.7 }}
+      animate={{ y: 0, opacity: 1, scale: 1 }}
+      transition={{ type: "spring", stiffness: 200, damping: 20, delay: delayMs / 1000 }}
+    >
+      <div className="cinematic-pill-name">{name}</div>
+      <div className="cinematic-pill-points">{display}</div>
+    </motion.div>
+  );
+}
+
+type CinematicStage = "title" | "tally" | "winner" | "modal";
+
 export function RoundEndOverlay() {
   const game = useStore((s) => s.game!);
   const mode = useStore((s) => s.mode);
@@ -99,6 +149,28 @@ export function RoundEndOverlay() {
   const playAgain = useStore((s) => s.playAgain);
   const backToMenu = useStore((s) => s.backToMenu);
   const kickedSet = new Set(mp?.kickedIds ?? []);
+  const reduced = useReducedMotion() ?? false;
+
+  // ── Cinematic stage machine. Drives a 3-beat opening before the
+  //    existing scoreboard modal slides in:
+  //      title  (0   to  0.7s)  → big "Round Over" headline, cards already
+  //                                flipping face-up via the round_over phase
+  //      tally  (0.7 to  2.0s)  → each player's hand value count-ups from 0
+  //                                inside a pill row at the top of the overlay
+  //      winner (2.0 to  3.0s)  → winner pill pulses, confetti bursts, a
+  //                                "WINS THE ROUND" stamp slams in
+  //      modal  (3.0s onward)   → existing leaderboard modal slides up
+  //    Tap anywhere during cinematic to skip to the modal.
+  //    Reduced-motion users go straight to modal.
+  const [stage, setStage] = useState<CinematicStage>("title");
+  useEffect(() => {
+    if (game.phase !== "round_over") { setStage("title"); return; }
+    if (reduced) { setStage("modal"); return; }
+    const t1 = setTimeout(() => setStage("tally"),  700);
+    const t2 = setTimeout(() => setStage("winner"), 2000);
+    const t3 = setTimeout(() => setStage("modal"),  3000);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+  }, [game.phase, game.roundNumber, reduced]);
 
   // Play the win/lose SFX once per round end. Keyed on roundNumber so a fresh
   // round triggers a fresh sound, and reconnecting mid-overlay still plays it.
@@ -112,6 +184,23 @@ export function RoundEndOverlay() {
     playedFor.current = game.roundNumber;
     Audio.playSfx(game.winnerId === humanId ? "win" : "lose");
   }, [game.phase, game.roundNumber, game.winnerId, humanId, mp?.gloriosVictory]);
+
+  // Confetti burst at the "winner" beat — only for a clean (non-tie) win.
+  const confettiFiredFor = useRef<number | null>(null);
+  useEffect(() => {
+    if (stage !== "winner") return;
+    if (game.phase !== "round_over") return;
+    if (confettiFiredFor.current === game.roundNumber) return;
+    confettiFiredFor.current = game.roundNumber;
+    if (reduced) return;
+    confetti({
+      particleCount: 80,
+      spread: 75,
+      startVelocity: 32,
+      origin: { y: 0.45 },
+      colors: ["#ffd86b", "#a87bff", "#67e0a3", "#ff5b6e", "#7aa8ff"],
+    });
+  }, [stage, game.phase, game.roundNumber, reduced]);
 
   if (game.phase !== "round_over") return null;
   // GloriousVictory takes over when a winner is declared — hide this overlay.
@@ -159,18 +248,77 @@ export function RoundEndOverlay() {
     modalLowestCounts.push(values.filter((v) => v === min).length);
   }
 
+  // Sort for the cinematic pill row — same order as the modal so the
+  // user's eye doesn't jump from one ordering to another between beats.
+  const pillRows = rows;
+  const winnerName = !isTie ? (winner?.name ?? "") : "";
+
   return (
     <AnimatePresence>
       <motion.div
-        className="overlay"
+        className="overlay round-end-overlay"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
+        onClick={stage !== "modal" ? () => setStage("modal") : undefined}
+        style={{ cursor: stage !== "modal" ? "pointer" : "default" }}
       >
+        {/* ── Beats 1–3: cinematic title + pill tally + winner stamp ── */}
+        <AnimatePresence>
+          {stage !== "modal" && (
+            <motion.div
+              key="cinematic"
+              className="round-cinematic"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.25 } }}
+            >
+              <motion.h1
+                className="cinematic-title"
+                initial={{ scale: 0.55, y: -30, opacity: 0 }}
+                animate={{ scale: 1, y: 0, opacity: 1 }}
+                transition={{ type: "spring", stiffness: 220, damping: 18, delay: 0.15 }}
+              >
+                {isTie ? "It's a tie" : "Round Over"}
+              </motion.h1>
+
+              <div className="cinematic-pills">
+                {pillRows.map((row, i) => (
+                  <CinematicPill
+                    key={row.id}
+                    name={row.name}
+                    total={row.handSum}
+                    active={stage === "tally" || stage === "winner"}
+                    delayMs={i * 140}
+                    isWinner={!isTie && winner?.id === row.id}
+                    isHighlighted={stage === "winner" && !isTie && winner?.id === row.id}
+                  />
+                ))}
+              </div>
+
+              {stage === "winner" && !isTie && (
+                <motion.div
+                  className="cinematic-winner-stamp"
+                  initial={{ scale: 0.4, rotate: -8, opacity: 0 }}
+                  animate={{ scale: 1, rotate: -4, opacity: 1 }}
+                  transition={{ type: "spring", stiffness: 320, damping: 16 }}
+                >
+                  {winnerName} wins the round
+                </motion.div>
+              )}
+
+              <div className="cinematic-skip-hint">tap to skip</div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── Beat 4: existing scoreboard modal, slides up from below ── */}
+        {stage === "modal" && (
         <motion.div
           className="modal"
-          initial={{ scale: 0.6, y: 20, rotate: -4 }}
-          animate={{ scale: 1, y: 0, rotate: 0 }}
-          transition={{ type: "spring", stiffness: 200, damping: 18 }}
+          initial={{ scale: 0.85, y: 60, opacity: 0 }}
+          animate={{ scale: 1, y: 0, opacity: 1 }}
+          transition={{ type: "spring", stiffness: 180, damping: 22 }}
+          onClick={(e) => e.stopPropagation()}
         >
           <div className="modal-burst">{isTie ? "🤝" : "🎉"}</div>
           {isTie ? (
@@ -241,6 +389,7 @@ export function RoundEndOverlay() {
             <button className="btn" onClick={backToMenu}>Main menu</button>
           </div>
         </motion.div>
+        )}
       </motion.div>
     </AnimatePresence>
   );

@@ -179,11 +179,13 @@ export function Center() {
               </motion.div>
             ) : (
               <>
-                {/* Buried under-pile cards (everything below the top). These
-                    are static — already settled in place; no entrance
-                    animation. The inner CardView still owns its layoutId so
-                    framer-motion handles the small position shift when this
-                    card was previously the top and is now buried. */}
+                {/* Buried under-pile cards (everything below the top).
+                    Pure static stamps: no motion.div, NO layoutId.
+                    layoutId on a settled card caused continuous twitching
+                    because framer-motion's LayoutGroup re-measured the
+                    position every render and animated the subpixel
+                    variance. These cards never move once placed, so we
+                    drop the shared-element link and let CSS position them. */}
                 {visiblePile.slice(0, -1).map((card, i) => {
                   const absoluteIdx = pileBaseAbsoluteIdx + i;
                   const rot = pileRotation(card.id, absoluteIdx);
@@ -204,7 +206,6 @@ export function Center() {
                         card={card}
                         faceUp={true}
                         size="md"
-                        layoutId={card.id}
                       />
                     </div>
                   );
