@@ -162,22 +162,14 @@ export function LeftPanel({ className = "" }: LeftPanelProps = {}) {
             : "Swap it into your hand or discard it.";
         buttons = (
           <>
-            {/* Always: swap into hand */}
-            <button
-              className={`btn left-btn ${targeting === "swap_hand" ? "primary" : ""}`}
-              onClick={() => setTargeting("swap_hand")}
-            >
-              🔄 {targeting === "swap_hand" ? "Pick a card to swap…" : "Swap into Hand"}
-            </button>
-
-            {/* Only for action cards: use the ability (with CSS tooltip) */}
+            {/* Action FIRST (only for action cards): use the ability */}
             {drawnAction && actionMeta && (
               <div
                 className="left-tip-wrap"
                 data-tip={actionMeta.desc}
               >
                 <button
-                  className="btn left-btn action-trigger-btn"
+                  className="btn left-btn action-trigger-btn primary"
                   style={{ borderColor: actionMeta.color, color: actionMeta.color }}
                   disabled={game.drawnFrom === "discard"}
                   onClick={() => { Audio.playSfx("action_trigger"); discardAndTrigger(); }}
@@ -187,7 +179,15 @@ export function LeftPanel({ className = "" }: LeftPanelProps = {}) {
               </div>
             )}
 
-            {/* Always: plain discard (never triggers action) */}
+            {/* Then: swap into hand */}
+            <button
+              className={`btn left-btn ${targeting === "swap_hand" ? "primary" : ""}`}
+              onClick={() => setTargeting("swap_hand")}
+            >
+              🔄 {targeting === "swap_hand" ? "Pick a card to swap…" : "Swap into Hand"}
+            </button>
+
+            {/* Last: plain discard (never triggers action) */}
             <button
               className="btn left-btn"
               disabled={game.drawnFrom === "discard"}
