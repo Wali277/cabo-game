@@ -1,7 +1,7 @@
 /**
  * Visual config for every card skin + the inline SVG for the racing-helmet
  * silhouette used by the McLaren tributes (no logos, no trademarks — just
- * colors and a generic helmet shape).
+ * colors and a generic helmet shape based on a side-profile racing helmet).
  *
  * Each skin describes how its FACE and BACK should look. `Card.tsx` reads
  * `useCardSkin()` and pulls the matching record from here. Adding a new skin
@@ -22,38 +22,38 @@ export interface SkinStyle {
   suitColor?: { red: string; black: string };
   /** Font stack for the rank corners + center glyph. */
   font?: string;
-  /** Renders the CENTER of the card. By default the suit glyph at 48% w.
-   *  Override to render anything (e.g. the McLaren helmet). */
-  centerOverride?: "helmet" | null;
-  /** Optional SVG pattern URL or inline data: overlay on top of the face
-   *  for textural skins (Hand-drawn crosshatch). */
-  patternOverlay?: string;
-  /** Decorative stripe across the face — used by McLaren Senna's Monaco
-   *  green band. `null` = no stripe. */
-  faceStripe?: { color: string; startPct: number; endPct: number } | null;
-  /** Card back background + border + center logo style. */
+  /** Card back style — which renderer to use for the centre logo. */
+  backCenter?: "cabo" | "helmet" | "handdrawn";
+  /** Card back background + border. */
   backBg: string;
   backBorder: string;
-  /** What to render in the center of the card BACK.
-   *   - "cabo": classic CABO wordmark (default)
-   *   - "helmet": helmet silhouette (McLaren skins)
-   *   - "mono-rank": just a single rank letter in skin color (Minimalist) */
-  backCenter?: "cabo" | "helmet" | "monogram";
   /** Color of the "CABO" pill on the back when backCenter === "cabo". */
   caboColor?: string;
   /** Background of the CABO pill on the back. */
   caboPillBg?: string;
   /** Optional sticker on the card back — small badge in a corner. */
   backBadge?: { text: string; color: string; bg: string } | null;
+  /** Optional inline SVG pattern overlay for the FACE (Hand-drawn crosshatch). */
+  patternOverlay?: string;
+  /** Same pattern overlay applied to the BACK (Hand-drawn). */
+  backPatternOverlay?: string;
 }
 
-const DEFAULT_FONT = "'Fredoka', 'Comic Sans MS', system-ui, sans-serif";
+// All text on every skin now uses Fredoka — the user's request for
+// "use the same font as on the classic". This keeps the project's
+// single self-hosted font family in play (no Google Fonts hop) and
+// lets each skin earn its personality through color/effects, not type.
+const FONT = "'Fredoka', 'Fredoka One', system-ui, sans-serif";
+
+/** Inline SVG crosshatch — diagonal pen strokes for the Hand-drawn skin. */
+const CROSSHATCH = `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14'><g stroke='%23262220' stroke-width='0.7' opacity='0.20'><line x1='0' y1='14' x2='14' y2='0'/><line x1='-7' y1='7' x2='7' y2='-7'/><line x1='7' y1='21' x2='21' y2='7'/></g></svg>")`;
 
 export const SKIN_STYLES: Record<CardSkin, SkinStyle> = {
+  // ── Classic — current yellow + black ───────────────────────────────
   classic: {
     faceBg: "#ffd86b",
     faceBorder: "#1c1d2b",
-    font: DEFAULT_FONT,
+    font: FONT,
     backBg: "#1c1d2b",
     backBorder: "#ffd86b",
     backCenter: "cabo",
@@ -61,30 +61,28 @@ export const SKIN_STYLES: Record<CardSkin, SkinStyle> = {
     caboPillBg: "#ffd86b",
   },
 
+  // ── Royal — deep velvet red with gold gilt suits + gold border ─────
   royal: {
-    // Deep velvet red with a subtle radial sheen — looks like a tabletop
-    // playing card from a high-end set.
     faceBg:
-      "radial-gradient(circle at 30% 18%, rgba(255,221,150,0.18) 0%, transparent 55%), linear-gradient(160deg, #7c1a26 0%, #5b1019 60%, #3d0911 100%)",
+      "radial-gradient(circle at 30% 18%, rgba(255,221,150,0.20) 0%, transparent 55%), linear-gradient(160deg, #7c1a26 0%, #5b1019 60%, #3d0911 100%)",
     faceBorder: "#d4af37",
     suitColor: { red: "#f4cf5b", black: "#f4cf5b" },
-    font: "'Cormorant Garamond', 'Times New Roman', Georgia, serif",
+    font: FONT,
     backBg:
-      "radial-gradient(circle at 30% 18%, rgba(255,221,150,0.20) 0%, transparent 60%), linear-gradient(160deg, #7c1a26 0%, #4a0d15 100%)",
+      "radial-gradient(circle at 30% 18%, rgba(255,221,150,0.22) 0%, transparent 60%), linear-gradient(160deg, #7c1a26 0%, #4a0d15 100%)",
     backBorder: "#d4af37",
     backCenter: "cabo",
     caboColor: "#7c1a26",
     caboPillBg: "#d4af37",
   },
 
+  // ── Neon — cyber black with cyan/magenta glow ──────────────────────
   neon: {
-    // Pure black with a subtle scan-line — the cyan/magenta glow comes
-    // from the box-shadow on `.card-skin-neon` in App.css.
     faceBg:
       "repeating-linear-gradient(180deg, #0a0a14 0px, #0a0a14 3px, #0d0d1a 3px, #0d0d1a 4px)",
     faceBorder: "#00e5ff",
     suitColor: { red: "#ff2dca", black: "#00e5ff" },
-    font: "'JetBrains Mono', 'Menlo', 'Consolas', monospace",
+    font: FONT,
     backBg:
       "repeating-linear-gradient(180deg, #050510 0px, #050510 3px, #08081a 3px, #08081a 4px)",
     backBorder: "#ff2dca",
@@ -93,61 +91,67 @@ export const SKIN_STYLES: Record<CardSkin, SkinStyle> = {
     caboPillBg: "#00e5ff",
   },
 
+  // ── Hand-drawn — sketched ink with crosshatch on BOTH face & back ──
   handdrawn: {
     faceBg: "#f3ead4",
     faceBorder: "#262220",
-    suitColor: { red: "#262220", black: "#262220" }, // single-ink sketch
-    font: "'Caveat', 'Patrick Hand', 'Bradley Hand', cursive",
-    patternOverlay:
-      // Inline SVG crosshatch — diagonal pen strokes at 35° and 145°.
-      // Used as a CSS background image with very low opacity.
-      `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14'><g stroke='%23262220' stroke-width='0.7' opacity='0.16'><line x1='0' y1='14' x2='14' y2='0'/><line x1='-7' y1='7' x2='7' y2='-7'/><line x1='7' y1='21' x2='21' y2='7'/></g></svg>")`,
-    backBg: "#e8dcb8",
+    suitColor: { red: "#262220", black: "#262220" },
+    font: FONT,
+    patternOverlay: CROSSHATCH,
+    backBg:
+      "linear-gradient(160deg, #f5ecd5 0%, #ede0bd 100%)",
     backBorder: "#262220",
-    backCenter: "cabo",
-    caboColor: "#262220",
-    caboPillBg: "#f3ead4",
+    backCenter: "handdrawn",
+    backPatternOverlay: CROSSHATCH,
   },
 
+  // ── Minimalist — pure black-and-white version of Classic ───────────
+  // Same layout as Classic: rank corners with suit glyph, big center
+  // suit. Just stripped to monochrome — no red/black, no yellow.
   minimalist: {
     faceBg: "#ffffff",
     faceBorder: "#0a0a0a",
     suitColor: { red: "#0a0a0a", black: "#0a0a0a" },
-    font: "'Inter Tight', 'Helvetica Neue', system-ui, sans-serif",
-    backBg: "#ffffff",
-    backBorder: "#0a0a0a",
-    backCenter: "monogram", // just a single big rank-less mark
+    font: FONT,
+    backBg: "#0a0a0a",
+    backBorder: "#ffffff",
+    backCenter: "cabo",
     caboColor: "#0a0a0a",
     caboPillBg: "#ffffff",
   },
 
+  // ── McLaren Papaya — orange + black, helmet ONLY on back ───────────
+  // Face is a normal playing card with black suits/ranks on papaya
+  // orange. Helmet silhouette dominates the back.
   mclaren_papaya: {
-    // Iconic McLaren papaya orange.
     faceBg:
-      "radial-gradient(circle at 50% 12%, rgba(255,255,255,0.12) 0%, transparent 55%), linear-gradient(160deg, #ff8000 0%, #ee6a00 100%)",
+      // Sleek papaya: vertical gradient with a soft top highlight and a
+      // bottom shadow so the card has subtle "race livery" depth.
+      "radial-gradient(circle at 50% 0%, rgba(255,255,255,0.22) 0%, transparent 55%), radial-gradient(circle at 50% 100%, rgba(0,0,0,0.15) 0%, transparent 60%), linear-gradient(160deg, #ff8a14 0%, #ff8000 50%, #e16a00 100%)",
     faceBorder: "#0a0a0a",
     suitColor: { red: "#0a0a0a", black: "#0a0a0a" },
-    font: "'Barlow Condensed', 'Oswald', 'Arial Narrow', sans-serif",
-    centerOverride: "helmet",
+    font: FONT,
     backBg:
-      "radial-gradient(circle at 50% 30%, rgba(255,255,255,0.10) 0%, transparent 55%), linear-gradient(160deg, #ff8000 0%, #d65a00 100%)",
+      // Slightly more saturated for the back so the helmet pops harder.
+      "radial-gradient(circle at 50% 30%, rgba(255,255,255,0.22) 0%, transparent 60%), radial-gradient(circle at 50% 110%, rgba(0,0,0,0.30) 0%, transparent 65%), linear-gradient(160deg, #ff8a14 0%, #ff8000 55%, #d96500 100%)",
     backBorder: "#0a0a0a",
     backCenter: "helmet",
   },
 
+  // ── McLaren Senna Monaco '24 — yellow / green / blue tribute ───────
   mclaren_senna: {
-    // Senna Monaco '24 livery: yellow base, green stripe, blue accents.
     faceBg:
-      "radial-gradient(circle at 50% 8%, rgba(255,255,255,0.12) 0%, transparent 50%), linear-gradient(160deg, #ffdd00 0%, #f5cf00 100%)",
+      // Yellow base with a subtle top sheen — kept clean so the blue
+      // suits read crisp.
+      "radial-gradient(circle at 50% 0%, rgba(255,255,255,0.28) 0%, transparent 50%), linear-gradient(160deg, #ffe533 0%, #ffdd00 40%, #f0cc00 100%)",
     faceBorder: "#002776",
     suitColor: { red: "#002776", black: "#002776" },
-    font: "'Barlow Condensed', 'Oswald', 'Arial Narrow', sans-serif",
-    centerOverride: "helmet",
-    // Green stripe across the bottom third of the card — the unmistakable
-    // band from the Monaco helmet/livery.
-    faceStripe: { color: "#009739", startPct: 70, endPct: 86 },
+    font: FONT,
+    // Layered horizontal bands evoke the Monaco livery: a thin blue
+    // racing line near the top, a green band lower on the card, with
+    // yellow dominating the rest.
     backBg:
-      "linear-gradient(180deg, #ffdd00 0%, #ffdd00 64%, #009739 64%, #009739 80%, #ffdd00 80%, #ffdd00 100%)",
+      "linear-gradient(180deg, #ffdd00 0%, #ffdd00 16%, #002776 16%, #002776 20%, #ffdd00 20%, #ffdd00 70%, #009739 70%, #009739 82%, #ffdd00 82%, #ffdd00 100%)",
     backBorder: "#002776",
     backCenter: "helmet",
     backBadge: { text: "1", color: "#ffdd00", bg: "#002776" },
@@ -157,91 +161,133 @@ export const SKIN_STYLES: Record<CardSkin, SkinStyle> = {
 /* ─────────────────────────────────────────────────────────────────────────
    <HelmetIcon /> — generic racing-helmet silhouette.
 
-   No logos, no McLaren wordmark. The helmet is drawn at viewBox 100×100;
-   pass `size` to scale.  `visorBg` controls the visor inset color (used so
-   the visor appears as a colored "window" against the helmet shell — pass
-   the underlying card bg color and it looks like a knockout).
+   Side-profile racing helmet with an L-shaped visor opening carved into
+   the lower-left. No logos, no McLaren wordmark. The path is taken from
+   a public SVG (CC0/no-trademark) the user provided, and rendered as a
+   single fill in `shellColor` (default black). The visor area is a notch
+   in the outline itself, so whatever sits behind the SVG shows through.
    ─────────────────────────────────────────────────────────────────────── */
 export function HelmetIcon({
   size,
   shellColor = "#0a0a0a",
-  visorBg = "#ff8000",
-  highlightColor = "rgba(255,255,255,0.6)",
 }: {
   size: number;
   shellColor?: string;
-  visorBg?: string;
-  highlightColor?: string;
 }) {
+  // Original viewBox 512×512. Path content actually extends slightly
+  // outside (x reaches ~530), so we widen the viewBox to 540×480 with a
+  // hair of margin and the SVG renders cleanly without clipping.
   return (
     <svg
-      viewBox="0 0 100 100"
+      viewBox="-10 0 550 480"
       width={size}
-      height={size}
+      height={size * (480 / 550)}
       style={{ display: "block" }}
       aria-hidden="true"
     >
-      {/* Soft drop shadow underneath */}
-      <ellipse cx="50" cy="86" rx="28" ry="3.2" fill="rgba(0,0,0,0.25)" />
-
-      {/* Helmet shell — rounded racing form with slight rear bulge */}
       <path
-        d="M 50 12
-           C 28 12, 14 28, 14 52
-           C 14 64, 18 74, 26 78
-           L 30 80
-           L 70 80
-           L 74 78
-           C 82 74, 86 64, 86 52
-           C 86 28, 72 12, 50 12 Z"
         fill={shellColor}
+        fillRule="evenodd"
+        d="M231.744,43.821C113.192,61.604,37.922,149.161,25.278,267.139H195.68c3.907,0,7.562,1.899,9.795,5.11
+           c2.234,3.201,2.766,7.282,1.422,10.951l-15.116,58.123c-1.343,3.65-4.558,6.292-8.401,6.916L4.214,359.832L0,471.547h442.42
+           c29.492-35.817,58.989-128.564,67.414-187.558C530.53,139.127,400.283,18.552,231.744,43.821z
+           M156.534,143.135l-47.58,3.137c21.917-34.441,69.496-53.225,88.28-53.225C178.45,114.958,156.534,143.135,156.534,143.135z"
       />
-
-      {/* Subtle top highlight band to give the shell volume */}
-      <path
-        d="M 28 24 Q 50 14 72 24 Q 70 30 50 30 Q 30 30 28 24 Z"
-        fill="rgba(255,255,255,0.10)"
-      />
-
-      {/* Visor — wraps low across the brow */}
-      <path
-        d="M 20 44
-           C 22 38, 30 36, 42 36
-           L 60 36
-           C 72 36, 80 40, 80 46
-           L 78 52
-           C 73 56, 64 58, 50 58
-           C 36 58, 27 56, 22 52 Z"
-        fill={visorBg}
-      />
-
-      {/* Inner visor frame — thin dark line giving the visor edge definition */}
-      <path
-        d="M 20 44
-           C 22 38, 30 36, 42 36
-           L 60 36
-           C 72 36, 80 40, 80 46"
-        stroke={shellColor}
-        strokeWidth="1.6"
-        fill="none"
-      />
-
-      {/* Visor reflection — single highlight stroke top of the visor */}
-      <path
-        d="M 28 42 Q 50 39 72 42"
-        stroke={highlightColor}
-        strokeWidth="1.4"
-        fill="none"
-        opacity="0.85"
-        strokeLinecap="round"
-      />
-
-      {/* Chin guard — small rectangle at the bottom front */}
-      <path
-        d="M 36 78 L 64 78 L 62 84 L 38 84 Z"
-        fill={shellColor}
-      />
-      <rect x="42" y="78" width="16" height="1.5" fill="rgba(255,255,255,0.20)" />
     </svg>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   <HandDrawnBack /> — full back design for the Hand-drawn skin.
+
+   Cream paper background with crosshatch (added by Card.tsx as a pattern
+   overlay layer), centre "CABO" sketched-style wordmark with a wavy
+   underline, plus four small doodles in the corners so the back feels
+   like a notebook scribble rather than the usual pill.
+   ─────────────────────────────────────────────────────────────────────── */
+export function HandDrawnBack({ w }: { w: number }) {
+  const ink = "#262220";
+
+  return (
+    <div
+      style={{
+        width: "100%", height: "100%",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        position: "relative",
+      }}
+    >
+      {/* Small doodles around the corners */}
+      <svg
+        viewBox="0 0 100 145"
+        preserveAspectRatio="none"
+        style={{
+          position: "absolute", inset: 0,
+          width: "100%", height: "100%",
+          pointerEvents: "none",
+        }}
+        aria-hidden="true"
+      >
+        {/* Top-left flourish: tiny spiral */}
+        <path
+          d="M 14 14 q 5 -5 8 1 q -2 6 -6 2 q -1 -3 3 -3"
+          stroke={ink} strokeWidth="1.2" fill="none" strokeLinecap="round"
+          opacity="0.7"
+        />
+        {/* Top-right star */}
+        <g stroke={ink} strokeWidth="1.1" fill="none" strokeLinecap="round" opacity="0.7">
+          <line x1="84" y1="12" x2="84" y2="22" />
+          <line x1="79" y1="17" x2="89" y2="17" />
+          <line x1="80.5" y1="13.5" x2="87.5" y2="20.5" />
+          <line x1="87.5" y1="13.5" x2="80.5" y2="20.5" />
+        </g>
+        {/* Bottom-left heart */}
+        <path
+          d="M 14 128 q -3 -4 0 -6 q 3 -2 4 1 q 1 -3 4 -1 q 3 2 0 6 q -3 4 -4 5 q -1 -1 -4 -5 z"
+          fill={ink} opacity="0.6"
+        />
+        {/* Bottom-right dot cluster */}
+        <g fill={ink} opacity="0.65">
+          <circle cx="83" cy="128" r="1.6" />
+          <circle cx="88" cy="131" r="1.1" />
+          <circle cx="80" cy="133" r="1" />
+        </g>
+      </svg>
+
+      {/* CABO sketched wordmark, slightly rotated */}
+      <div
+        style={{
+          transform: "rotate(-6deg)",
+          textAlign: "center",
+          color: ink,
+        }}
+      >
+        <div
+          style={{
+            fontFamily: "'Fredoka', system-ui, sans-serif",
+            fontWeight: 900,
+            fontSize: w * 0.34,
+            letterSpacing: 2,
+            lineHeight: 1,
+            textShadow: "1px 1px 0 rgba(0,0,0,0.06)",
+          }}
+        >
+          CABO
+        </div>
+        {/* Wavy hand-drawn underline */}
+        <svg
+          viewBox="0 0 80 10"
+          style={{ width: w * 0.7, height: w * 0.12, marginTop: 2 }}
+          aria-hidden="true"
+        >
+          <path
+            d="M 2 5 Q 12 1, 22 5 T 42 5 T 62 5 T 78 5"
+            stroke={ink}
+            strokeWidth="1.6"
+            fill="none"
+            strokeLinecap="round"
+          />
+        </svg>
+      </div>
+    </div>
   );
 }

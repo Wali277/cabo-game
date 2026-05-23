@@ -3686,3 +3686,32 @@ body.mobile-mode .customize-popover {
 body.mobile-mode .skin-grid {
   max-height: min(360px, calc(100vh - 220px));
 }
+
+/* ── v3.1 round-2 polish: McLaren Senna glow + premium card-tile feel ── */
+.card-wrap.card-skin-mclaren_senna {
+  filter: drop-shadow(0 0 6px rgba(0, 39, 118, 0.32));
+}
+
+/* Lift skin tiles a touch on hover so they feel tactile in the picker */
+.skin-tile-mclaren_papaya:hover,
+.skin-tile-mclaren_senna:hover {
+  box-shadow:
+    0 6px 18px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* Selected McLaren tiles ring in their livery color, not the generic gold */
+.skin-tile.selected.skin-tile-mclaren_papaya {
+  border-color: #ff8000;
+  box-shadow: 0 0 0 1px rgba(255, 128, 0, 0.35);
+}
+.skin-tile.selected.skin-tile-mclaren_papaya .skin-tile-label {
+  color: #ff8000;
+}
+.skin-tile.selected.skin-tile-mclaren_senna {
+  border-color: #009739;
+  box-shadow: 0 0 0 1px rgba(0, 151, 57, 0.35);
+}
+.skin-tile.selected.skin-tile-mclaren_senna .skin-tile-label {
+  color: #009739;
+}

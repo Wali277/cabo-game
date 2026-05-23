@@ -3,7 +3,7 @@ import type React from "react";
 import type { Card as CardT } from "../engine/types";
 import { useViewMode } from "../state/viewmode";
 import { useCardSkin } from "../state/cardskin";
-import { SKIN_STYLES, HelmetIcon } from "./cardSkins";
+import { SKIN_STYLES, HelmetIcon, HandDrawnBack } from "./cardSkins";
 
 interface Props {
   card?: CardT | null;
@@ -20,15 +20,6 @@ interface Props {
 
 const SUIT_GLYPH: Record<string, string> = { S: "♠", H: "♥", D: "♦", C: "♣" };
 
-// Card pixel widths per size, split per view mode.
-//
-// Desktop math (unchanged):
-//   sm = 56, md = 80, lg = 110
-//
-// Mobile math: per user request, OPPONENT (md) and HUMAN (lg) cards are now
-// the same size so every player's row visually lines up. 60×87 fits 3
-// opponents on iPhone 12+ (375×812) with margin to spare, and any single
-// opponent row is the same width as the human's row — true symmetry.
 const SIZE_PX: Record<"desktop" | "mobile", Record<"sm" | "md" | "lg", number>> = {
   desktop: { sm: 56, md: 80, lg: 110 },
   mobile:  { sm: 40, md: 60, lg: 60  },
@@ -66,15 +57,9 @@ export function CardView({
       }}
       onClick={onClick}
       animate={shake ? { x: [0, -6, 6, -4, 4, 0] } : {}}
-      // Disable `whileHover` on phones — touch devices fire spurious hover
-      // events on tap (especially the second tap-and-release), which made
-      // individual cards "shake" while the others sat still. Mobile users
-      // never see hover state anyway, so this only affects bug behaviour.
       whileHover={onClick && viewMode === "desktop" ? { y: -6, scale: 1.04 } : {}}
       transition={{
         layout: { type: "spring", stiffness: 200, damping: 32, mass: 1 },
-        // Slightly higher damping on mobile so layout reflows settle quickly
-        // instead of bouncing/overshooting after every state change.
         default: viewMode === "mobile"
           ? { type: "spring", stiffness: 260, damping: 32, mass: 1 }
           : { type: "spring", stiffness: 300, damping: 24 },
@@ -87,8 +72,8 @@ export function CardView({
         transition={{ duration: flipDuration, type: "spring", stiffness: 160, damping: 18 }}
         style={{ width: "100%", height: "100%", transformStyle: "preserve-3d", position: "relative" }}
       >
-        <CardFace card={card} w={w} h={h} skin={skin} skinId={skinId} />
-        <CardBack w={w} h={h} skin={skin} skinId={skinId} card={card} />
+        <CardFace card={card} w={w} h={h} skin={skin} />
+        <CardBack w={w} h={h} skin={skin} />
       </motion.div>
     </motion.div>
   );
@@ -101,20 +86,12 @@ function suitTextColor(suit: string, skin: import("./cardSkins").SkinStyle): str
   return isRed ? "#e23a5e" : "#1c1d2b";
 }
 
-/** Bg color used as the helmet visor inset so it reads like a knockout. */
-function visorBgForSkin(skinId: import("../state/cardskin").CardSkin): string {
-  if (skinId === "mclaren_papaya") return "#ff8000";
-  if (skinId === "mclaren_senna")  return "#ffdd00";
-  return "#ffd86b";
-}
-
 function CardFace({
-  card, w, h, skin, skinId,
+  card, w, h, skin,
 }: {
   card?: CardT | null;
   w: number; h: number;
   skin: import("./cardSkins").SkinStyle;
-  skinId: import("../state/cardskin").CardSkin;
 }) {
   // Empty-slot placeholder (no card in this hand index).
   if (!card) {
@@ -139,10 +116,9 @@ function CardFace({
     const faceColor = isRed ? "#e23a5e" : "#1c1d2b";
 
     const letterFs = w * 0.11;
-    const letterLh = 1.05;
     const letterStyle: React.CSSProperties = {
       fontSize: letterFs,
-      lineHeight: letterLh,
+      lineHeight: 1.05,
       fontWeight: 900,
       color: faceColor,
       display: "flex",
@@ -165,7 +141,7 @@ function CardFace({
           border: "3px solid #1c1d2b",
           boxShadow: "0 6px 18px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.5)",
           overflow: "hidden",
-          fontFamily: "'Fredoka', 'Comic Sans MS', system-ui, sans-serif",
+          fontFamily: "'Fredoka', system-ui, sans-serif",
         }}
       >
         <div style={{ position: "absolute", top: 6, left: 8, ...letterStyle }}>
@@ -194,57 +170,7 @@ function CardFace({
 
   const color = suitTextColor(card.suit, skin);
   const glyph = SUIT_GLYPH[card.suit];
-  const font = skin.font ?? "'Fredoka', 'Comic Sans MS', system-ui, sans-serif";
-
-  // Minimalist: corners are smaller; no center glyph — just a single big
-  // rank in the middle of the card. This is the most distinct skin.
-  const isMinimalist = skinId === "minimalist";
-
-  // Center rendering branches by skin:
-  //   - "helmet" override → McLaren helmet silhouette
-  //   - minimalist        → big rank, no suit
-  //   - default           → big suit glyph
-  let centerNode: React.ReactNode;
-  if (skin.centerOverride === "helmet") {
-    centerNode = (
-      <div style={{ alignSelf: "center" }}>
-        <HelmetIcon
-          size={w * 0.56}
-          shellColor="#0a0a0a"
-          visorBg={visorBgForSkin(skinId)}
-        />
-      </div>
-    );
-  } else if (isMinimalist) {
-    centerNode = (
-      <div
-        style={{
-          alignSelf: "center",
-          fontSize: w * 0.6,
-          lineHeight: 1,
-          fontWeight: 600,
-          color,
-          letterSpacing: card.rank.length > 1 ? "-2px" : 0,
-        }}
-      >
-        {card.rank}
-      </div>
-    );
-  } else {
-    centerNode = (
-      <div
-        style={{
-          alignSelf: "center",
-          fontSize: w * 0.48,
-          lineHeight: 1,
-          color,
-          textShadow: `1px 2px 0 rgba(0,0,0,0.12)`,
-        }}
-      >
-        {glyph}
-      </div>
-    );
-  }
+  const font = skin.font ?? "'Fredoka', system-ui, sans-serif";
 
   return (
     <div
@@ -267,22 +193,6 @@ function CardFace({
         color,
       }}
     >
-      {/* Optional decorative stripe (McLaren Senna's Monaco green band) */}
-      {skin.faceStripe && (
-        <div
-          style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            top: `${skin.faceStripe.startPct}%`,
-            height: `${skin.faceStripe.endPct - skin.faceStripe.startPct}%`,
-            background: skin.faceStripe.color,
-            pointerEvents: "none",
-            zIndex: 0,
-          }}
-        />
-      )}
-
       {/* Optional pattern overlay (Hand-drawn crosshatch) */}
       {skin.patternOverlay && (
         <div
@@ -303,14 +213,21 @@ function CardFace({
         whiteSpace: "nowrap", zIndex: 1, position: "relative",
       }}>
         {card.rank}
-        {!isMinimalist && (
-          <div style={{ fontSize: w * 0.17, lineHeight: 1 }}>{glyph}</div>
-        )}
+        <div style={{ fontSize: w * 0.17, lineHeight: 1 }}>{glyph}</div>
       </div>
 
-      {/* Center */}
-      <div style={{ zIndex: 1, position: "relative", alignSelf: "stretch", display: "flex", flexDirection: "column", alignItems: "center" }}>
-        {centerNode}
+      {/* Centre suit glyph */}
+      <div
+        style={{
+          alignSelf: "center",
+          fontSize: w * 0.48,
+          lineHeight: 1,
+          textShadow: `1px 2px 0 rgba(0,0,0,0.12)`,
+          zIndex: 1,
+          position: "relative",
+        }}
+      >
+        {glyph}
       </div>
 
       {/* Bottom-right corner: rotated */}
@@ -327,16 +244,14 @@ function CardFace({
         }}
       >
         {card.rank}
-        {!isMinimalist && (
-          <div style={{ fontSize: w * 0.17, lineHeight: 1 }}>{glyph}</div>
-        )}
+        <div style={{ fontSize: w * 0.17, lineHeight: 1 }}>{glyph}</div>
       </div>
     </div>
   );
 }
 
 /**
- * Inline SVG jester face — unchanged from before. Used only on Joker.
+ * Inline SVG jester face — unchanged. Used only on Joker.
  */
 function JesterFace({ size, color }: { size: number; color: string }) {
   const bg = "#ffd86b";
@@ -359,36 +274,20 @@ function JesterFace({ size, color }: { size: number; color: string }) {
 }
 
 function CardBack({
-  w, h, skin, skinId, card,
+  w, h, skin,
 }: {
   w: number; h: number;
   skin: import("./cardSkins").SkinStyle;
-  skinId: import("../state/cardskin").CardSkin;
-  card?: CardT | null;
 }) {
   const font = skin.font ?? "'Fredoka', system-ui, sans-serif";
 
   let center: React.ReactNode;
   if (skin.backCenter === "helmet") {
     center = (
-      <HelmetIcon
-        size={w * 0.7}
-        shellColor="#0a0a0a"
-        visorBg={visorBgForSkin(skinId)}
-      />
+      <HelmetIcon size={w * 0.78} shellColor="#0a0a0a" />
     );
-  } else if (skin.backCenter === "monogram") {
-    // Minimalist: a tiny circular black dot mark — pure restraint.
-    center = (
-      <div
-        style={{
-          width: w * 0.18,
-          height: w * 0.18,
-          borderRadius: "50%",
-          background: "#0a0a0a",
-        }}
-      />
-    );
+  } else if (skin.backCenter === "handdrawn") {
+    center = <HandDrawnBack w={w} />;
   } else {
     // Default "CABO" pill
     center = (
@@ -411,10 +310,6 @@ function CardBack({
     );
   }
 
-  // Unused-suppression: keep `card` in the API so future skins can vary the
-  // back per-card (e.g. show suit). Currently the back is suit-agnostic.
-  void card;
-
   return (
     <div
       className="card-back"
@@ -431,7 +326,24 @@ function CardBack({
         overflow: "hidden",
       }}
     >
-      {center}
+      {/* Optional back pattern overlay (Hand-drawn crosshatch) */}
+      {skin.backPatternOverlay && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            backgroundImage: skin.backPatternOverlay,
+            pointerEvents: "none",
+            mixBlendMode: "multiply",
+            zIndex: 0,
+          }}
+        />
+      )}
+
+      <div style={{ position: "relative", zIndex: 1, width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        {center}
+      </div>
+
       {skin.backBadge && (
         <div
           style={{
@@ -449,7 +361,10 @@ function CardBack({
             alignItems: "center",
             justifyContent: "center",
             lineHeight: 1,
-            fontFamily: "'Barlow Condensed', 'Oswald', sans-serif",
+            fontFamily: font,
+            zIndex: 2,
+            boxShadow: "0 2px 6px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.3)",
+            border: "1.5px solid rgba(255,255,255,0.25)",
           }}
         >
           {skin.backBadge.text}
