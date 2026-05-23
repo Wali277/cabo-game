@@ -167,15 +167,28 @@ function CardFace({
     const jesterCutoutBg = skin.jesterBg ?? "#ffd86b";
 
     const letterFs = w * 0.11;
+    // Each letter sits in a fixed-width "cell" so the J/O/K/E/R stack
+    // shares a single visual axis. Without this, the natural widths of
+    // the letters (K and R are wide, J is narrow) leave a ragged
+    // left edge — the user-visible "misalignment". Cells are slightly
+    // wider than the widest letter at this font, giving small visual
+    // breathing room on either side of each glyph.
+    const cellSize = letterFs * 1.05;
     const letterStyle: React.CSSProperties = {
       fontSize: letterFs,
-      lineHeight: 1.05,
       fontWeight: 900,
       color: faceColor,
       display: "flex",
       flexDirection: "column",
-      alignItems: "flex-start",
+      alignItems: "center",
       userSelect: "none",
+    };
+    const letterCellStyle: React.CSSProperties = {
+      width: cellSize,
+      height: cellSize,
+      lineHeight: `${cellSize}px`,
+      textAlign: "center",
+      display: "block",
     };
 
     const jesterSize = w * 0.56;
@@ -195,8 +208,10 @@ function CardFace({
           fontFamily: skin.font ?? "'Fredoka', system-ui, sans-serif",
         }}
       >
-        <div style={{ position: "absolute", top: 6, left: 8, ...letterStyle }}>
-          {"JOKER".split("").map((ch, i) => <span key={i}>{ch}</span>)}
+        <div style={{ position: "absolute", top: 6, left: 6, ...letterStyle }}>
+          {"JOKER".split("").map((ch, i) => (
+            <span key={i} style={letterCellStyle}>{ch}</span>
+          ))}
         </div>
         <div style={{
           position: "absolute",
@@ -209,11 +224,13 @@ function CardFace({
         <div style={{
           position: "absolute",
           bottom: 6,
-          right: 8,
+          right: 6,
           transform: "rotate(180deg)",
           ...letterStyle,
         }}>
-          {"JOKER".split("").map((ch, i) => <span key={i}>{ch}</span>)}
+          {"JOKER".split("").map((ch, i) => (
+            <span key={i} style={letterCellStyle}>{ch}</span>
+          ))}
         </div>
       </div>
     );
