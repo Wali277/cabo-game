@@ -3,6 +3,7 @@ import type React from "react";
 import type { Card as CardT } from "../engine/types";
 import { useViewMode } from "../state/viewmode";
 import { useCardSkin } from "../state/cardskin";
+import { useStore } from "../state/store";
 import { SKIN_STYLES, HelmetIcon, HandDrawnBack, RoyalBack, NeonBack, MinimalistBack } from "./cardSkins";
 
 interface Props {
@@ -44,6 +45,22 @@ export function CardView({
   const skin = SKIN_STYLES[skinId];
   const reduced = useReducedMotion() ?? false;
 
+  // Subscribe ONLY to the kind of the most-recent animation event. The
+  // selector returns a primitive, so this re-renders only when that
+  // string changes — even though we mount on every card on the board.
+  //
+  // The Jack / Queen / King action moves (Blind Swap and Peek-and-Swap)
+  // get a noticeably slower spring than the standard hand-swap so the
+  // cards' path between seats is fully readable. Regular swap_hand is
+  // also slowed a touch from before so it stops feeling hasty.
+  const lastAnimKind = useStore((s) => {
+    const anims = s.game?.animations;
+    return anims && anims.length > 0 ? anims[anims.length - 1].kind : null;
+  });
+  const isActionCardSwap =
+    lastAnimKind === "blind_swap" || lastAnimKind === "peek_and_swap";
+  const isHandSwap = lastAnimKind === "swap_hand";
+
   const isHl = highlight === "selectable" || highlight === "selected";
 
   return (
@@ -60,21 +77,33 @@ export function CardView({
       animate={shake ? { x: [0, -6, 6, -4, 4, 0] } : {}}
       whileHover={onClick && viewMode === "desktop" ? { y: -6, scale: 1.04 } : {}}
       transition={{
-        // GLIDE, do not SNAP. Cards must visibly travel between positions
-        // (shared-element layout transitions via layoutId rely on this).
-        // Tuned to ~1.0s perceived duration so the path is fully readable
-        // even across the longest move (opponent's hand → human's hand).
-        // Reduced-motion users get an instant crossfade.
+        // GLIDE, do not SNAP. The shared-element layout transition (via
+        // layoutId) carries the card visibly between positions. Three
+        // tiers, slowest first:
+        //   • J / Q / K action swaps (blind_swap, peek_and_swap):
+        //     ~1.5s — the cards cross between seats, the path needs to
+        //     be deliberate enough to read.
+        //   • Regular hand swap (drawn → hand, displaced → discard):
+        //     ~1.2s — slower than before so it no longer feels hasty.
+        //   • Everything else (drawn-slot entry, discard pile shuffle):
+        //     ~1.0s baseline glide.
         layout: reduced
           ? { duration: 0.15, ease: "easeOut" }
           : viewMode === "mobile"
-          ? { type: "spring", stiffness: 150, damping: 26, mass: 1.15 }
-          : { type: "spring", stiffness: 110, damping: 22, mass: 1.3 },
+          ? { type: "spring",
+              stiffness: isActionCardSwap ? 95 : isHandSwap ? 130 : 150,
+              damping: 26, mass: 1.2 }
+          : { type: "spring",
+              stiffness: isActionCardSwap ? 70 : isHandSwap ? 90  : 110,
+              damping: isActionCardSwap ? 24 : 22,
+              mass: isActionCardSwap ? 1.5 : isHandSwap ? 1.35 : 1.3 },
         default: reduced
           ? { duration: 0.15, ease: "easeOut" }
           : viewMode === "mobile"
           ? { type: "spring", stiffness: 180, damping: 26, mass: 1.05 }
-          : { type: "spring", stiffness: 140, damping: 22, mass: 1.2 },
+          : { type: "spring",
+              stiffness: isActionCardSwap ? 95 : isHandSwap ? 115 : 140,
+              damping: 22, mass: 1.25 },
       }}
     >
       <motion.div

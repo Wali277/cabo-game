@@ -1267,6 +1267,10 @@
   width: 80px;
   height: 116px;
   position: relative;
+  /* Allow the stacked pile to spread past the slot bounds so the
+     uneven cards genuinely peek out — without overflow:visible the
+     under-pile cards get clipped at the slot edge. */
+  overflow: visible;
 }
 .drawn-placeholder {
   color: rgba(255,255,255,0.7);
