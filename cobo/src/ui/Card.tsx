@@ -60,26 +60,35 @@ export function CardView({
       animate={shake ? { x: [0, -6, 6, -4, 4, 0] } : {}}
       whileHover={onClick && viewMode === "desktop" ? { y: -6, scale: 1.04 } : {}}
       transition={{
-        // Slower, more graceful layout spring — cards now glide between
-        // positions instead of snapping. Reduced-motion users get a near-
-        // instant crossfade-style transition instead.
+        // GLIDE, do not SNAP. Cards must visibly travel between positions
+        // (shared-element layout transitions via layoutId rely on this).
+        // Tuned to ~1.0s perceived duration so the path is fully readable
+        // even across the longest move (opponent's hand → human's hand).
+        // Reduced-motion users get an instant crossfade.
         layout: reduced
           ? { duration: 0.15, ease: "easeOut" }
           : viewMode === "mobile"
-          ? { type: "spring", stiffness: 180, damping: 28, mass: 1.05 }
-          : { type: "spring", stiffness: 150, damping: 22, mass: 1.15 },
+          ? { type: "spring", stiffness: 150, damping: 26, mass: 1.15 }
+          : { type: "spring", stiffness: 110, damping: 22, mass: 1.3 },
         default: reduced
           ? { duration: 0.15, ease: "easeOut" }
           : viewMode === "mobile"
-          ? { type: "spring", stiffness: 220, damping: 28, mass: 1 }
-          : { type: "spring", stiffness: 180, damping: 22, mass: 1.1 },
+          ? { type: "spring", stiffness: 180, damping: 26, mass: 1.05 }
+          : { type: "spring", stiffness: 140, damping: 22, mass: 1.2 },
       }}
     >
       <motion.div
         className="card-inner"
         initial={{ rotateY: faceUp ? 0 : 180 }}
         animate={{ rotateY: faceUp ? 0 : 180 }}
-        transition={{ duration: flipDuration, type: "spring", stiffness: 160, damping: 18 }}
+        // Slower flip so peek/spy reveals are clearly visible — the edge
+        // (rotateY ≈ 90°) needs to dwell long enough to read as a flip,
+        // not a snap.
+        transition={
+          reduced
+            ? { duration: 0.15 }
+            : { duration: flipDuration, type: "spring", stiffness: 105, damping: 16, mass: 1.1 }
+        }
         style={{ width: "100%", height: "100%", transformStyle: "preserve-3d", position: "relative" }}
       >
         <CardFace card={card} w={w} h={h} skin={skin} />

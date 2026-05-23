@@ -4,8 +4,9 @@ import { useStore } from "../state/store";
 import type { GameState } from "../engine/types";
 
 /** Slow, premium-feeling spring for cards arriving at the centre slots.
- *  Tuned for ~700–750ms perceived duration vs the old snappy 300/26. */
-const CARD_SPRING = { type: "spring" as const, stiffness: 180, damping: 22, mass: 1.1 };
+ *  Tuned for ~950ms perceived duration so the path is fully readable.
+ *  Cards GLIDE — they do not snap into place. */
+const CARD_SPRING = { type: "spring" as const, stiffness: 130, damping: 22, mass: 1.2 };
 
 /**
  * Build a "fly + arc" trajectory for a card arriving in the drawn or
@@ -124,7 +125,12 @@ export function Center() {
                 transition={reduced ? { duration: 0.15 } : CARD_SPRING}
                 style={{ position: "relative", zIndex: 5 }}
               >
-                <CardView card={drawn} faceUp={isHumanTurn} size="lg" />
+                <CardView
+                  card={drawn}
+                  faceUp={isHumanTurn}
+                  size="lg"
+                  layoutId={drawn.id}
+                />
               </motion.div>
             ) : (
               <motion.div
@@ -156,14 +162,22 @@ export function Center() {
                     ? { opacity: 1 }
                     : {
                         ...discardTraj.animate,
-                        // Override final rotation with the per-card jitter
-                        // so the pile reads as a real stack.
-                        rotate: settleRotation(topDiscard.id),
+                        // First card on the pile lands STRAIGHT. Subsequent
+                        // cards rotate by a per-id jitter so the pile reads
+                        // as a real stack growing on top of that base card.
+                        rotate: game.discard.length <= 1
+                          ? 0
+                          : settleRotation(topDiscard.id),
                       }}
                   transition={reduced ? { duration: 0.15 } : CARD_SPRING}
                   style={{ position: "relative", zIndex: 5 }}
                 >
-                  <CardView card={topDiscard} faceUp={true} size="md" />
+                  <CardView
+                    card={topDiscard}
+                    faceUp={true}
+                    size="md"
+                    layoutId={topDiscard.id}
+                  />
                 </motion.div>
               ) : (
                 <motion.div

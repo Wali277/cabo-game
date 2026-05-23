@@ -15,8 +15,11 @@ interface Props {
   tablePos?: TablePos;
 }
 
-/** Spring for card movement animations. */
-const CARD_SPRING = { type: "spring" as const, stiffness: 300, damping: 26 };
+/** Spring for HAND-SLOT wrapper entrance animations (only fires for
+ *  entries that don't have a layoutId source — e.g. round_start deal,
+ *  initial mount). Swap / blind_swap / peek_and_swap let the shared-
+ *  element layout animation on the inner CardView handle the glide. */
+const CARD_SPRING = { type: "spring" as const, stiffness: 140, damping: 22, mass: 1.2 };
 
 export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: Props) {
   const viewMode = useViewMode();
@@ -79,42 +82,43 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
 
   /**
    * Entrance animation for a card that just arrived in this slot.
-   * Called when key changes (meaning the card ID in this slot just changed).
+   *
+   * For moves where the SOURCE card was visible on screen before landing
+   * here (swap_hand: from drawn slot, blind_swap: from another seat,
+   * peek_and_swap: from another seat) we return {} so the wrapper does
+   * NOT run an entrance animation. Instead, framer-motion's shared-element
+   * layout transition on the inner CardView (via layoutId={c.id}) glides
+   * the card visibly from its previous on-screen position to here.
+   *
+   * The fallback offsets that used to live here (drop-from-above etc.)
+   * caused the wrapper to translate ON TOP of the layout animation, which
+   * compounded into a visible "snap then re-snap" feel. Now: ONE smooth
+   * arc carries the card to its new home, every time.
+   *
+   * Deal (round start) and other unrecognised moves get a gentle fade-in
+   * from a slight scale so empty slots don't pop into view.
    */
   function slotInitial(idx: number) {
     if (!lastAnim) return {};
 
-    if (lastAnim.kind === "swap_hand") {
-      const p = lastAnim.payload as { playerId: string; handIndex: number };
-      // The card just swapped in from the drawn slot — drops in from above
-      if (p.playerId === player.id && p.handIndex === idx) {
-        return { y: -70, opacity: 0, scale: 0.88 };
-      }
-    }
+    // Layout-id-handled moves — let the inner CardView glide via the shared
+    // element transition. No wrapper offset.
+    const layoutIdHandled =
+      lastAnim.kind === "swap_hand" ||
+      lastAnim.kind === "blind_swap" ||
+      lastAnim.kind === "peek_and_swap";
 
-    if (lastAnim.kind === "blind_swap") {
-      const p = lastAnim.payload as {
-        fromPlayerId: string; fromIndex: number;
-        toPlayerId: string; toIndex: number;
-      };
-      // Card arrived from another player — slide in from their direction
-      if (p.toPlayerId === player.id && p.toIndex === idx) {
-        return tablePos === "bottom"
-          ? { y: -60, opacity: 0, scale: 0.88 }  // human receives: from above
-          : { y: 60,  opacity: 0, scale: 0.88 }; // opponent receives: from below
-      }
-    }
+    if (layoutIdHandled) return {};
 
-    if (lastAnim.kind === "peek_and_swap") {
-      const p = lastAnim.payload as { didSwap: boolean; targetPlayerId: string; targetIndex: number };
-      if (p.didSwap) {
-        // Receiving card: slide in from opponent direction
-        if (p.targetPlayerId === player.id && p.targetIndex === idx) {
-          return tablePos === "bottom"
-            ? { y: -60, opacity: 0, scale: 0.88 }
-            : { y: 60,  opacity: 0, scale: 0.88 };
-        }
-      }
+    // Round-start deal — cards fly toward the seat from the centre (where
+    // the deck sits). Direction varies per seat position.
+    if (lastAnim.kind === "deal") {
+      const offset =
+        tablePos === "bottom" ? { y: -90 } :
+        tablePos === "top"    ? { y: 90 }  :
+        tablePos === "left"   ? { x: 60 }  :
+        tablePos === "right"  ? { x: -60 } : {};
+      return { ...offset, opacity: 0, scale: 0.85, rotate: (idx - 1.5) * 4 };
     }
 
     return {};
@@ -146,8 +150,15 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
         className={`hand-slot${spied ? " spy-glow" : ""}`}
         key={c.id}
         initial={hasInitial ? initial : false}
-        animate={{ x: 0, y: 0, opacity: 1, scale: 1 }}
-        transition={CARD_SPRING}
+        animate={{ x: 0, y: 0, opacity: 1, scale: 1, rotate: 0 }}
+        transition={
+          // Round-start deal staggers per card so each of the 4 cards in
+          // a hand arrives a beat after the previous — reads as a real
+          // deal, not a four-card splash.
+          lastAnim?.kind === "deal"
+            ? { ...CARD_SPRING, delay: 0.12 + idx * 0.09 }
+            : CARD_SPRING
+        }
       >
         <CardView
           card={card}
