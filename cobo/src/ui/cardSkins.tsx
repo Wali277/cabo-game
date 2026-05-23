@@ -15,38 +15,43 @@ import type { CardSkin } from "../state/cardskin";
 export interface SkinStyle {
   /** Card face background. CSS color or linear-gradient string. */
   faceBg: string;
-  /** 3px border color around the face. */
+  /** Face border color. */
   faceBorder: string;
+  /** Face border width in px. Default 3. */
+  faceBorderWidth?: number;
   /** Per-suit color override applied to corner rank, corner glyph,
    *  center glyph. `undefined` = use the default red/black behaviour. */
   suitColor?: { red: string; black: string };
   /** Font stack for the rank corners + center glyph. */
   font?: string;
-  /** Card back style — which renderer to use for the centre logo. */
-  backCenter?: "cabo" | "helmet" | "handdrawn";
-  /** Card back background + border. */
+  /** Card back style — which renderer to use. */
+  backCenter?: "cabo" | "helmet" | "handdrawn" | "royal" | "neon" | "minimalist";
+  /** Card back background. */
   backBg: string;
   backBorder: string;
+  /** Back border width in px. Default 3. */
+  backBorderWidth?: number;
   /** Color of the "CABO" pill on the back when backCenter === "cabo". */
   caboColor?: string;
   /** Background of the CABO pill on the back. */
   caboPillBg?: string;
   /** Optional sticker on the card back — small badge in a corner. */
   backBadge?: { text: string; color: string; bg: string } | null;
-  /** Optional inline SVG pattern overlay for the FACE (Hand-drawn crosshatch). */
+  /** Optional inline SVG pattern overlay for the FACE. */
   patternOverlay?: string;
   /** Same pattern overlay applied to the BACK (Hand-drawn). */
   backPatternOverlay?: string;
 }
 
-// All text on every skin now uses Fredoka — the user's request for
-// "use the same font as on the classic". This keeps the project's
-// single self-hosted font family in play (no Google Fonts hop) and
-// lets each skin earn its personality through color/effects, not type.
+// Every skin uses Fredoka (the project's self-hosted font) for type
+// consistency. Skin personality comes from layout, color, and accents.
 const FONT = "'Fredoka', 'Fredoka One', system-ui, sans-serif";
 
-/** Inline SVG crosshatch — diagonal pen strokes for the Hand-drawn skin. */
+/** Hand-drawn crosshatch overlay (diagonal pen strokes). */
 const CROSSHATCH = `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14'><g stroke='%23262220' stroke-width='0.7' opacity='0.20'><line x1='0' y1='14' x2='14' y2='0'/><line x1='-7' y1='7' x2='7' y2='-7'/><line x1='7' y1='21' x2='21' y2='7'/></g></svg>")`;
+
+/** Carbon-fibre pinstripe pattern overlay — diagonal weave. */
+const CARBON_PINSTRIPE = `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='8'><g stroke='%23000' stroke-width='0.4' opacity='0.18'><line x1='0' y1='8' x2='8' y2='0'/><line x1='-4' y1='4' x2='4' y2='-4'/><line x1='4' y1='12' x2='12' y2='4'/></g></svg>")`;
 
 export const SKIN_STYLES: Record<CardSkin, SkinStyle> = {
   // ── Classic — current yellow + black ───────────────────────────────
@@ -61,7 +66,7 @@ export const SKIN_STYLES: Record<CardSkin, SkinStyle> = {
     caboPillBg: "#ffd86b",
   },
 
-  // ── Royal — deep velvet red with gold gilt suits + gold border ─────
+  // ── Royal — deep velvet with crown & gold filigree back ────────────
   royal: {
     faceBg:
       "radial-gradient(circle at 30% 18%, rgba(255,221,150,0.20) 0%, transparent 55%), linear-gradient(160deg, #7c1a26 0%, #5b1019 60%, #3d0911 100%)",
@@ -71,12 +76,10 @@ export const SKIN_STYLES: Record<CardSkin, SkinStyle> = {
     backBg:
       "radial-gradient(circle at 30% 18%, rgba(255,221,150,0.22) 0%, transparent 60%), linear-gradient(160deg, #7c1a26 0%, #4a0d15 100%)",
     backBorder: "#d4af37",
-    backCenter: "cabo",
-    caboColor: "#7c1a26",
-    caboPillBg: "#d4af37",
+    backCenter: "royal",
   },
 
-  // ── Neon — cyber black with cyan/magenta glow ──────────────────────
+  // ── Neon — cyberpunk hex grid back ─────────────────────────────────
   neon: {
     faceBg:
       "repeating-linear-gradient(180deg, #0a0a14 0px, #0a0a14 3px, #0d0d1a 3px, #0d0d1a 4px)",
@@ -86,9 +89,7 @@ export const SKIN_STYLES: Record<CardSkin, SkinStyle> = {
     backBg:
       "repeating-linear-gradient(180deg, #050510 0px, #050510 3px, #08081a 3px, #08081a 4px)",
     backBorder: "#ff2dca",
-    backCenter: "cabo",
-    caboColor: "#0a0a14",
-    caboPillBg: "#00e5ff",
+    backCenter: "neon",
   },
 
   // ── Hand-drawn — sketched ink with crosshatch on BOTH face & back ──
@@ -105,67 +106,53 @@ export const SKIN_STYLES: Record<CardSkin, SkinStyle> = {
     backPatternOverlay: CROSSHATCH,
   },
 
-  // ── Minimalist — pure black-and-white version of Classic ───────────
-  // Same layout as Classic: rank corners with suit glyph, big center
-  // suit. Just stripped to monochrome — no red/black, no yellow.
+  // ── Minimalist — pure black & white, modernist diamond back ────────
   minimalist: {
     faceBg: "#ffffff",
     faceBorder: "#0a0a0a",
     suitColor: { red: "#0a0a0a", black: "#0a0a0a" },
     font: FONT,
-    backBg: "#0a0a0a",
-    backBorder: "#ffffff",
-    backCenter: "cabo",
-    caboColor: "#0a0a0a",
-    caboPillBg: "#ffffff",
+    backBg: "#ffffff",
+    backBorder: "#0a0a0a",
+    backCenter: "minimalist",
   },
 
-  // ── McLaren Papaya — orange + black, helmet ONLY on back ───────────
-  // Face is a normal playing card with black suits/ranks on papaya
-  // orange. Helmet silhouette dominates the back.
+  // ── McLaren Papaya — thicker border + pinstripe + top racing band ──
   mclaren_papaya: {
     faceBg:
-      // Sleek papaya: vertical gradient with a soft top highlight and a
-      // bottom shadow so the card has subtle "race livery" depth.
       "radial-gradient(circle at 50% 0%, rgba(255,255,255,0.22) 0%, transparent 55%), radial-gradient(circle at 50% 100%, rgba(0,0,0,0.15) 0%, transparent 60%), linear-gradient(160deg, #ff8a14 0%, #ff8000 50%, #e16a00 100%)",
     faceBorder: "#0a0a0a",
+    faceBorderWidth: 5,
     suitColor: { red: "#0a0a0a", black: "#0a0a0a" },
     font: FONT,
+    patternOverlay: CARBON_PINSTRIPE,
     backBg:
-      // Slightly more saturated for the back so the helmet pops harder.
       "radial-gradient(circle at 50% 30%, rgba(255,255,255,0.22) 0%, transparent 60%), radial-gradient(circle at 50% 110%, rgba(0,0,0,0.30) 0%, transparent 65%), linear-gradient(160deg, #ff8a14 0%, #ff8000 55%, #d96500 100%)",
     backBorder: "#0a0a0a",
+    backBorderWidth: 5,
     backCenter: "helmet",
   },
 
   // ── McLaren Senna Monaco '24 — yellow / green / blue tribute ───────
   mclaren_senna: {
     faceBg:
-      // Yellow base with a subtle top sheen — kept clean so the blue
-      // suits read crisp.
       "radial-gradient(circle at 50% 0%, rgba(255,255,255,0.28) 0%, transparent 50%), linear-gradient(160deg, #ffe533 0%, #ffdd00 40%, #f0cc00 100%)",
     faceBorder: "#002776",
+    faceBorderWidth: 5,
     suitColor: { red: "#002776", black: "#002776" },
     font: FONT,
-    // Layered horizontal bands evoke the Monaco livery: a thin blue
-    // racing line near the top, a green band lower on the card, with
-    // yellow dominating the rest.
     backBg:
       "linear-gradient(180deg, #ffdd00 0%, #ffdd00 16%, #002776 16%, #002776 20%, #ffdd00 20%, #ffdd00 70%, #009739 70%, #009739 82%, #ffdd00 82%, #ffdd00 100%)",
     backBorder: "#002776",
+    backBorderWidth: 5,
     backCenter: "helmet",
     backBadge: { text: "1", color: "#ffdd00", bg: "#002776" },
   },
 };
 
 /* ─────────────────────────────────────────────────────────────────────────
-   <HelmetIcon /> — generic racing-helmet silhouette.
-
-   Side-profile racing helmet with an L-shaped visor opening carved into
-   the lower-left. No logos, no McLaren wordmark. The path is taken from
-   a public SVG (CC0/no-trademark) the user provided, and rendered as a
-   single fill in `shellColor` (default black). The visor area is a notch
-   in the outline itself, so whatever sits behind the SVG shows through.
+   <HelmetIcon /> — generic racing-helmet silhouette (no logos).
+   Side-profile, L-shaped visor cutout. Path from a CC0 SVG.
    ─────────────────────────────────────────────────────────────────────── */
 export function HelmetIcon({
   size,
@@ -174,9 +161,6 @@ export function HelmetIcon({
   size: number;
   shellColor?: string;
 }) {
-  // Original viewBox 512×512. Path content actually extends slightly
-  // outside (x reaches ~530), so we widen the viewBox to 540×480 with a
-  // hair of margin and the SVG renders cleanly without clipping.
   return (
     <svg
       viewBox="-10 0 550 480"
@@ -198,12 +182,10 @@ export function HelmetIcon({
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   <HandDrawnBack /> — full back design for the Hand-drawn skin.
+   <HandDrawnBack /> — sketched notebook page (centring tightened).
 
-   Cream paper background with crosshatch (added by Card.tsx as a pattern
-   overlay layer), centre "CABO" sketched-style wordmark with a wavy
-   underline, plus four small doodles in the corners so the back feels
-   like a notebook scribble rather than the usual pill.
+   Reduced font size, letter spacing, rotation angle, and underline width
+   so even on the smallest preview card (w=56) nothing kisses the edge.
    ─────────────────────────────────────────────────────────────────────── */
 export function HandDrawnBack({ w }: { w: number }) {
   const ink = "#262220";
@@ -214,6 +196,7 @@ export function HandDrawnBack({ w }: { w: number }) {
         width: "100%", height: "100%",
         display: "flex", alignItems: "center", justifyContent: "center",
         position: "relative",
+        padding: 4,
       }}
     >
       {/* Small doodles around the corners */}
@@ -227,25 +210,21 @@ export function HandDrawnBack({ w }: { w: number }) {
         }}
         aria-hidden="true"
       >
-        {/* Top-left flourish: tiny spiral */}
         <path
           d="M 14 14 q 5 -5 8 1 q -2 6 -6 2 q -1 -3 3 -3"
           stroke={ink} strokeWidth="1.2" fill="none" strokeLinecap="round"
           opacity="0.7"
         />
-        {/* Top-right star */}
         <g stroke={ink} strokeWidth="1.1" fill="none" strokeLinecap="round" opacity="0.7">
           <line x1="84" y1="12" x2="84" y2="22" />
           <line x1="79" y1="17" x2="89" y2="17" />
           <line x1="80.5" y1="13.5" x2="87.5" y2="20.5" />
           <line x1="87.5" y1="13.5" x2="80.5" y2="20.5" />
         </g>
-        {/* Bottom-left heart */}
         <path
           d="M 14 128 q -3 -4 0 -6 q 3 -2 4 1 q 1 -3 4 -1 q 3 2 0 6 q -3 4 -4 5 q -1 -1 -4 -5 z"
           fill={ink} opacity="0.6"
         />
-        {/* Bottom-right dot cluster */}
         <g fill={ink} opacity="0.65">
           <circle cx="83" cy="128" r="1.6" />
           <circle cx="88" cy="131" r="1.1" />
@@ -253,30 +232,29 @@ export function HandDrawnBack({ w }: { w: number }) {
         </g>
       </svg>
 
-      {/* CABO sketched wordmark, slightly rotated */}
       <div
         style={{
-          transform: "rotate(-6deg)",
+          transform: "rotate(-4deg)",
           textAlign: "center",
           color: ink,
+          maxWidth: "82%",
         }}
       >
         <div
           style={{
             fontFamily: "'Fredoka', system-ui, sans-serif",
             fontWeight: 900,
-            fontSize: w * 0.34,
-            letterSpacing: 2,
+            fontSize: w * 0.27,
+            letterSpacing: 1,
             lineHeight: 1,
             textShadow: "1px 1px 0 rgba(0,0,0,0.06)",
           }}
         >
           CABO
         </div>
-        {/* Wavy hand-drawn underline */}
         <svg
           viewBox="0 0 80 10"
-          style={{ width: w * 0.7, height: w * 0.12, marginTop: 2 }}
+          style={{ width: w * 0.5, height: w * 0.08, marginTop: 3 }}
           aria-hidden="true"
         >
           <path
@@ -287,6 +265,244 @@ export function HandDrawnBack({ w }: { w: number }) {
             strokeLinecap="round"
           />
         </svg>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   <RoyalBack /> — gilt crown + filigree inner frame.
+
+   Velvet red base (from skin.backBg) plus an inset 1.5px gold frame with
+   small fleur-de-lis cap ornaments, a centred crown in gold with red
+   jewels, and "CABO" beneath in spaced gold letters. Reads like an
+   heirloom playing card from a baroque set.
+   ─────────────────────────────────────────────────────────────────────── */
+export function RoyalBack({ w }: { w: number }) {
+  const gold = "#d4af37";
+  const goldLight = "#f0d674";
+  const velvet = "#7c1a26";
+
+  return (
+    <div style={{
+      width: "100%", height: "100%",
+      position: "relative",
+      display: "flex", alignItems: "center", justifyContent: "center",
+    }}>
+      {/* Gold inner frame */}
+      <div style={{
+        position: "absolute",
+        inset: 5,
+        border: `1.5px solid ${gold}`,
+        borderRadius: 7,
+        pointerEvents: "none",
+        boxShadow: `inset 0 0 0 0.5px rgba(244,207,91,0.4)`,
+      }} />
+
+      {/* Corner fleur-de-lis dots */}
+      {(["tl", "tr", "bl", "br"] as const).map((corner) => {
+        const pos: React.CSSProperties =
+          corner === "tl" ? { top: 9, left: 9 } :
+          corner === "tr" ? { top: 9, right: 9 } :
+          corner === "bl" ? { bottom: 9, left: 9 } :
+                            { bottom: 9, right: 9 };
+        return (
+          <svg
+            key={corner}
+            viewBox="0 0 10 10"
+            width={Math.max(7, w * 0.10)}
+            height={Math.max(7, w * 0.10)}
+            style={{ position: "absolute", ...pos }}
+          >
+            {/* Simple fleur-de-lis: three teardrop petals from a center point */}
+            <path d="M 5 1 C 3 3, 3 5, 5 6 C 7 5, 7 3, 5 1 Z" fill={gold} />
+            <path d="M 1.5 4 C 2.5 5, 4 6, 5 6 C 4 6.5, 2.5 6.5, 1.5 4 Z" fill={gold} />
+            <path d="M 8.5 4 C 7.5 5, 6 6, 5 6 C 6 6.5, 7.5 6.5, 8.5 4 Z" fill={gold} />
+            <circle cx="5" cy="6.5" r="0.8" fill={gold} />
+          </svg>
+        );
+      })}
+
+      {/* Central crown */}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, transform: "translateY(-4%)" }}>
+        <svg
+          viewBox="0 0 100 60"
+          width={w * 0.62}
+          height={w * 0.37}
+          style={{ display: "block", filter: `drop-shadow(0 1px 1px rgba(0,0,0,0.4))` }}
+        >
+          {/* Crown band */}
+          <path d="M 18 38 L 82 38 L 78 48 L 22 48 Z" fill={gold} />
+          {/* Three pointed spikes with cross at top centre */}
+          <path
+            d="M 18 38 L 26 22 L 33 34 L 42 14 L 50 30 L 58 14 L 67 34 L 74 22 L 82 38 Z"
+            fill={gold}
+            stroke={goldLight}
+            strokeWidth="0.6"
+          />
+          {/* Small cross on top of centre spike */}
+          <rect x="48.5" y="6" width="3" height="9" fill={gold} />
+          <rect x="46" y="9" width="8" height="3" fill={gold} />
+          {/* Jewels */}
+          <circle cx="50" cy="43" r="2.6" fill={velvet} stroke={goldLight} strokeWidth="0.5" />
+          <circle cx="34" cy="43" r="1.6" fill={velvet} />
+          <circle cx="66" cy="43" r="1.6" fill={velvet} />
+          {/* Jewel sparkles at spike tips */}
+          <circle cx="26" cy="23" r="1.3" fill={velvet} />
+          <circle cx="74" cy="23" r="1.3" fill={velvet} />
+          <circle cx="42" cy="16" r="1.3" fill={velvet} />
+          <circle cx="58" cy="16" r="1.3" fill={velvet} />
+        </svg>
+
+        <div style={{
+          fontSize: w * 0.16,
+          color: gold,
+          fontWeight: 700,
+          letterSpacing: w * 0.05,
+          paddingLeft: w * 0.05,  // compensate for trailing letter-spacing
+          fontFamily: FONT,
+          textShadow: `0 1px 1px rgba(0,0,0,0.5), 0 0 4px rgba(212,175,55,0.3)`,
+          lineHeight: 1,
+        }}>
+          CABO
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   <NeonBack /> — cyberpunk hex with cyan/magenta glow.
+
+   Glowing hexagon centerpiece, magenta inner triangle, scanline corners.
+   "CABO" rendered with a layered cyan + magenta text-shadow for chromatic
+   aberration vibes.
+   ─────────────────────────────────────────────────────────────────────── */
+export function NeonBack({ w }: { w: number }) {
+  const cyan = "#00e5ff";
+  const magenta = "#ff2dca";
+
+  return (
+    <div style={{
+      width: "100%", height: "100%",
+      position: "relative",
+      display: "flex", alignItems: "center", justifyContent: "center",
+    }}>
+      {/* Corner triangle accents — alternating cyan / magenta */}
+      {(
+        [
+          { pos: { top: 5, left: 5 },    color: cyan,    points: "0,0 8,0 0,8" },
+          { pos: { top: 5, right: 5 },   color: magenta, points: "8,0 0,0 8,8" },
+          { pos: { bottom: 5, left: 5 }, color: magenta, points: "0,8 8,8 0,0" },
+          { pos: { bottom: 5, right: 5 },color: cyan,    points: "8,8 0,8 8,0" },
+        ] as const
+      ).map((c, i) => (
+        <svg key={i} style={{ position: "absolute", ...c.pos }} width="8" height="8" viewBox="0 0 8 8" aria-hidden="true">
+          <polygon points={c.points} fill={c.color} opacity="0.85" style={{ filter: `drop-shadow(0 0 2px ${c.color})` }} />
+        </svg>
+      ))}
+
+      {/* Central hex emblem + CABO */}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+        <svg
+          viewBox="0 0 100 100"
+          width={w * 0.62}
+          height={w * 0.62}
+          style={{ display: "block" }}
+          aria-hidden="true"
+        >
+          {/* Outer cyan hexagon */}
+          <polygon
+            points="50,10 84,30 84,70 50,90 16,70 16,30"
+            fill="none"
+            stroke={cyan}
+            strokeWidth="2.2"
+            style={{ filter: `drop-shadow(0 0 4px ${cyan})` }}
+          />
+          {/* Inner magenta triangle */}
+          <polygon
+            points="50,28 72,64 28,64"
+            fill="none"
+            stroke={magenta}
+            strokeWidth="1.6"
+            style={{ filter: `drop-shadow(0 0 3px ${magenta})` }}
+          />
+          {/* Smaller cyan inverted triangle inside */}
+          <polygon
+            points="36,40 64,40 50,60"
+            fill="none"
+            stroke={cyan}
+            strokeWidth="1.2"
+            opacity="0.7"
+          />
+          {/* Central dot */}
+          <circle cx="50" cy="50" r="2.4" fill={cyan} style={{ filter: `drop-shadow(0 0 3px ${cyan})` }} />
+        </svg>
+
+        <div style={{
+          fontSize: w * 0.15,
+          color: cyan,
+          fontWeight: 700,
+          letterSpacing: w * 0.04,
+          paddingLeft: w * 0.04,  // optical compensation for trailing tracking
+          fontFamily: FONT,
+          textShadow: `0 0 4px ${cyan}, 1.5px 0 0 ${magenta}, -1.5px 0 0 ${magenta}`,
+          lineHeight: 1,
+        }}>
+          CABO
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   <MinimalistBack /> — modernist diamond + thin frame.
+
+   White card with a thin 1px black inset frame, a single black diamond
+   (rotated square) at the centre, and a small wide-tracked "cabo" in
+   light grey at the bottom edge. Bauhaus restraint.
+   ─────────────────────────────────────────────────────────────────────── */
+export function MinimalistBack({ w }: { w: number }) {
+  const ink = "#0a0a0a";
+  const ghost = "#9a9a9a";
+
+  return (
+    <div style={{
+      width: "100%", height: "100%",
+      position: "relative",
+      display: "flex", alignItems: "center", justifyContent: "center",
+    }}>
+      {/* Thin inset frame */}
+      <div style={{
+        position: "absolute",
+        inset: 4,
+        border: `1px solid ${ink}`,
+        borderRadius: 7,
+        pointerEvents: "none",
+      }} />
+
+      {/* Central diamond */}
+      <div style={{
+        width: w * 0.22,
+        height: w * 0.22,
+        background: ink,
+        transform: "rotate(45deg) translateY(-6%)",
+      }} />
+
+      {/* Bottom-edge cabo wordmark, lowercase, very small */}
+      <div style={{
+        position: "absolute",
+        bottom: w * 0.11,
+        fontSize: w * 0.09,
+        color: ghost,
+        fontWeight: 500,
+        letterSpacing: w * 0.04,
+        paddingLeft: w * 0.04,
+        fontFamily: FONT,
+        textTransform: "lowercase",
+      }}>
+        cabo
       </div>
     </div>
   );

@@ -3,7 +3,7 @@ import type React from "react";
 import type { Card as CardT } from "../engine/types";
 import { useViewMode } from "../state/viewmode";
 import { useCardSkin } from "../state/cardskin";
-import { SKIN_STYLES, HelmetIcon, HandDrawnBack } from "./cardSkins";
+import { SKIN_STYLES, HelmetIcon, HandDrawnBack, RoyalBack, NeonBack, MinimalistBack } from "./cardSkins";
 
 interface Props {
   card?: CardT | null;
@@ -102,7 +102,7 @@ function CardFace({
           width: w, height: h, position: "absolute", inset: 0,
           backfaceVisibility: "hidden",
           background: skin.faceBg,
-          borderRadius: 12, border: `3px solid ${skin.faceBorder}`,
+          borderRadius: 12, border: `${skin.faceBorderWidth ?? 3}px solid ${skin.faceBorder}`,
         }}
       />
     );
@@ -180,7 +180,7 @@ function CardFace({
         backfaceVisibility: "hidden",
         background: skin.faceBg,
         borderRadius: 12,
-        border: `3px solid ${skin.faceBorder}`,
+        border: `${skin.faceBorderWidth ?? 3}px solid ${skin.faceBorder}`,
         boxShadow: "0 6px 18px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.5)",
         display: "flex",
         flexDirection: "column",
@@ -288,6 +288,12 @@ function CardBack({
     );
   } else if (skin.backCenter === "handdrawn") {
     center = <HandDrawnBack w={w} />;
+  } else if (skin.backCenter === "royal") {
+    center = <RoyalBack w={w} />;
+  } else if (skin.backCenter === "neon") {
+    center = <NeonBack w={w} />;
+  } else if (skin.backCenter === "minimalist") {
+    center = <MinimalistBack w={w} />;
   } else {
     // Default "CABO" pill
     center = (
@@ -317,7 +323,7 @@ function CardBack({
         width: w, height: h, position: "absolute", inset: 0,
         backfaceVisibility: "hidden", transform: "rotateY(180deg)",
         borderRadius: 12,
-        border: `3px solid ${skin.backBorder}`,
+        border: `${skin.backBorderWidth ?? 3}px solid ${skin.backBorder}`,
         background: skin.backBg,
         boxShadow: "0 6px 18px rgba(0,0,0,0.4), inset 0 0 0 6px rgba(255,255,255,0.04)",
         display: "flex",
