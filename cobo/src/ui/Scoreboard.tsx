@@ -224,6 +224,18 @@ export function RoundEndOverlay() {
 
   const winner = !isTie ? rows.find((t) => t.id === game.winnerId) ?? rows[0] : null;
 
+  // ── Cinematic tie / winner — based on THIS ROUND's hand sums.
+  // Using `isTie` (cumulative-based) gave false ties: e.g. two players
+  // with hand sums 22 and 20 still tied "It's a tie" if their running
+  // totals happened to coincide. The cinematic shows hand-sum pills, so
+  // its title + winner stamp should be judged on hand sums too.
+  const lowestHandSum = rows.length ? Math.min(...rows.map((r) => r.handSum)) : 0;
+  const roundLeaders = rows.filter((r) => r.handSum === lowestHandSum);
+  const isRoundTie = roundLeaders.length > 1;
+  const roundWinner = !isRoundTie
+    ? (rows.find((r) => r.id === game.winnerId) ?? roundLeaders[0] ?? rows[0])
+    : null;
+
   // Collective Play Again — only relevant in MP
   const playAgainVotes = mp?.playAgainVotes ?? [];
   const iVoted = playAgainVotes.includes(humanId);
@@ -251,7 +263,7 @@ export function RoundEndOverlay() {
   // Sort for the cinematic pill row — same order as the modal so the
   // user's eye doesn't jump from one ordering to another between beats.
   const pillRows = rows;
-  const winnerName = !isTie ? (winner?.name ?? "") : "";
+  const winnerName = !isRoundTie ? (roundWinner?.name ?? "") : "";
 
   return (
     <AnimatePresence>
@@ -287,7 +299,7 @@ export function RoundEndOverlay() {
                 animate={{ scale: 1, y: 0, opacity: 1 }}
                 transition={{ type: "spring", stiffness: 220, damping: 18, delay: 0.15 }}
               >
-                {isTie ? "It's a tie" : "Round Over"}
+                {isRoundTie ? "It's a tie" : "Round Over"}
               </motion.h1>
 
               <div className="cinematic-pills">
@@ -298,13 +310,13 @@ export function RoundEndOverlay() {
                     total={row.handSum}
                     active={stage === "tally" || stage === "winner"}
                     delayMs={i * 140}
-                    isWinner={!isTie && winner?.id === row.id}
-                    isHighlighted={stage === "winner" && !isTie && winner?.id === row.id}
+                    isWinner={!isRoundTie && roundWinner?.id === row.id}
+                    isHighlighted={stage === "winner" && !isRoundTie && roundWinner?.id === row.id}
                   />
                 ))}
               </div>
 
-              {stage === "winner" && !isTie && (
+              {stage === "winner" && !isRoundTie && (
                 <motion.div
                   className="cinematic-winner-stamp"
                   initial={{ scale: 0.4, rotate: -8, opacity: 0 }}

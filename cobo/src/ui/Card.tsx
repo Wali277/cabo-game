@@ -77,33 +77,34 @@ export function CardView({
       animate={shake ? { x: [0, -6, 6, -4, 4, 0] } : {}}
       whileHover={onClick && viewMode === "desktop" ? { y: -6, scale: 1.04 } : {}}
       transition={{
-        // GLIDE, do not SNAP. The shared-element layout transition (via
-        // layoutId) carries the card visibly between positions. Three
-        // tiers, slowest first:
+        // GLIDE, do not SNAP. Three tiers tuned slow-and-deliberate:
         //   • J / Q / K action swaps (blind_swap, peek_and_swap):
-        //     ~1.5s — the cards cross between seats, the path needs to
-        //     be deliberate enough to read.
+        //     ~2.0s — cards cross between seats; the path is long, the
+        //     moment is rare, the timing should feel ceremonial.
         //   • Regular hand swap (drawn → hand, displaced → discard):
-        //     ~1.2s — slower than before so it no longer feels hasty.
+        //     ~1.6s — the user's most common deliberate action; needs
+        //     to read as a clear two-card glide, not a snap.
         //   • Everything else (drawn-slot entry, discard pile shuffle):
-        //     ~1.0s baseline glide.
+        //     ~1.1s baseline glide.
+        // Tuned by lowering stiffness + raising mass; reduced-motion
+        // still drops to a 150ms crossfade.
         layout: reduced
           ? { duration: 0.15, ease: "easeOut" }
           : viewMode === "mobile"
           ? { type: "spring",
-              stiffness: isActionCardSwap ? 95 : isHandSwap ? 130 : 150,
-              damping: 26, mass: 1.2 }
+              stiffness: isActionCardSwap ? 75 : isHandSwap ? 105 : 140,
+              damping: 28, mass: 1.3 }
           : { type: "spring",
-              stiffness: isActionCardSwap ? 70 : isHandSwap ? 90  : 110,
-              damping: isActionCardSwap ? 24 : 22,
-              mass: isActionCardSwap ? 1.5 : isHandSwap ? 1.35 : 1.3 },
+              stiffness: isActionCardSwap ? 50  : isHandSwap ? 68  : 105,
+              damping: isActionCardSwap ? 26   : isHandSwap ? 24  : 22,
+              mass:    isActionCardSwap ? 1.8  : isHandSwap ? 1.55 : 1.3 },
         default: reduced
           ? { duration: 0.15, ease: "easeOut" }
           : viewMode === "mobile"
-          ? { type: "spring", stiffness: 180, damping: 26, mass: 1.05 }
+          ? { type: "spring", stiffness: 170, damping: 28, mass: 1.1 }
           : { type: "spring",
-              stiffness: isActionCardSwap ? 95 : isHandSwap ? 115 : 140,
-              damping: 22, mass: 1.25 },
+              stiffness: isActionCardSwap ? 75 : isHandSwap ? 92 : 130,
+              damping: 22, mass: 1.3 },
       }}
     >
       <motion.div

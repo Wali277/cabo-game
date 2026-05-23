@@ -57,7 +57,15 @@
     rgba(168, 123, 255, 0.09) 35%,
     transparent 65%
   );
-  filter: blur(40px);
+  /* Reduced from blur(40px) — a 40px blur forces the browser to
+     re-rasterize a huge sample area each frame and was a major
+     contributor to the menu feeling sluggish. 18px reads almost
+     identically as a soft glow but is dramatically cheaper. */
+  filter: blur(18px);
+  /* will-change tells the browser to composite this on the GPU so
+     the breathe animation (opacity + scale) plays as a layer
+     transform, not a full repaint. */
+  will-change: opacity, transform;
   animation: menuGlowBreathe 10s ease-in-out infinite alternate;
 }
 .menu-wallpaper-glow-left { left: -16%; }
@@ -148,8 +156,7 @@
     radial-gradient(circle at 90% 18%, rgba(60, 100, 220, 0.30) 0 400px, transparent 400px),
     radial-gradient(circle at 80% 95%, rgba(168, 123, 255, 0.25) 0 420px, transparent 420px),
     linear-gradient(160deg, #0d1638 0%, #1a1a4a 40%, #3b2473 100%);
-  background-attachment: fixed;
-  animation: bgDrift 30s ease-in-out infinite alternate;
+  /* bgDrift removed for performance (see index.css for the same body fix). */
 }
 
 /* 6. Aquarium — brighter "lit tank" teal/turquoise base. Visually distinct
@@ -1744,7 +1751,12 @@
   color: #fff;
   font-size: 22px;
   cursor: pointer;
-  z-index: 240;
+  /* Chat sits above theme picker (250) and audio controls (260) so the
+     chat button + expanded panel always render on top of the other FAB
+     surfaces in MP. The mutex closes the others before chat opens, but
+     the z-index lift is the defence-in-depth so mid-exit overlap never
+     buries the chat. */
+  z-index: 280;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1784,7 +1796,8 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  z-index: 245;
+  /* Above theme picker (250) and audio controls (260) — see .chat-toggle. */
+  z-index: 285;
 }
 .chat-header {
   display: flex;

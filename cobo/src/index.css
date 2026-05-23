@@ -47,14 +47,12 @@ body {
     radial-gradient(circle at 90% 18%, rgba(60,100,220,0.3) 0 400px, transparent 400px),
     radial-gradient(circle at 80% 95%, rgba(168,123,255,0.25) 0 420px, transparent 420px),
     linear-gradient(160deg, #0d1638 0%, #1a1a4a 40%, #3b2473 100%);
-  background-attachment: fixed;
-  background-size: 200% 200%;
-  animation: bgDrift 30s ease-in-out infinite alternate;
   overflow-x: hidden;
-}
-@keyframes bgDrift {
-  0%   { background-position: 0% 0%, 100% 0%, 100% 100%, 0% 0%; }
-  100% { background-position: 4% 6%, 96% 4%, 96% 94%, 0% 100%; }
+  /* NOTE: bgDrift animation + background-attachment: fixed previously
+     forced a full-viewport repaint on every frame (4 layered gradients
+     at 200% size, can't be GPU-composited with bg-attachment:fixed),
+     making the menu feel sluggish. The drift was barely perceptible
+     over 30s anyway. Static gradient now; the page sits still. */
 }
 
 #root {
