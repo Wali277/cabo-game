@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useStore } from "../state/store";
+import { ShatterGlass } from "./Particles";
 
 // Key used to persist the "busted from room X" flag across page loads/refreshes.
 // Cleared when the player explicitly dismisses the EliminatedOverlay.
@@ -51,7 +52,9 @@ export function BustedOverlay() {
           animate={{ scale: 1, y: 0, rotate: 0 }}
           transition={{ type: "spring", stiffness: 200, damping: 18 }}
         >
-          <div className="modal-burst">💥</div>
+          {/* Glass shatter — radiates from the modal centre on entry. */}
+          <ShatterGlass color="#ff5b6e" />
+          <div className="modal-burst" style={{ position: "relative", zIndex: 1 }}>💥</div>
           <h2>You&apos;re Busted!</h2>
           <p className="modal-subtitle">Your total score reached {total} pts — over the 60 limit</p>
           <div className="busted-score">{total} pts</div>

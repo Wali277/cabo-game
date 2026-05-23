@@ -1,33 +1,86 @@
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { CardView } from "./Card";
 import { useStore } from "../state/store";
 import type { GameState } from "../engine/types";
 
-/** Spring shared across all card movement animations. */
-const CARD_SPRING = { type: "spring" as const, stiffness: 300, damping: 26 };
+/** Slow, premium-feeling spring for cards arriving at the centre slots.
+ *  Tuned for ~700–750ms perceived duration vs the old snappy 300/26. */
+const CARD_SPRING = { type: "spring" as const, stiffness: 180, damping: 22, mass: 1.1 };
 
-/** Return the entrance initial state for the DRAWN CARD SLOT based on last action. */
-function drawnInitial(g: GameState) {
-  const last = g.animations[g.animations.length - 1];
-  if (last?.kind === "draw_discard") return { x: 100, opacity: 0, scale: 0.88 };
-  return { y: -52, opacity: 0, scale: 0.88 }; // draw_deck or default — drops from above
+/**
+ * Build a "fly + arc" trajectory for a card arriving in the drawn or
+ * discard slot. We return BOTH the initial state and the animate keyframes
+ * so the arc lift between start and settle is real (a single intermediate
+ * peak gives a parabolic feel; the spring smooths the in-between).
+ */
+type Trajectory = {
+  initial: { x: number; y: number; opacity: number; scale: number; rotate: number };
+  animate: { x: number[]; y: number[]; opacity: number; scale: number; rotate: number };
+};
+
+function withArc(start: { x: number; y: number; rotate: number; scale: number }, lift: number): Trajectory {
+  const midX = start.x / 2;
+  // Peak Y is HIGHER (more negative) than start so the card lifts before
+  // settling. lift is the additional vertical climb past the start point.
+  const peakY = Math.min(start.y, 0) - lift;
+  return {
+    initial: { ...start, opacity: 0 },
+    animate: {
+      x: [start.x, midX, 0],
+      y: [start.y, peakY, 0],
+      opacity: 1,
+      scale: 1,
+      rotate: 0,
+    },
+  };
 }
 
-/** Return the entrance initial state for the DISCARD PILE TOP based on last action. */
-function discardInitial(g: GameState) {
+function drawnTrajectory(g: GameState): Trajectory {
+  const last = g.animations[g.animations.length - 1];
+  if (last?.kind === "draw_discard") {
+    // Arc in from the right (where the discard pile sits)
+    return withArc({ x: 110, y: -28, rotate: 8, scale: 0.85 }, 30);
+  }
+  // draw_deck or default — fly in from the deck (to the left), arc over
+  return withArc({ x: -90, y: -50, rotate: -6, scale: 0.85 }, 35);
+}
+
+function discardTrajectory(g: GameState): Trajectory {
   const last = g.animations[g.animations.length - 1];
   switch (last?.kind) {
-    case "discard_drawn":   return { x: -80, opacity: 0, scale: 0.88 }; // comes from drawn slot (left)
-    case "swap_hand":       return { y: 90,  opacity: 0, scale: 0.88 }; // displaced card rises from hand (below)
-    case "blind_swap":      return { y: 70,  opacity: 0, scale: 0.88 };
-    case "peek_and_swap":   return { y: 70,  opacity: 0, scale: 0.88 };
-    default:                return { scale: 0.72, opacity: 0 };
+    case "discard_drawn":
+      return withArc({ x: -100, y: -30, rotate: -10, scale: 0.85 }, 30);
+    case "swap_hand":
+      return withArc({ x: 0, y: 110, rotate: 6, scale: 0.85 }, 50);
+    case "blind_swap":
+      return withArc({ x: 0, y: 85, rotate: 4, scale: 0.85 }, 40);
+    case "peek_and_swap":
+      return withArc({ x: 0, y: 85, rotate: -4, scale: 0.85 }, 40);
+    default:
+      // Static load (no last animation) — just gently fade up
+      return {
+        initial: { x: 0, y: 0, opacity: 0, scale: 0.7, rotate: 0 },
+        animate: { x: [0, 0, 0], y: [0, 0, 0], opacity: 1, scale: 1, rotate: 0 },
+      };
   }
+}
+
+/**
+ * Deterministic 4-degree-ish jitter per card id — the discard pile top
+ * card rotates slightly so the stack looks like real cards thrown down,
+ * not pixel-aligned sprites.
+ */
+function settleRotation(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) & 0xffffffff;
+  // Range -5° → +5°
+  return (((h % 1000) / 1000) * 10) - 5;
 }
 
 export function Center() {
   const game = useStore((s) => s.game!);
   const humanId = useStore((s) => s.humanId);
+  const reduced = useReducedMotion() ?? false;
 
   const isHumanTurn = game.players[game.currentPlayer].id === humanId;
   const canDraw = isHumanTurn && game.phase === "turn_start";
@@ -38,6 +91,10 @@ export function Center() {
 
   const draw = useStore((s) => s.draw);
   const drawDiscard = useStore((s) => s.drawDiscard);
+
+  // Compute trajectories once per render so initial + animate stay in sync.
+  const drawnTraj = drawnTrajectory(game);
+  const discardTraj = discardTrajectory(game);
 
   return (
     <div className="center-area">
@@ -59,10 +116,13 @@ export function Center() {
             {drawn ? (
               <motion.div
                 key={drawn.id}
-                initial={drawnInitial(game)}
-                animate={{ x: 0, y: 0, opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.85, transition: { duration: 0.15 } }}
-                transition={CARD_SPRING}
+                initial={reduced ? { opacity: 0 } : drawnTraj.initial}
+                animate={reduced
+                  ? { opacity: 1 }
+                  : drawnTraj.animate}
+                exit={{ opacity: 0, scale: 0.85, transition: { duration: 0.18 } }}
+                transition={reduced ? { duration: 0.15 } : CARD_SPRING}
+                style={{ position: "relative", zIndex: 5 }}
               >
                 <CardView card={drawn} faceUp={isHumanTurn} size="lg" />
               </motion.div>
@@ -91,9 +151,17 @@ export function Center() {
               {topDiscard ? (
                 <motion.div
                   key={topDiscard.id}
-                  initial={discardInitial(game)}
-                  animate={{ x: 0, y: 0, opacity: 1, scale: 1 }}
-                  transition={CARD_SPRING}
+                  initial={reduced ? { opacity: 0 } : discardTraj.initial}
+                  animate={reduced
+                    ? { opacity: 1 }
+                    : {
+                        ...discardTraj.animate,
+                        // Override final rotation with the per-card jitter
+                        // so the pile reads as a real stack.
+                        rotate: settleRotation(topDiscard.id),
+                      }}
+                  transition={reduced ? { duration: 0.15 } : CARD_SPRING}
+                  style={{ position: "relative", zIndex: 5 }}
                 >
                   <CardView card={topDiscard} faceUp={true} size="md" />
                 </motion.div>

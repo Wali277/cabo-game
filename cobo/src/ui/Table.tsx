@@ -23,6 +23,7 @@ import { EmeraldWallpaper } from "./EmeraldWallpaper";
 import { OceanWallpaper } from "./OceanWallpaper";
 import { CrimsonWallpaper } from "./CrimsonWallpaper";
 import { CosmicWallpaper } from "./CosmicWallpaper";
+import { CaboLettersBurst } from "./Particles";
 
 export function Table() {
   const game = useStore((s) => s.game!);
@@ -43,6 +44,10 @@ export function Table() {
   const viewMode = useViewMode();
   const isMobile = viewMode === "mobile";
   const [rightDrawerOpen, setRightDrawerOpen] = useState(false);
+
+  // CABO letter-burst particle anchor — set when a "cabo_called" animation
+  // event lands. Cleared 1.2s later so the burst auto-unmounts.
+  const [caboBurst, setCaboBurst] = useState<{ x: number; y: number; key: number } | null>(null);
 
   // Reveals that the human can tap-anywhere to dismiss early
   // (peek_own / peek_other only — peek_and_swap stays until user decides)
@@ -106,6 +111,42 @@ export function Table() {
     }, 2400);
     return () => clearTimeout(t);
   }, [game.reveals, game.phase]);
+
+  // Spawn the CABO letter-burst particle when a "cabo_called" animation
+  // event arrives. Anchor to the centre of the caller's seat by querying
+  // the `.seat-{N}` DOM element — a small concession to running outside
+  // React, but lighter than forwarding refs through PlayerSeat for a
+  // one-frame visual effect.
+  //
+  // NOTE: the 1.2s auto-clear setTimeout deliberately is NOT registered
+  // in this effect's cleanup. game.animations is consumed ~500ms after
+  // the cabo_called event lands, which would otherwise tear down the
+  // setTimeout and yank the burst off-screen mid-animation. Instead we
+  // self-clear inside the timer using the burst's key to verify the
+  // burst hasn't been replaced by a newer one.
+  useEffect(() => {
+    if (game.animations.length === 0) return;
+    const latest = game.animations[game.animations.length - 1];
+    if (latest.kind !== "cabo_called") return;
+    const callerId = latest.payload.playerId as string;
+    const seatIdx = game.players.findIndex((p) => p.id === callerId);
+    if (seatIdx < 0) return;
+    const raf = requestAnimationFrame(() => {
+      const el = document.querySelector<HTMLElement>(`.seat-${seatIdx}`);
+      const rect = el?.getBoundingClientRect();
+      if (!rect) return;
+      const key = Date.now();
+      setCaboBurst({
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+        key,
+      });
+      setTimeout(() => {
+        setCaboBurst((curr) => (curr?.key === key ? null : curr));
+      }, 1200);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [game.animations, game.players]);
 
   // Show toasts AND play sound effects for latest animations
   useEffect(() => {
@@ -354,6 +395,14 @@ export function Table() {
         <GameLostOverlay />
         <GloriousVictory />
         <MpNotices />
+
+        {caboBurst && (
+          <CaboLettersBurst
+            key={caboBurst.key}
+            x={caboBurst.x}
+            y={caboBurst.y}
+          />
+        )}
 
         {/* Tap-anywhere overlay to dismiss peek/spy reveals early */}
         {hasDismissableReveal && (

@@ -4,6 +4,7 @@ import confetti from "canvas-confetti";
 import { useStore } from "../state/store";
 import { Audio } from "../audio/sounds";
 import { EndScoreboard, buildScoreRows } from "./EndScoreboard";
+import { FireworksLayer } from "./Particles";
 
 export function GloriousVictory() {
   const mp = useStore((s) => s.mp);
@@ -66,6 +67,9 @@ export function GloriousVictory() {
         animate={{ opacity: 1 }}
         style={{ zIndex: 400 }}
       >
+        {/* Continuous fireworks behind the modal — auto-recycles bursts */}
+        <FireworksLayer count={6} />
+
         <motion.div
           className="modal glory-modal"
           initial={{ scale: 0.6, y: 20, rotate: -4 }}

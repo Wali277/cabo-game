@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import type React from "react";
 import type { Card as CardT } from "../engine/types";
 import { useViewMode } from "../state/viewmode";
@@ -42,6 +42,7 @@ export function CardView({
   const currentSkin = useCardSkin();
   const skinId = skinOverride ?? currentSkin;
   const skin = SKIN_STYLES[skinId];
+  const reduced = useReducedMotion() ?? false;
 
   const isHl = highlight === "selectable" || highlight === "selected";
 
@@ -59,10 +60,19 @@ export function CardView({
       animate={shake ? { x: [0, -6, 6, -4, 4, 0] } : {}}
       whileHover={onClick && viewMode === "desktop" ? { y: -6, scale: 1.04 } : {}}
       transition={{
-        layout: { type: "spring", stiffness: 200, damping: 32, mass: 1 },
-        default: viewMode === "mobile"
-          ? { type: "spring", stiffness: 260, damping: 32, mass: 1 }
-          : { type: "spring", stiffness: 300, damping: 24 },
+        // Slower, more graceful layout spring — cards now glide between
+        // positions instead of snapping. Reduced-motion users get a near-
+        // instant crossfade-style transition instead.
+        layout: reduced
+          ? { duration: 0.15, ease: "easeOut" }
+          : viewMode === "mobile"
+          ? { type: "spring", stiffness: 180, damping: 28, mass: 1.05 }
+          : { type: "spring", stiffness: 150, damping: 22, mass: 1.15 },
+        default: reduced
+          ? { duration: 0.15, ease: "easeOut" }
+          : viewMode === "mobile"
+          ? { type: "spring", stiffness: 220, damping: 28, mass: 1 }
+          : { type: "spring", stiffness: 180, damping: 22, mass: 1.1 },
       }}
     >
       <motion.div
