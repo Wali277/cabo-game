@@ -2,6 +2,8 @@ import { motion } from "framer-motion";
 import type React from "react";
 import type { Card as CardT } from "../engine/types";
 import { useViewMode } from "../state/viewmode";
+import { useCardSkin } from "../state/cardskin";
+import { SKIN_STYLES, HelmetIcon } from "./cardSkins";
 
 interface Props {
   card?: CardT | null;
@@ -12,15 +14,11 @@ interface Props {
   flipDuration?: number;
   shake?: boolean;
   layoutId?: string;
+  /** Override the user's chosen skin — used by the skin picker preview tiles. */
+  skinOverride?: import("../state/cardskin").CardSkin;
 }
 
 const SUIT_GLYPH: Record<string, string> = { S: "♠", H: "♥", D: "♦", C: "♣" };
-const SUIT_COLOR: Record<string, string> = {
-  S: "#1c1d2b",
-  C: "#1c1d2b",
-  H: "#e23a5e",
-  D: "#e23a5e",
-};
 
 // Card pixel widths per size, split per view mode.
 //
@@ -45,17 +43,21 @@ export function CardView({
   flipDuration = 0.5,
   shake = false,
   layoutId,
+  skinOverride,
 }: Props) {
   const viewMode = useViewMode();
   const w = SIZE_PX[viewMode][size];
   const h = Math.round(w * 1.45);
+  const currentSkin = useCardSkin();
+  const skinId = skinOverride ?? currentSkin;
+  const skin = SKIN_STYLES[skinId];
 
   const isHl = highlight === "selectable" || highlight === "selected";
 
   return (
     <motion.div
       layoutId={layoutId}
-      className={`card-wrap ${isHl ? "hl" : ""} ${highlight ?? ""}`}
+      className={`card-wrap card-skin-${skinId} ${isHl ? "hl" : ""} ${highlight ?? ""}`}
       style={{
         width: w,
         height: h,
@@ -85,14 +87,36 @@ export function CardView({
         transition={{ duration: flipDuration, type: "spring", stiffness: 160, damping: 18 }}
         style={{ width: "100%", height: "100%", transformStyle: "preserve-3d", position: "relative" }}
       >
-        <CardFace card={card} w={w} h={h} />
-        <CardBack w={w} h={h} />
+        <CardFace card={card} w={w} h={h} skin={skin} skinId={skinId} />
+        <CardBack w={w} h={h} skin={skin} skinId={skinId} card={card} />
       </motion.div>
     </motion.div>
   );
 }
 
-function CardFace({ card, w, h }: { card?: CardT | null; w: number; h: number }) {
+/** Pick a per-suit text color: skin override wins, else default red/black. */
+function suitTextColor(suit: string, skin: import("./cardSkins").SkinStyle): string {
+  const isRed = suit === "H" || suit === "D";
+  if (skin.suitColor) return isRed ? skin.suitColor.red : skin.suitColor.black;
+  return isRed ? "#e23a5e" : "#1c1d2b";
+}
+
+/** Bg color used as the helmet visor inset so it reads like a knockout. */
+function visorBgForSkin(skinId: import("../state/cardskin").CardSkin): string {
+  if (skinId === "mclaren_papaya") return "#ff8000";
+  if (skinId === "mclaren_senna")  return "#ffdd00";
+  return "#ffd86b";
+}
+
+function CardFace({
+  card, w, h, skin, skinId,
+}: {
+  card?: CardT | null;
+  w: number; h: number;
+  skin: import("./cardSkins").SkinStyle;
+  skinId: import("../state/cardskin").CardSkin;
+}) {
+  // Empty-slot placeholder (no card in this hand index).
   if (!card) {
     return (
       <div
@@ -100,21 +124,20 @@ function CardFace({ card, w, h }: { card?: CardT | null; w: number; h: number })
         style={{
           width: w, height: h, position: "absolute", inset: 0,
           backfaceVisibility: "hidden",
-          background: "#ffd86b",
-          borderRadius: 12, border: "3px solid #1c1d2b",
+          background: skin.faceBg,
+          borderRadius: 12, border: `3px solid ${skin.faceBorder}`,
         }}
       />
     );
   }
 
-  // Joker — yellow card, jester centre, "JOKER" in corners
+  // Joker — yellow card baseline, jester centre, "JOKER" in corners.
+  // Joker keeps a fixed yellow face so the jester drawing stays recognisable
+  // across every skin; the skin still affects the back of the card.
   if (card.rank === "Joker") {
     const isRed = card.suit === "H" || card.suit === "D";
     const faceColor = isRed ? "#e23a5e" : "#1c1d2b";
 
-    // Font size chosen so 5 stacked letters fit within half the card height,
-    // leaving clean room at top and bottom. Absolute positioning means the
-    // jester sits in the true centre without being squeezed by the text.
     const letterFs = w * 0.11;
     const letterLh = 1.05;
     const letterStyle: React.CSSProperties = {
@@ -128,7 +151,6 @@ function CardFace({ card, w, h }: { card?: CardT | null; w: number; h: number })
       userSelect: "none",
     };
 
-    // Jester fills ~56% of card width; truly centred via absolute + translate
     const jesterSize = w * 0.56;
 
     return (
@@ -146,12 +168,9 @@ function CardFace({ card, w, h }: { card?: CardT | null; w: number; h: number })
           fontFamily: "'Fredoka', 'Comic Sans MS', system-ui, sans-serif",
         }}
       >
-        {/* Top-left: JOKER stacked top → bottom */}
         <div style={{ position: "absolute", top: 6, left: 8, ...letterStyle }}>
           {"JOKER".split("").map((ch, i) => <span key={i}>{ch}</span>)}
         </div>
-
-        {/* Centre: jester — absolutely positioned to always land dead-centre */}
         <div style={{
           position: "absolute",
           top: "50%",
@@ -160,8 +179,6 @@ function CardFace({ card, w, h }: { card?: CardT | null; w: number; h: number })
         }}>
           <JesterFace size={jesterSize} color={faceColor} />
         </div>
-
-        {/* Bottom-right: JOKER rotated 180° — reads correctly when card is flipped */}
         <div style={{
           position: "absolute",
           bottom: 6,
@@ -175,48 +192,128 @@ function CardFace({ card, w, h }: { card?: CardT | null; w: number; h: number })
     );
   }
 
-  const color = SUIT_COLOR[card.suit];
+  const color = suitTextColor(card.suit, skin);
   const glyph = SUIT_GLYPH[card.suit];
+  const font = skin.font ?? "'Fredoka', 'Comic Sans MS', system-ui, sans-serif";
+
+  // Minimalist: corners are smaller; no center glyph — just a single big
+  // rank in the middle of the card. This is the most distinct skin.
+  const isMinimalist = skinId === "minimalist";
+
+  // Center rendering branches by skin:
+  //   - "helmet" override → McLaren helmet silhouette
+  //   - minimalist        → big rank, no suit
+  //   - default           → big suit glyph
+  let centerNode: React.ReactNode;
+  if (skin.centerOverride === "helmet") {
+    centerNode = (
+      <div style={{ alignSelf: "center" }}>
+        <HelmetIcon
+          size={w * 0.56}
+          shellColor="#0a0a0a"
+          visorBg={visorBgForSkin(skinId)}
+        />
+      </div>
+    );
+  } else if (isMinimalist) {
+    centerNode = (
+      <div
+        style={{
+          alignSelf: "center",
+          fontSize: w * 0.6,
+          lineHeight: 1,
+          fontWeight: 600,
+          color,
+          letterSpacing: card.rank.length > 1 ? "-2px" : 0,
+        }}
+      >
+        {card.rank}
+      </div>
+    );
+  } else {
+    centerNode = (
+      <div
+        style={{
+          alignSelf: "center",
+          fontSize: w * 0.48,
+          lineHeight: 1,
+          color,
+          textShadow: `1px 2px 0 rgba(0,0,0,0.12)`,
+        }}
+      >
+        {glyph}
+      </div>
+    );
+  }
+
   return (
     <div
       className="card-face"
       style={{
         width: w, height: h, position: "absolute", inset: 0,
         backfaceVisibility: "hidden",
-        background: "#ffd86b",
+        background: skin.faceBg,
         borderRadius: 12,
-        border: `3px solid #1c1d2b`,
+        border: `3px solid ${skin.faceBorder}`,
         boxShadow: "0 6px 18px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.5)",
         display: "flex",
         flexDirection: "column",
-        alignItems: "flex-start",   // pins top-left corner to left; centre/bottom override with alignSelf
+        alignItems: "flex-start",
         justifyContent: "space-between",
-        textAlign: "left",          // resets button UA text-align:center so corner text stays left
+        textAlign: "left",
         padding: "6px 8px",
         overflow: "hidden",
-        fontFamily: "'Fredoka', 'Comic Sans MS', system-ui, sans-serif",
+        fontFamily: font,
         color,
       }}
     >
-      {/* Top-left corner — shrink-wraps to content width so it can't drift centre */}
-      <div style={{ fontSize: w * 0.22, lineHeight: 1, fontWeight: 700, whiteSpace: "nowrap" }}>
+      {/* Optional decorative stripe (McLaren Senna's Monaco green band) */}
+      {skin.faceStripe && (
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: `${skin.faceStripe.startPct}%`,
+            height: `${skin.faceStripe.endPct - skin.faceStripe.startPct}%`,
+            background: skin.faceStripe.color,
+            pointerEvents: "none",
+            zIndex: 0,
+          }}
+        />
+      )}
+
+      {/* Optional pattern overlay (Hand-drawn crosshatch) */}
+      {skin.patternOverlay && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            backgroundImage: skin.patternOverlay,
+            pointerEvents: "none",
+            mixBlendMode: "multiply",
+            zIndex: 0,
+          }}
+        />
+      )}
+
+      {/* Top-left corner */}
+      <div style={{
+        fontSize: w * 0.22, lineHeight: 1, fontWeight: 700,
+        whiteSpace: "nowrap", zIndex: 1, position: "relative",
+      }}>
         {card.rank}
-        <div style={{ fontSize: w * 0.17, lineHeight: 1 }}>{glyph}</div>
+        {!isMinimalist && (
+          <div style={{ fontSize: w * 0.17, lineHeight: 1 }}>{glyph}</div>
+        )}
       </div>
 
-      {/* Centre suit glyph */}
-      <div
-        style={{
-          alignSelf: "center",
-          fontSize: w * 0.48,
-          lineHeight: 1,
-          textShadow: `1px 2px 0 rgba(0,0,0,0.12)`,
-        }}
-      >
-        {glyph}
+      {/* Center */}
+      <div style={{ zIndex: 1, position: "relative", alignSelf: "stretch", display: "flex", flexDirection: "column", alignItems: "center" }}>
+        {centerNode}
       </div>
 
-      {/* Bottom-right corner: rotated — alignSelf:flex-end keeps it to the right */}
+      {/* Bottom-right corner: rotated */}
       <div
         style={{
           alignSelf: "flex-end",
@@ -225,113 +322,99 @@ function CardFace({ card, w, h }: { card?: CardT | null; w: number; h: number })
           lineHeight: 1,
           fontWeight: 700,
           whiteSpace: "nowrap",
+          zIndex: 1,
+          position: "relative",
         }}
       >
         {card.rank}
-        <div style={{ fontSize: w * 0.17, lineHeight: 1 }}>{glyph}</div>
+        {!isMinimalist && (
+          <div style={{ fontSize: w * 0.17, lineHeight: 1 }}>{glyph}</div>
+        )}
       </div>
     </div>
   );
 }
 
 /**
- * Inline SVG jester face — flat-icon style matching the reference design.
- *
- * Construction (drawn back-to-front so later elements layer on top):
- *   1. Two side "horn" peaks that swoop outward and downward, each ending in
- *      a bell circle (the floppy jester tendrils).
- *   2. A balloon-shaped centre peak rising straight up, capped with a bell.
- *   3. A rounded "cap" dome that ties the three peaks together over the head.
- *   4. A yellow face circle that "punches out" the face area.
- *   5. Two closed crescent-shaped smiling eyes.
- *   6. A wide upturned smile.
- *   7. A jagged 5-point downward-fanning collar at the chin.
+ * Inline SVG jester face — unchanged from before. Used only on Joker.
  */
 function JesterFace({ size, color }: { size: number; color: string }) {
-  const bg = "#ffd86b"; // card background — yellow cutout for face
+  const bg = "#ffd86b";
   return (
-    <svg
-      viewBox="0 0 100 110"
-      width={size}
-      height={size * 1.1}
-      style={{ display: "block" }}
-    >
-      {/* ── Left horn: sweeps up-and-out from cap, droops down to bell ── */}
-      <path
-        d="M 33 38 Q 4 30 12 58 Q 22 56 33 44 Z"
-        fill={color}
-      />
+    <svg viewBox="0 0 100 110" width={size} height={size * 1.1} style={{ display: "block" }}>
+      <path d="M 33 38 Q 4 30 12 58 Q 22 56 33 44 Z" fill={color} />
       <circle cx="10" cy="58" r="5" fill={color} />
-
-      {/* ── Right horn: mirror of left ── */}
-      <path
-        d="M 67 38 Q 96 30 88 58 Q 78 56 67 44 Z"
-        fill={color}
-      />
+      <path d="M 67 38 Q 96 30 88 58 Q 78 56 67 44 Z" fill={color} />
       <circle cx="90" cy="58" r="5" fill={color} />
-
-      {/* ── Centre balloon peak: bulbous teardrop pointing up ── */}
-      <path
-        d="M 42 34 C 36 22 38 6 50 4 C 62 6 64 22 58 34 Z"
-        fill={color}
-      />
+      <path d="M 42 34 C 36 22 38 6 50 4 C 62 6 64 22 58 34 Z" fill={color} />
       <circle cx="50" cy="4" r="3.5" fill={color} />
-
-      {/* ── Cap: rounded dome sitting over the top of the head ── */}
-      <path
-        d="M 28 40 Q 50 50 72 40 L 72 54 Q 50 60 28 54 Z"
-        fill={color}
-      />
-
-      {/* ── Face cutout: yellow circle revealing the face area ── */}
+      <path d="M 28 40 Q 50 50 72 40 L 72 54 Q 50 60 28 54 Z" fill={color} />
       <circle cx="50" cy="64" r="14" fill={bg} />
-
-      {/* ── Closed smiling eyes (crescent arcs) ── */}
-      <path
-        d="M 42 61 Q 45 65 48 61"
-        stroke={color}
-        strokeWidth="2.2"
-        fill="none"
-        strokeLinecap="round"
-      />
-      <path
-        d="M 52 61 Q 55 65 58 61"
-        stroke={color}
-        strokeWidth="2.2"
-        fill="none"
-        strokeLinecap="round"
-      />
-
-      {/* ── Wide upturned smile ── */}
-      <path
-        d="M 43 67 Q 50 74 57 67"
-        stroke={color}
-        strokeWidth="2.4"
-        fill="none"
-        strokeLinecap="round"
-      />
-
-      {/* ── Pointed collar: 5 sharp triangular points fanning downward ── */}
-      <path
-        d="M 40 78
-           L 30 95
-           L 39 92
-           L 35 104
-           L 45 99
-           L 50 107
-           L 55 99
-           L 65 104
-           L 61 92
-           L 70 95
-           L 60 78
-           Z"
-        fill={color}
-      />
+      <path d="M 42 61 Q 45 65 48 61" stroke={color} strokeWidth="2.2" fill="none" strokeLinecap="round" />
+      <path d="M 52 61 Q 55 65 58 61" stroke={color} strokeWidth="2.2" fill="none" strokeLinecap="round" />
+      <path d="M 43 67 Q 50 74 57 67" stroke={color} strokeWidth="2.4" fill="none" strokeLinecap="round" />
+      <path d="M 40 78 L 30 95 L 39 92 L 35 104 L 45 99 L 50 107 L 55 99 L 65 104 L 61 92 L 70 95 L 60 78 Z" fill={color} />
     </svg>
   );
 }
 
-function CardBack({ w, h }: { w: number; h: number }) {
+function CardBack({
+  w, h, skin, skinId, card,
+}: {
+  w: number; h: number;
+  skin: import("./cardSkins").SkinStyle;
+  skinId: import("../state/cardskin").CardSkin;
+  card?: CardT | null;
+}) {
+  const font = skin.font ?? "'Fredoka', system-ui, sans-serif";
+
+  let center: React.ReactNode;
+  if (skin.backCenter === "helmet") {
+    center = (
+      <HelmetIcon
+        size={w * 0.7}
+        shellColor="#0a0a0a"
+        visorBg={visorBgForSkin(skinId)}
+      />
+    );
+  } else if (skin.backCenter === "monogram") {
+    // Minimalist: a tiny circular black dot mark — pure restraint.
+    center = (
+      <div
+        style={{
+          width: w * 0.18,
+          height: w * 0.18,
+          borderRadius: "50%",
+          background: "#0a0a0a",
+        }}
+      />
+    );
+  } else {
+    // Default "CABO" pill
+    center = (
+      <div
+        style={{
+          background: skin.caboPillBg ?? "#ffd86b",
+          color: skin.caboColor ?? "#1c1d2b",
+          padding: "4px 10px",
+          borderRadius: 8,
+          transform: "rotate(-8deg)",
+          boxShadow: "0 3px 0 rgba(0,0,0,0.25), 0 6px 14px rgba(0,0,0,0.3)",
+          fontWeight: 900,
+          fontSize: w * 0.28,
+          letterSpacing: 2,
+          fontFamily: font,
+        }}
+      >
+        CABO
+      </div>
+    );
+  }
+
+  // Unused-suppression: keep `card` in the API so future skins can vary the
+  // back per-card (e.g. show suit). Currently the back is suit-agnostic.
+  void card;
+
   return (
     <div
       className="card-back"
@@ -339,33 +422,39 @@ function CardBack({ w, h }: { w: number; h: number }) {
         width: w, height: h, position: "absolute", inset: 0,
         backfaceVisibility: "hidden", transform: "rotateY(180deg)",
         borderRadius: 12,
-        border: "3px solid #ffd86b",
-        background: "#1c1d2b",
-        boxShadow: "0 6px 18px rgba(0,0,0,0.4), inset 0 0 0 6px #2e2f45",
+        border: `3px solid ${skin.backBorder}`,
+        background: skin.backBg,
+        boxShadow: "0 6px 18px rgba(0,0,0,0.4), inset 0 0 0 6px rgba(255,255,255,0.04)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        fontFamily: "'Fredoka', system-ui, sans-serif",
-        fontWeight: 900,
-        fontSize: w * 0.35,
-        letterSpacing: 1,
+        overflow: "hidden",
       }}
     >
-      <div
-        style={{
-          background: "#ffd86b",
-          color: "#1c1d2b",
-          padding: "4px 10px",
-          borderRadius: 8,
-          transform: "rotate(-8deg)",
-          boxShadow: "0 3px 0 #c98e00, 0 6px 14px rgba(0,0,0,0.3)",
-          fontWeight: 900,
-          fontSize: w * 0.28,
-          letterSpacing: 2,
-        }}
-      >
-        CABO
-      </div>
+      {center}
+      {skin.backBadge && (
+        <div
+          style={{
+            position: "absolute",
+            top: 6,
+            right: 6,
+            background: skin.backBadge.bg,
+            color: skin.backBadge.color,
+            fontWeight: 900,
+            fontSize: w * 0.18,
+            width: w * 0.24,
+            height: w * 0.24,
+            borderRadius: "50%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            lineHeight: 1,
+            fontFamily: "'Barlow Condensed', 'Oswald', sans-serif",
+          }}
+        >
+          {skin.backBadge.text}
+        </div>
+      )}
     </div>
   );
 }

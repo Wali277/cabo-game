@@ -3425,3 +3425,264 @@ body.mobile-mode .card-wrap.hl::after {
   }
 }
 
+
+/* ──────────────────────────────────────────────────────────────────────────
+   v3.1 — CUSTOMIZE SHEET (Wallpaper + Card tabs) + CARD SKINS
+
+   Refactor of the Theme FAB into a tabbed sheet. When open, it lifts above
+   the chat/audio popovers (z-index bump) so the three FAB popovers never
+   visually fight. The three-way mutex in the store ensures only one is open
+   at a time anyway, but the z-index lift is a defence-in-depth so a hovering
+   chat or audio popover (mid-exit animation) never covers the customize one.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* When the customize popover is open, lift the entire FAB stack above the
+   other two FABs (chat at 240, audio at ~250 via .audio-controls).
+   1000 is well above any other floating UI. */
+.theme-picker.open {
+  z-index: 1000;
+}
+.theme-picker.open .theme-popover {
+  z-index: 1001;
+}
+
+/* Wider popover to fit the skin grid + tab strip comfortably */
+.customize-popover {
+  width: 320px;
+  padding: 14px;
+  /* Premium glass-morphism feel with a soft outer glow */
+  background:
+    linear-gradient(160deg, rgba(20, 26, 64, 0.96) 0%, rgba(16, 18, 42, 0.97) 100%);
+  border: 1.5px solid rgba(168, 123, 255, 0.45);
+  box-shadow:
+    0 20px 48px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(255, 255, 255, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* ── Tab strip ─────────────────────────────────────────────────────────── */
+.customize-tabs {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  padding: 4px;
+  margin-bottom: 14px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(168, 123, 255, 0.18);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.customize-tab {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 10px;
+  background: transparent;
+  border: none;
+  color: rgba(244, 235, 255, 0.55);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 200ms ease;
+  font-family: inherit;
+}
+.customize-tab:hover { color: rgba(244, 235, 255, 0.85); }
+.customize-tab.active { color: #1c1d2b; }
+.customize-tab-icon {
+  font-size: 15px;
+  line-height: 1;
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,0.3));
+}
+.customize-tab-indicator {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  background: linear-gradient(160deg, #ffd86b 0%, #f5c14c 100%);
+  border-radius: 7px;
+  box-shadow:
+    0 2px 8px rgba(255, 216, 107, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  z-index: 0;
+}
+
+/* ── Card skin tile grid (Card tab) ────────────────────────────────────── */
+.skin-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  /* Cap height so the McLaren tiles at the bottom remain reachable on short
+     landscape viewports — internal scroll, picker stays anchored. */
+  max-height: min(420px, calc(100vh - 200px));
+  overflow-y: auto;
+  padding-right: 2px;
+}
+.skin-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 8px 10px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 2px solid transparent;
+  border-radius: 12px;
+  cursor: pointer;
+  color: #f4ebff;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  transition:
+    background 180ms ease,
+    border-color 180ms ease,
+    transform 180ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.skin-tile:hover {
+  background: rgba(168, 123, 255, 0.10);
+  border-color: rgba(168, 123, 255, 0.4);
+  transform: translateY(-1px);
+}
+.skin-tile.selected {
+  border-color: #ffd86b;
+  background: rgba(255, 216, 107, 0.10);
+  box-shadow: 0 0 0 1px rgba(255, 216, 107, 0.25);
+}
+.skin-tile-preview {
+  position: relative;
+  width: 90px;
+  height: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* Two cards fanned at slight angles to suggest a deck */
+.skin-tile-card {
+  position: absolute;
+  transform-origin: center bottom;
+}
+.skin-tile-card-back {
+  transform: translateX(-12px) rotate(-9deg);
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.35));
+}
+.skin-tile-card-front {
+  transform: translateX(12px) rotate(8deg);
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.35));
+  z-index: 1;
+}
+/* Disable the preview cards' hover lift so it doesn't fight the tile hover */
+.skin-tile .card-wrap { cursor: pointer !important; }
+
+.skin-tile-label {
+  width: 100%;
+  font-size: 11.5px;
+  letter-spacing: 0.3px;
+  color: #d9cdf2;
+}
+.skin-tile.selected .skin-tile-label { color: #ffd86b; }
+.skin-tile-check {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  color: #ffd86b;
+  font-size: 14px;
+  font-weight: 900;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+/* ── Per-skin tile background hints — reinforce the personality ──────── */
+.skin-tile-classic {
+  background:
+    radial-gradient(circle at 50% 100%, rgba(255, 216, 107, 0.10) 0%, transparent 60%),
+    rgba(255, 255, 255, 0.025);
+}
+.skin-tile-royal {
+  background:
+    radial-gradient(circle at 50% 30%, rgba(212, 175, 55, 0.10) 0%, transparent 60%),
+    rgba(124, 26, 38, 0.10);
+}
+.skin-tile-neon {
+  background:
+    linear-gradient(135deg, rgba(0, 229, 255, 0.05) 0%, rgba(255, 45, 202, 0.05) 100%),
+    rgba(10, 10, 20, 0.4);
+}
+.skin-tile-handdrawn {
+  background:
+    radial-gradient(circle at 30% 30%, rgba(243, 234, 212, 0.08) 0%, transparent 60%),
+    rgba(255, 255, 255, 0.025);
+}
+.skin-tile-minimalist {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 100%),
+    rgba(255, 255, 255, 0.02);
+}
+.skin-tile-mclaren_papaya {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 128, 0, 0.18) 0%, transparent 70%),
+    rgba(255, 128, 0, 0.05);
+}
+.skin-tile-mclaren_senna {
+  background:
+    linear-gradient(180deg,
+      rgba(255, 221, 0, 0.10) 0%,
+      rgba(255, 221, 0, 0.10) 60%,
+      rgba(0, 151, 57, 0.18) 60%,
+      rgba(0, 151, 57, 0.18) 78%,
+      rgba(255, 221, 0, 0.10) 78%,
+      rgba(255, 221, 0, 0.10) 100%);
+}
+
+/* ── Per-skin in-game glow (the live card on the table) ────────────────
+   Neon's signature outer glow lives here so it tracks the card wrapper
+   even during layout transitions. */
+.card-wrap.card-skin-neon {
+  filter:
+    drop-shadow(0 0 4px rgba(0, 229, 255, 0.55))
+    drop-shadow(0 0 10px rgba(255, 45, 202, 0.35));
+}
+
+/* Royal gets a softer warm halo so the gold border doesn't blend into
+   bright table backgrounds. */
+.card-wrap.card-skin-royal {
+  filter: drop-shadow(0 0 6px rgba(212, 175, 55, 0.25));
+}
+
+/* McLaren papaya glow */
+.card-wrap.card-skin-mclaren_papaya {
+  filter: drop-shadow(0 0 6px rgba(255, 128, 0, 0.4));
+}
+
+/* Minimalist gets a subtle edge shadow so the white card stays visible
+   on lighter wallpapers (Aquarium / Northern). */
+.card-wrap.card-skin-minimalist .card-face,
+.card-wrap.card-skin-minimalist .card-back {
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.35),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.04) !important;
+}
+
+/* ── Narrow viewport: collapse skin grid to single column ──────────────── */
+@media (max-width: 380px) {
+  .customize-popover {
+    width: calc(100vw - 36px);
+  }
+  .skin-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Mobile mode: keep the popover anchored and scrollable ─────────────── */
+body.mobile-mode .customize-popover {
+  width: min(320px, calc(100vw - 24px));
+}
+body.mobile-mode .skin-grid {
+  max-height: min(360px, calc(100vh - 220px));
+}

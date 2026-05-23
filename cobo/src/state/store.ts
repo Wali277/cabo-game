@@ -109,6 +109,7 @@ interface StoreState {
   chatOpen: boolean;
   chatUnread: number;
   audioOpen: boolean;
+  themeOpen: boolean;
   eliminatedFromRoom: boolean;
   init: (numBots: number) => void;
   trainInit: () => void;
@@ -144,6 +145,7 @@ interface StoreState {
   receiveChatMessage: (msg: ChatMessage) => void;
   setChatOpen: (open: boolean) => void;
   setAudioOpen: (open: boolean) => void;
+  setThemeOpen: (open: boolean) => void;
   clearChat: () => void;
 }
 
@@ -179,6 +181,7 @@ export const useStore = create<StoreState>((set, get) => ({
   chatOpen: false,
   chatUnread: 0,
   audioOpen: false,
+  themeOpen: false,
   eliminatedFromRoom: false,
 
   init(numBots) {
@@ -798,10 +801,26 @@ export const useStore = create<StoreState>((set, get) => ({
   },
 
   setChatOpen(open) {
-    set({ chatOpen: open, chatUnread: open ? 0 : get().chatUnread, audioOpen: open ? false : get().audioOpen });
+    set({
+      chatOpen: open,
+      chatUnread: open ? 0 : get().chatUnread,
+      audioOpen: open ? false : get().audioOpen,
+      themeOpen: open ? false : get().themeOpen,
+    });
   },
   setAudioOpen(open) {
-    set({ audioOpen: open, chatOpen: open ? false : get().chatOpen });
+    set({
+      audioOpen: open,
+      chatOpen: open ? false : get().chatOpen,
+      themeOpen: open ? false : get().themeOpen,
+    });
+  },
+  setThemeOpen(open) {
+    set({
+      themeOpen: open,
+      chatOpen: open ? false : get().chatOpen,
+      audioOpen: open ? false : get().audioOpen,
+    });
   },
 
   clearChat() {
