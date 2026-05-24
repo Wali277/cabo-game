@@ -3,13 +3,21 @@ import { useMemo } from "react";
 import { CardView } from "./Card";
 import { useStore } from "../state/store";
 import type { GameState } from "../engine/types";
+import { useViewMode } from "../state/viewmode";
+import {
+  consumeSwapHandSource,
+  recordSwapHandSource,
+  swapHandDiscardAnimate,
+  swapHandDiscardTrajectory,
+  swapHandDiscardTransition,
+} from "./swapHandMotion";
 
 /** Slow, premium-feeling spring for cards arriving at the centre slots.
  *  Cards GLIDE — they do not snap into place. */
 const CARD_SPRING = { type: "spring" as const, stiffness: 115, damping: 22, mass: 1.25 };
 
 /** ~15% slower variant used when a swap card lands on the discard pile,
- *  so the discard arrival matches the pace of the hand-swap glide. */
+ *  so the discard arrival matches the pace of the swap glide. */
 const SWAP_CARD_SPRING = { type: "spring" as const, stiffness: 87, damping: 20, mass: 1.25 };
 
 /** How many cards of the discard pile are visibly rendered as a stack.
@@ -95,10 +103,34 @@ function pileOffset(cardId: string, indexInStack: number): { x: number; y: numbe
   return { x, y };
 }
 
+function captureSwapHandSourceFromBoard(game: GameState, cardId: string) {
+  const latest = game.animations[game.animations.length - 1];
+  if (latest?.kind !== "swap_hand") return null;
+
+  const playerId = latest.payload.playerId as string | undefined;
+  const handIndex = latest.payload.handIndex as number | undefined;
+  if (!playerId || typeof handIndex !== "number") return null;
+
+  const sourceSlot = document.querySelector<HTMLElement>(
+    `.hand-slot[data-player-id="${playerId}"][data-hand-index="${handIndex}"]`,
+  );
+  const discardArea = document.querySelector<HTMLElement>(".discard-card-area");
+  if (!sourceSlot || !discardArea) return null;
+
+  recordSwapHandSource(
+    cardId,
+    sourceSlot.getBoundingClientRect(),
+    discardArea.getBoundingClientRect(),
+  );
+  return consumeSwapHandSource(cardId);
+}
+
 export function Center() {
   const game = useStore((s) => s.game!);
   const humanId = useStore((s) => s.humanId);
   const reduced = useReducedMotion() ?? false;
+  const viewMode = useViewMode();
+  const isDesktop = viewMode === "desktop";
 
   const isHumanTurn = game.players[game.currentPlayer].id === humanId;
   const canDraw = isHumanTurn && game.phase === "turn_start";
@@ -108,10 +140,6 @@ export function Center() {
   const lastAnimKind = game.animations.length > 0
     ? game.animations[game.animations.length - 1].kind
     : null;
-  const isSwapDiscard =
-    lastAnimKind === "blind_swap" ||
-    lastAnimKind === "peek_and_swap" ||
-    lastAnimKind === "swap_hand";
 
   const draw = useStore((s) => s.draw);
   const drawDiscard = useStore((s) => s.drawDiscard);
@@ -126,6 +154,29 @@ export function Center() {
   // turn ticks, reveals, etc.). The entrance trajectory is captured the
   // moment a card lands in the slot; subsequent re-renders reuse the same
   // object reference, so the motion.div animate prop stays stable.
+  const discardArrivalKind = useMemo(
+    () => lastAnimKind,
+    // Capture the event kind when this exact discard card first becomes top.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [topDiscard?.id],
+  );
+  const isHandSwapDiscard = isDesktop && discardArrivalKind === "swap_hand";
+  const isSwapDiscard =
+    discardArrivalKind === "blind_swap" ||
+    discardArrivalKind === "peek_and_swap" ||
+    discardArrivalKind === "swap_hand";
+  const swapHandSource = useMemo(
+    () => {
+      if (!topDiscard || !isDesktop || discardArrivalKind !== "swap_hand") return null;
+      return (
+        consumeSwapHandSource(topDiscard.id) ??
+        captureSwapHandSourceFromBoard(game, topDiscard.id)
+      );
+    },
+    // Capture once for this top discard card. The source map is single-use.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [topDiscard?.id, isDesktop],
+  );
   const drawnTraj = useMemo(
     () => drawnTrajectory(game),
     // Re-compute only when the card occupying the slot changes.
@@ -133,9 +184,14 @@ export function Center() {
     [drawn?.id],
   );
   const discardTraj = useMemo(
-    () => discardTrajectory(game),
+    () => {
+      if (isDesktop && discardArrivalKind === "swap_hand") {
+        return swapHandDiscardTrajectory(swapHandSource);
+      }
+      return discardTrajectory(game);
+    },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [topDiscard?.id],
+    [topDiscard?.id, isDesktop, swapHandSource],
   );
   const topRotation = useMemo(
     () => topDiscard ? pileRotation(topDiscard.id, game.discard.length - 1) : 0,
@@ -154,6 +210,9 @@ export function Center() {
   );
   const discardAnimate = useMemo(() => {
     if (!topDiscard) return null;
+    if (isHandSwapDiscard) {
+      return swapHandDiscardAnimate(topOffset, topRotation, swapHandSource);
+    }
     return {
       x: [...discardTraj.animate.x.slice(0, -1), topOffset.x],
       y: [...discardTraj.animate.y.slice(0, -1), topOffset.y],
@@ -161,7 +220,18 @@ export function Center() {
       scale: 1,
       rotate: topRotation,
     };
-  }, [topDiscard?.id, discardTraj, topOffset, topRotation]);
+  }, [topDiscard?.id, discardTraj, topOffset, topRotation, isHandSwapDiscard, swapHandSource]);
+  const discardTransition = useMemo(
+    () =>
+      isHandSwapDiscard
+        ? swapHandDiscardTransition(reduced)
+        : reduced
+        ? { duration: 0.15 }
+        : isSwapDiscard
+        ? SWAP_CARD_SPRING
+        : CARD_SPRING,
+    [topDiscard?.id, isHandSwapDiscard, isSwapDiscard, reduced],
+  );
 
   return (
     <div className="center-area">
@@ -274,7 +344,7 @@ export function Center() {
                     key={topDiscard.id}
                     initial={reduced ? { opacity: 0 } : discardTraj.initial}
                     animate={reduced ? { opacity: 1 } : discardAnimate}
-                    transition={reduced ? { duration: 0.15 } : isSwapDiscard ? SWAP_CARD_SPRING : CARD_SPRING}
+                    transition={discardTransition}
                     style={{
                       position: "absolute",
                       left: "50%",

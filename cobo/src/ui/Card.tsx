@@ -89,10 +89,10 @@ export function CardView({
       transition={{
         // GLIDE, do not SNAP. Three tiers tuned slow-and-deliberate:
         //   - J / Q / K action swaps (blind_swap, peek_and_swap):
-        //     1.04s desktop tween so cards cross seats without
+        //     1.2s desktop tween so cards cross seats without
         //     spring bounce or end-of-path twitch.
         //   - Regular hand swap:
-        //     slower than before so it reads as a clear two-card glide.
+        //     1s desktop tween for a clear drawn-card-to-hand glide.
         //   - Everything else (drawn-slot entry, discard pile shuffle):
         //     ~1.1s baseline glide.
         // Reduced-motion still drops to a 150ms crossfade.
@@ -108,7 +108,7 @@ export function CardView({
           : isActionCardSwap
           ? { type: "tween" as const, duration: 1.2,  ease: [0.22, 1, 0.36, 1] as const }
           : isHandSwap
-          ? { type: "tween" as const, duration: 0.69, ease: [0.22, 1, 0.36, 1] as const }
+          ? { type: "tween" as const, duration: 1, ease: [0.22, 1, 0.36, 1] as const }
           : { type: "spring" as const, stiffness: 130, damping: 22, mass: 1.3 },
       }}
     >

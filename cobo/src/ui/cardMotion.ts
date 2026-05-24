@@ -16,6 +16,7 @@ export function actionSwapAnimationHoldMs(
   kind: AnimationKind,
   viewMode: ViewMode,
 ): number {
+  if (viewMode === "desktop" && kind === "swap_hand") return 1000;
   return viewMode === "desktop" && isActionSwapKind(kind) ? 1250 : 500;
 }
 
@@ -23,7 +24,7 @@ export function shouldSuppressCssTransformTransition(
   kind: AnimationKind,
   viewMode: ViewMode,
 ): boolean {
-  return viewMode === "desktop" && isActionSwapKind(kind);
+  return viewMode === "desktop" && (isActionSwapKind(kind) || kind === "swap_hand");
 }
 
 export function cardLayoutTransition({
@@ -53,7 +54,7 @@ export function cardLayoutTransition({
   if (viewMode === "desktop" && isHandSwap) {
     return {
       type: "tween" as const,
-      duration: 0.69,
+      duration: 1,
       ease: [0.22, 1, 0.36, 1] as const,
     };
   }

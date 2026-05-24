@@ -3,6 +3,7 @@ import { CardView } from "./Card";
 import type { PlayerState } from "../engine/types";
 import { useStore, PLAYER_COLORS } from "../state/store";
 import { useViewMode } from "../state/viewmode";
+import { recordSwapHandSource } from "./swapHandMotion";
 
 type TablePos = "top" | "left" | "right" | "bottom";
 
@@ -69,6 +70,16 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
   function handleClick(idx: number) {
     if (isHuman) clickOwnCard(idx);
     else clickOtherCard(player.id, idx);
+  }
+
+  function rememberSwapHandSource(cardId: string, slotEl: HTMLElement) {
+    if (!isHuman || targeting !== "swap_hand" || game.phase !== "turn_drawn") return;
+    const discardArea = document.querySelector<HTMLElement>(".discard-card-area");
+    recordSwapHandSource(
+      cardId,
+      slotEl.getBoundingClientRect(),
+      discardArea?.getBoundingClientRect(),
+    );
   }
 
   function cardIsBeingSpied(idx: number): boolean {
@@ -149,6 +160,9 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
       <motion.div
         className={`hand-slot${spied ? " spy-glow" : ""}`}
         key={c.id}
+        data-player-id={player.id}
+        data-hand-index={idx}
+        onPointerDown={(event) => rememberSwapHandSource(c.id, event.currentTarget)}
         initial={hasInitial ? initial : false}
         animate={{ x: 0, y: 0, opacity: 1, scale: 1, rotate: 0 }}
         transition={

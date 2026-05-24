@@ -2801,7 +2801,7 @@ body.mobile-mode .round-start-label {
   will-change: transform;
 }
 body:not(.mobile-mode) .card-wrap.layout-glide {
-  /* During J/Q/K shared-element swaps, Framer Motion owns transform.
+  /* During desktop shared-element swaps, Framer Motion owns transform.
      The regular CSS transform transition/selection bob can fight the
      measured layout transform and cause a small end-of-flight twitch. */
   transition: filter 0.25s ease !important;
