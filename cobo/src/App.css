@@ -1502,40 +1502,204 @@
 
 /* right-sidebar (and its children) hidden below 1100px — see game-body media query */
 
-/* ========== Action banner ========== */
-.action-banner {
+/* ========== Action cinematic (replaces old .action-banner) ==========
+   Full-screen dramatic intro that plays for ~1.5s when an action ability
+   starts (peek own, spy, blind swap, peek & swap). The --accent CSS var is
+   set inline on the root element by the React component so each ability
+   gets its own color theme (green / blue / pink / gold).
+*/
+.action-cinematic {
   position: fixed;
-  top: 36%;
-  left: 50%;
-  transform: translateX(-50%);
-  color: #1c1d2b;
-  font-weight: 900;
-  font-size: 20px;
-  letter-spacing: 1px;
-  padding: 10px 20px;
-  border-radius: 14px;
-  border: 3px solid #fff;
-  box-shadow:
-    0 0 0 3px #1c1d2b,
-    0 10px 24px rgba(0,0,0,0.45),
-    inset 0 -4px 0 rgba(0,0,0,0.15);
-  display: flex;
+  inset: 0;
+  z-index: 220;            /* below chat (280) + theme picker (250), above board */
+  display: grid;
+  grid-template-rows: 1fr auto auto auto 1fr;
+  justify-items: center;
   align-items: center;
-  gap: 10px;
-  z-index: 150;
+  cursor: pointer;
+  pointer-events: auto;    /* tap-to-skip is intentional */
+}
+.action-cinematic-vignette {
+  position: absolute;
+  inset: 0;
   pointer-events: none;
-  text-shadow: 1px 1px 0 rgba(255,255,255,0.55);
+  background:
+    radial-gradient(
+      ellipse 60% 50% at 50% 45%,
+      rgba(8, 10, 22, 0.0) 0%,
+      rgba(8, 10, 22, 0.55) 55%,
+      rgba(8, 10, 22, 0.82) 100%
+    );
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+.action-cinematic-bloom {
+  position: absolute;
+  top: 38%;
+  left: 50%;
+  width: 720px;
+  max-width: 90vw;
+  height: 720px;
+  max-height: 70vh;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  background:
+    radial-gradient(
+      circle at 50% 50%,
+      color-mix(in srgb, var(--accent, #ffd86b) 55%, transparent) 0%,
+      color-mix(in srgb, var(--accent, #ffd86b) 22%, transparent) 30%,
+      transparent 70%
+    );
+  filter: blur(28px);
+  will-change: transform, opacity;
+}
+.action-cinematic-glyph {
+  grid-row: 2;
+  font-size: clamp(72px, 12vw, 160px);
+  line-height: 1;
+  filter:
+    drop-shadow(0 6px 18px rgba(0, 0, 0, 0.55))
+    drop-shadow(0 0 24px color-mix(in srgb, var(--accent, #ffd86b) 50%, transparent));
+  position: relative;
+  z-index: 1;
+  user-select: none;
+}
+.action-cinematic-title {
+  grid-row: 3;
+  margin: 12px 0 0 0;
+  font-family: 'Fredoka', system-ui, sans-serif;
+  font-size: clamp(40px, 6.5vw, 86px);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  color: var(--accent, #ffd86b);
+  text-transform: uppercase;
+  text-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.55),
+    0 0 36px color-mix(in srgb, var(--accent, #ffd86b) 60%, transparent);
+  position: relative;
+  z-index: 1;
+  user-select: none;
   white-space: nowrap;
 }
-.action-emoji {
-  font-size: 30px;
-  filter: drop-shadow(0 3px 0 rgba(0,0,0,0.15));
-  animation: bouncyEmoji 0.8s ease;
+.action-cinematic-sub {
+  grid-row: 4;
+  margin-top: 18px;
+  font-size: clamp(14px, 1.4vw, 18px);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(244, 235, 255, 0.75);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  padding: 0 16px;
 }
-@keyframes bouncyEmoji {
-  0% { transform: scale(0.4) rotate(-30deg); }
-  60% { transform: scale(1.2) rotate(15deg); }
-  100% { transform: scale(1) rotate(0); }
+.action-cinematic-skip-hint {
+  position: absolute;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(244, 235, 255, 0.45);
+  letter-spacing: 0.4px;
+  pointer-events: none;
+  text-transform: lowercase;
+}
+
+/* ========== Round start cinematic ========== */
+.round-start-cinematic {
+  position: fixed;
+  inset: 0;
+  z-index: 215;            /* just below action cinematic */
+  display: grid;
+  grid-template-rows: 1fr auto auto 1fr;
+  justify-items: center;
+  align-items: center;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.round-start-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      ellipse 70% 60% at 50% 50%,
+      rgba(8, 10, 22, 0.0) 0%,
+      rgba(8, 10, 22, 0.35) 60%,
+      rgba(8, 10, 22, 0.65) 100%
+    );
+  backdrop-filter: blur(1.5px);
+  -webkit-backdrop-filter: blur(1.5px);
+}
+.round-start-bloom {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 640px;
+  max-width: 80vw;
+  height: 640px;
+  max-height: 60vh;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  background:
+    radial-gradient(
+      circle at 50% 50%,
+      rgba(255, 216, 107, 0.45) 0%,
+      rgba(168, 123, 255, 0.18) 35%,
+      transparent 70%
+    );
+  filter: blur(34px);
+  will-change: transform, opacity;
+}
+.round-start-label {
+  grid-row: 2;
+  font-family: 'Fredoka', system-ui, sans-serif;
+  font-size: clamp(18px, 2.2vw, 28px);
+  font-weight: 700;
+  color: rgba(244, 235, 255, 0.85);
+  text-transform: uppercase;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+  position: relative;
+  z-index: 1;
+  user-select: none;
+}
+.round-start-number {
+  grid-row: 3;
+  margin: 4px 0 0 0;
+  font-family: 'Fredoka', system-ui, sans-serif;
+  font-size: clamp(120px, 18vw, 240px);
+  font-weight: 900;
+  line-height: 0.9;
+  color: #ffd86b;
+  text-shadow:
+    0 6px 30px rgba(0, 0, 0, 0.55),
+    0 0 50px rgba(255, 216, 107, 0.5);
+  position: relative;
+  z-index: 1;
+  user-select: none;
+}
+
+/* Mobile tuning — keep the cinematic dramatic but not overflowing. */
+body.mobile-mode .action-cinematic-title {
+  font-size: clamp(28px, 8vw, 52px);
+  letter-spacing: 0.03em;
+  white-space: normal;
+  text-align: center;
+}
+body.mobile-mode .action-cinematic-glyph {
+  font-size: clamp(60px, 16vw, 110px);
+}
+body.mobile-mode .action-cinematic-sub {
+  font-size: 13px;
+}
+body.mobile-mode .round-start-number {
+  font-size: clamp(90px, 30vw, 180px);
+}
+body.mobile-mode .round-start-label {
+  font-size: 16px;
 }
 
 /* (action-choice-row / action-confirm-btn moved to LeftPanel — no longer center-screen) */
@@ -2735,11 +2899,6 @@ body:not(.mobile-mode) .card-wrap.layout-glide.hl {
     0 0 22px rgba(255,216,107,0.25);
 }
 
-/* Action banner glow */
-.action-banner {
-  filter: drop-shadow(0 0 26px rgba(255,255,255,0.35));
-}
-
 /* ── Busted overlay ─────────────────────────────────────────────────── */
 .busted-modal .modal-burst { font-size: 72px; }
 .busted-modal h2 { color: #ff5b6e; }
@@ -3348,16 +3507,6 @@ body.mobile-mode .chat-panel {
 }
 /* In mobile mode the theme picker doesn't need to swap slots — it's just
    stacked from the top, so the .sp override stays at top: 64px. */
-
-/* ── ActionBanner: full-width strip with smaller text ───────────────────── */
-body.mobile-mode .action-banner {
-  font-size: 14px;
-  padding: 10px 12px;
-  width: calc(100vw - 16px);
-  max-width: 480px;
-  white-space: normal;
-  text-align: center;
-}
 
 /* ── Toast notifications: narrower, smaller text on phones ──────────────── */
 body.mobile-mode .toast {

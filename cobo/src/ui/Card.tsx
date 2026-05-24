@@ -105,9 +105,11 @@ export function CardView({
           ? { duration: 0.15, ease: "easeOut" }
           : viewMode === "mobile"
           ? { type: "spring", stiffness: 170, damping: 28, mass: 1.1 }
-          : { type: "spring",
-              stiffness: isActionCardSwap ? 75 : isHandSwap ? 92 : 130,
-              damping: 22, mass: 1.3 },
+          : isActionCardSwap
+          ? { type: "tween" as const, duration: 1.2,  ease: [0.22, 1, 0.36, 1] as const }
+          : isHandSwap
+          ? { type: "tween" as const, duration: 0.69, ease: [0.22, 1, 0.36, 1] as const }
+          : { type: "spring" as const, stiffness: 130, damping: 22, mass: 1.3 },
       }}
     >
       <motion.div

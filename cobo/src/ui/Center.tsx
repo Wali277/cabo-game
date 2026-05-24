@@ -8,6 +8,10 @@ import type { GameState } from "../engine/types";
  *  Cards GLIDE — they do not snap into place. */
 const CARD_SPRING = { type: "spring" as const, stiffness: 115, damping: 22, mass: 1.25 };
 
+/** ~15% slower variant used when a swap card lands on the discard pile,
+ *  so the discard arrival matches the pace of the hand-swap glide. */
+const SWAP_CARD_SPRING = { type: "spring" as const, stiffness: 87, damping: 20, mass: 1.25 };
+
 /** How many cards of the discard pile are visibly rendered as a stack.
  *  Older cards exist in `game.discard` but stay invisibly buried. */
 const VISIBLE_PILE_DEPTH = 5;
@@ -101,6 +105,13 @@ export function Center() {
   const canDrawDiscard = canDraw && game.discard.length > 0;
 
   const drawn = game.drawnCard;
+  const lastAnimKind = game.animations.length > 0
+    ? game.animations[game.animations.length - 1].kind
+    : null;
+  const isSwapDiscard =
+    lastAnimKind === "blind_swap" ||
+    lastAnimKind === "peek_and_swap" ||
+    lastAnimKind === "swap_hand";
 
   const draw = useStore((s) => s.draw);
   const drawDiscard = useStore((s) => s.drawDiscard);
@@ -263,7 +274,7 @@ export function Center() {
                     key={topDiscard.id}
                     initial={reduced ? { opacity: 0 } : discardTraj.initial}
                     animate={reduced ? { opacity: 1 } : discardAnimate}
-                    transition={reduced ? { duration: 0.15 } : CARD_SPRING}
+                    transition={reduced ? { duration: 0.15 } : isSwapDiscard ? SWAP_CARD_SPRING : CARD_SPRING}
                     style={{
                       position: "absolute",
                       left: "50%",

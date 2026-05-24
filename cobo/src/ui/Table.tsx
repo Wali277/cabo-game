@@ -10,6 +10,7 @@ import { BustedOverlay } from "./BustedOverlay";
 import { GameLostOverlay } from "./GameLostOverlay";
 import { GloriousVictory } from "./GloriousVictory";
 import { ActionBanner } from "./ActionBanner";
+import { RoundStartCinematic } from "./RoundStartCinematic";
 import { ActionLog } from "./ActionLog";
 import { TrainingPanel } from "./TrainingPanel";
 import { MpNotices } from "./MpNotices";
@@ -392,6 +393,7 @@ export function Table() {
         </AnimatePresence>
 
         <ActionBanner />
+        <RoundStartCinematic />
         <RoundEndOverlay />
         <BustedOverlay />
         <GameLostOverlay />

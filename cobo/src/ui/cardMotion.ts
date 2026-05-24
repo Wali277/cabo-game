@@ -43,7 +43,17 @@ export function cardLayoutTransition({
   if (viewMode === "desktop" && isActionCardSwap) {
     return {
       type: "tween" as const,
-      duration: 1.04,
+      duration: 1.2,
+      ease: [0.22, 1, 0.36, 1] as const,
+    };
+  }
+
+  // Hand swap: smooth tween so the card glides in crisply rather than
+  // settling slowly via an over-damped spring.
+  if (viewMode === "desktop" && isHandSwap) {
+    return {
+      type: "tween" as const,
+      duration: 0.69,
       ease: [0.22, 1, 0.36, 1] as const,
     };
   }
@@ -51,16 +61,16 @@ export function cardLayoutTransition({
   if (viewMode === "mobile") {
     return {
       type: "spring" as const,
-      stiffness: isActionCardSwap ? 75 : isHandSwap ? 105 : 140,
-      damping: 28,
-      mass: 1.3,
+      stiffness: isActionCardSwap ? 75 : isHandSwap ? 130 : 140,
+      damping: 26,
+      mass: 1.1,
     };
   }
 
   return {
     type: "spring" as const,
-    stiffness: isHandSwap ? 68 : 105,
-    damping: isHandSwap ? 24 : 22,
-    mass: isHandSwap ? 1.55 : 1.3,
+    stiffness: 105,
+    damping: 22,
+    mass: 1.3,
   };
 }
