@@ -5,6 +5,11 @@ import { useViewMode } from "../state/viewmode";
 import { useCardSkin } from "../state/cardskin";
 import { useStore } from "../state/store";
 import { SKIN_STYLES, HelmetIcon, HandDrawnBack, RoyalBack, NeonBack, MinimalistBack } from "./cardSkins";
+import {
+  cardLayoutTransition,
+  isActionSwapKind,
+  shouldSuppressCssTransformTransition,
+} from "./cardMotion";
 
 interface Props {
   card?: CardT | null;
@@ -57,16 +62,17 @@ export function CardView({
     const anims = s.game?.animations;
     return anims && anims.length > 0 ? anims[anims.length - 1].kind : null;
   });
-  const isActionCardSwap =
-    lastAnimKind === "blind_swap" || lastAnimKind === "peek_and_swap";
+  const isActionCardSwap = isActionSwapKind(lastAnimKind);
   const isHandSwap = lastAnimKind === "swap_hand";
+  const suppressCssTransformTransition =
+    shouldSuppressCssTransformTransition(lastAnimKind, viewMode);
 
   const isHl = highlight === "selectable" || highlight === "selected";
 
   return (
     <motion.div
       layoutId={layoutId}
-      className={`card-wrap card-skin-${skinId} ${isHl ? "hl" : ""} ${highlight ?? ""}`}
+      className={`card-wrap card-skin-${skinId}${suppressCssTransformTransition ? " layout-glide" : ""} ${isHl ? "hl" : ""} ${highlight ?? ""}`}
       style={{
         width: w,
         height: h,
@@ -75,29 +81,26 @@ export function CardView({
       }}
       onClick={onClick}
       animate={shake ? { x: [0, -6, 6, -4, 4, 0] } : {}}
-      whileHover={onClick && viewMode === "desktop" ? { y: -6, scale: 1.04 } : {}}
+      whileHover={
+        onClick && viewMode === "desktop" && !suppressCssTransformTransition
+          ? { y: -6, scale: 1.04 }
+          : {}
+      }
       transition={{
         // GLIDE, do not SNAP. Three tiers tuned slow-and-deliberate:
-        //   • J / Q / K action swaps (blind_swap, peek_and_swap):
-        //     ~2.0s — cards cross between seats; the path is long, the
-        //     moment is rare, the timing should feel ceremonial.
-        //   • Regular hand swap (drawn → hand, displaced → discard):
-        //     ~1.6s — the user's most common deliberate action; needs
-        //     to read as a clear two-card glide, not a snap.
-        //   • Everything else (drawn-slot entry, discard pile shuffle):
+        //   - J / Q / K action swaps (blind_swap, peek_and_swap):
+        //     1.04s desktop tween so cards cross seats without
+        //     spring bounce or end-of-path twitch.
+        //   - Regular hand swap:
+        //     slower than before so it reads as a clear two-card glide.
+        //   - Everything else (drawn-slot entry, discard pile shuffle):
         //     ~1.1s baseline glide.
-        // Tuned by lowering stiffness + raising mass; reduced-motion
-        // still drops to a 150ms crossfade.
-        layout: reduced
-          ? { duration: 0.15, ease: "easeOut" }
-          : viewMode === "mobile"
-          ? { type: "spring",
-              stiffness: isActionCardSwap ? 75 : isHandSwap ? 105 : 140,
-              damping: 28, mass: 1.3 }
-          : { type: "spring",
-              stiffness: isActionCardSwap ? 50  : isHandSwap ? 68  : 105,
-              damping: isActionCardSwap ? 26   : isHandSwap ? 24  : 22,
-              mass:    isActionCardSwap ? 1.8  : isHandSwap ? 1.55 : 1.3 },
+        // Reduced-motion still drops to a 150ms crossfade.
+        layout: cardLayoutTransition({
+          kind: lastAnimKind,
+          reduced,
+          viewMode,
+        }),
         default: reduced
           ? { duration: 0.15, ease: "easeOut" }
           : viewMode === "mobile"

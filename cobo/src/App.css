@@ -2636,6 +2636,15 @@
               filter 0.25s ease;
   will-change: transform;
 }
+body:not(.mobile-mode) .card-wrap.layout-glide {
+  /* During J/Q/K shared-element swaps, Framer Motion owns transform.
+     The regular CSS transform transition/selection bob can fight the
+     measured layout transform and cause a small end-of-flight twitch. */
+  transition: filter 0.25s ease !important;
+}
+body:not(.mobile-mode) .card-wrap.layout-glide.hl {
+  animation: none;
+}
 .card-wrap:hover {
   filter: drop-shadow(0 12px 28px rgba(0,0,0,0.45))
           drop-shadow(0 0 18px rgba(255,216,107,0.18));

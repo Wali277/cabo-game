@@ -24,6 +24,7 @@ import { OceanWallpaper } from "./OceanWallpaper";
 import { CrimsonWallpaper } from "./CrimsonWallpaper";
 import { CosmicWallpaper } from "./CosmicWallpaper";
 import { CaboLettersBurst } from "./Particles";
+import { actionSwapAnimationHoldMs } from "./cardMotion";
 
 export function Table() {
   const game = useStore((s) => s.game!);
@@ -182,9 +183,10 @@ export function Table() {
         break;
     }
     if (msg) setToast(msg);
-    const t = setTimeout(() => consumeAnimations(), 500);
+    const holdMs = actionSwapAnimationHoldMs(latest.kind, viewMode);
+    const t = setTimeout(() => consumeAnimations(), holdMs);
     return () => clearTimeout(t);
-  }, [game.animations]);
+  }, [game.animations, viewMode]);
 
   // POV rotation: each viewer sees themselves at the bottom. The other players
   // are arranged in turn-order, starting with the player who plays next.
