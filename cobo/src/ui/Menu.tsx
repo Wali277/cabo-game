@@ -7,8 +7,9 @@ import { MenuWallpaper } from "./MenuWallpaper";
 import { useViewMode, setViewMode } from "../state/viewmode";
 
 export function Menu() {
-  const init = useStore((s) => s.init);
   const trainInit = useStore((s) => s.trainInit);
+  const setScreen = useStore((s) => s.setScreen);
+  const setPendingNumBots = useStore((s) => s.setPendingNumBots);
   const viewMode = useViewMode();
   const [bots, setBots] = useState(1);
   const [showTutorial, setShowTutorial] = useState(false);
@@ -53,7 +54,14 @@ export function Menu() {
             ))}
           </div>
         </div>
-        <button className="btn primary big" onClick={() => { Audio.playSfx("click"); init(bots); }}>
+        <button
+          className="btn primary big"
+          onClick={() => {
+            Audio.playSfx("click");
+            setPendingNumBots(bots);
+            setScreen("botPicker");
+          }}
+        >
           Play vs bots
         </button>
         <div className="divider"><span>or</span></div>

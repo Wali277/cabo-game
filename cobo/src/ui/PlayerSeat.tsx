@@ -1,9 +1,10 @@
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { CardView } from "./Card";
 import type { PlayerState } from "../engine/types";
 import { useStore, PLAYER_COLORS } from "../state/store";
 import { useViewMode } from "../state/viewmode";
 import { recordSwapHandSource } from "./swapHandMotion";
+import { BOT_PROFILES } from "../ai/bots";
 
 type TablePos = "top" | "left" | "right" | "bottom";
 
@@ -32,6 +33,12 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
   const clickOwnCard = useStore((s) => s.clickOwnCard);
   const clickOtherCard = useStore((s) => s.clickOtherCard);
   const reveals = game.reveals;
+  // In SP, bots show a stylized portrait + character name + speech bubble.
+  const botDifficulty = useStore((s) => s.botDifficulty);
+  const botSpeech = useStore((s) => s.botSpeech);
+  const botProfile = player.isBot && botDifficulty ? BOT_PROFILES[botDifficulty] : null;
+  const BotPortraitComp = botProfile?.Portrait;
+  const hasSpeech = !!botSpeech && botSpeech.playerId === player.id;
 
   const color = PLAYER_COLORS[seatIndex % PLAYER_COLORS.length];
   const lastAnim = game.animations[game.animations.length - 1];
@@ -188,19 +195,47 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
   });
 
   return (
-    <div className={`player-seat seat-${seatIndex}${tablePos ? ` pos-${tablePos}` : ""}`}>
-      <div
-        className="player-tag"
-        style={{
-          background: color,
-          color: "#1c1d2b",
-          fontWeight: 700,
-          boxShadow: isCurrent ? "0 0 0 4px #ffd86b, 0 6px 12px rgba(0,0,0,0.3)" : "0 4px 8px rgba(0,0,0,0.2)",
-        }}
-      >
-        <span>{player.name}</span>
-        {player.calledCabo && <span className="cabo-badge">CABO!</span>}
-      </div>
+    <div className={`player-seat seat-${seatIndex}${tablePos ? ` pos-${tablePos}` : ""}${botProfile ? ` has-bot-portrait diff-${botProfile.difficultyClass}` : ""}`}>
+      {BotPortraitComp ? (
+        // Bot identifier — the portrait IS the nametag. No text name shown
+        // in-game (the character is recognisable from their face). The
+        // current-turn highlight ring lives here now.
+        <div
+          className={`bot-portrait-wrap bot-portrait-identifier${isCurrent ? " is-current" : ""}`}
+          style={{ borderColor: botProfile!.accent }}
+        >
+          <BotPortraitComp size={isMobile ? 56 : 72} />
+          {player.calledCabo && <span className="cabo-badge bot-cabo-badge">CABO!</span>}
+          <AnimatePresence>
+            {hasSpeech && (
+              <motion.div
+                key={botSpeech!.at}
+                className="bot-speech-bubble"
+                initial={{ opacity: 0, y: 8, scale: 0.85 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -6, scale: 0.9 }}
+                transition={{ type: "spring", stiffness: 320, damping: 22 }}
+              >
+                {botSpeech!.text}
+                <span className="bot-speech-tail" />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      ) : (
+        <div
+          className="player-tag"
+          style={{
+            background: color,
+            color: "#1c1d2b",
+            fontWeight: 700,
+            boxShadow: isCurrent ? "0 0 0 4px #ffd86b, 0 6px 12px rgba(0,0,0,0.3)" : "0 4px 8px rgba(0,0,0,0.2)",
+          }}
+        >
+          <span>{player.name}</span>
+          {player.calledCabo && <span className="cabo-badge">CABO!</span>}
+        </div>
+      )}
 
       {isSide ? (
         // Fixed-size wrapper reserves the post-rotation footprint (93×266).

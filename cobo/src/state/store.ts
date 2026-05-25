@@ -23,8 +23,9 @@ import {
   triggerPendingAction,
 } from "../engine/game";
 import { Audio } from "../audio/sounds";
+import { type BotDifficulty, nameForSlot } from "../ai/bots";
 
-export type Screen = "menu" | "lobby" | "coin_toss" | "straw_draw" | "game" | "scoring";
+export type Screen = "menu" | "botPicker" | "lobby" | "coin_toss" | "straw_draw" | "game" | "scoring";
 
 export interface ChatMessage {
   from: string;
@@ -111,7 +112,21 @@ interface StoreState {
   audioOpen: boolean;
   themeOpen: boolean;
   eliminatedFromRoom: boolean;
-  init: (numBots: number) => void;
+  /** Number of bots the user has chosen on the main menu while routing to
+   *  the difficulty picker. Default 1; updated when they tap a count tile. */
+  pendingNumBots: number;
+  setPendingNumBots: (n: number) => void;
+  setScreen: (s: Screen) => void;
+  /** The bot difficulty profile in use for the current SP game. Drives bot
+   *  decision making in [ai/bot.ts](src/ai/bot.ts) and chat lines via
+   *  [ai/bots.ts](src/ai/bots.ts). Null in MP / outside an SP match. */
+  botDifficulty: BotDifficulty | null;
+  /** Transient SP-only "speech bubble" emitted by a bot at a key moment
+   *  (cabo, win, bust, juicy draw). Auto-clears after a few seconds via
+   *  the BotSpeechBubble component. */
+  botSpeech: { playerId: string; text: string; at: number } | null;
+  setBotSpeech: (v: StoreState["botSpeech"]) => void;
+  init: (numBots: number, difficulty?: BotDifficulty) => void;
   trainInit: () => void;
   trainingInjectCard: (card: Card) => void;
   triggerAction: () => void;
@@ -151,12 +166,14 @@ interface StoreState {
 
 const PLAYER_COLORS = ["#ff5b6e", "#ffd86b", "#67e0a3", "#7aa8ff"];
 
-function makePlayers(numBots: number) {
+function makePlayers(numBots: number, difficulty: BotDifficulty | null) {
   const human = { id: "p_human", name: "You", isBot: false };
   const bots = [];
-  const botNames = ["Beep", "Boop", "Bam"];
+  // Fallback names when no difficulty is set (Training Chamber uses this path).
+  const fallback = ["Beep", "Boop", "Bam"];
   for (let i = 0; i < numBots; i++) {
-    bots.push({ id: `p_bot${i + 1}`, name: botNames[i], isBot: true });
+    const name = difficulty ? nameForSlot(difficulty, i) : fallback[i];
+    bots.push({ id: `p_bot${i + 1}`, name, isBot: true });
   }
   return [human, ...bots];
 }
@@ -183,9 +200,16 @@ export const useStore = create<StoreState>((set, get) => ({
   audioOpen: false,
   themeOpen: false,
   eliminatedFromRoom: false,
+  pendingNumBots: 1,
+  setPendingNumBots(n) { set({ pendingNumBots: n }); },
+  setScreen(s) { set({ screen: s }); },
+  botDifficulty: null,
+  botSpeech: null,
+  setBotSpeech(v) { set({ botSpeech: v }); },
 
-  init(numBots) {
-    const game = newGame({ players: makePlayers(numBots) });
+  init(numBots, difficulty) {
+    const diff = difficulty ?? null;
+    const game = newGame({ players: makePlayers(numBots, diff) });
     // Start with the coin toss screen — the actual game state is held in
     // pendingGame until the toss completes and decides the starting player.
     set({
@@ -203,13 +227,15 @@ export const useStore = create<StoreState>((set, get) => ({
       },
       humanId: "p_human",
       setupPeekRevealed: false, targeting: null, toast: null,
+      botDifficulty: diff,
+      botSpeech: null,
     });
   },
 
   trainInit() {
     // Training Chamber: 1 bot so swap/spy actions have a target to work with.
     // Skip the coin toss in training mode — human always starts for predictable testing.
-    const game = newGame({ players: makePlayers(1) });
+    const game = newGame({ players: makePlayers(1, null) });
     set({
       mode: "sp", training: true, mp: null, game, screen: "game",
       pendingGame: null, coinToss: null,
@@ -775,6 +801,7 @@ export const useStore = create<StoreState>((set, get) => ({
       targeting: null, toast: null,
       chatMessages: [], chatOpen: false, chatUnread: 0,
       eliminatedFromRoom: false,
+      botDifficulty: null, botSpeech: null,
     });
   },
 

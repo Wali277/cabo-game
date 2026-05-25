@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react"; // useState kept for hydrat
 import "./App.css";
 import { useStore } from "./state/store";
 import { Menu } from "./ui/Menu";
+import { BotPicker } from "./ui/BotPicker";
 import { Table } from "./ui/Table";
 import { Lobby } from "./ui/Lobby";
 import { CoinToss } from "./ui/CoinToss";
@@ -116,6 +117,7 @@ function App() {
   return (
     <>
       {screen === "menu" && <Menu />}
+      {screen === "botPicker" && <BotPicker />}
       {screen === "lobby" && <Lobby initialCode={getRoomFromPath() ?? undefined} />}
       {screen === "coin_toss" && <CoinToss />}
       {screen === "straw_draw" && <StrawDraw />}

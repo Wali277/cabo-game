@@ -14,7 +14,7 @@ import { RoundStartCinematic } from "./RoundStartCinematic";
 import { ActionLog } from "./ActionLog";
 import { TrainingPanel } from "./TrainingPanel";
 import { MpNotices } from "./MpNotices";
-import { botMove, ingestReveals, resetBotKnowledge } from "../ai/bot";
+import { botMove, ingestReveals, reactToRoundEnd, resetBotKnowledge } from "../ai/bot";
 import { clearReveals as clearRevealsEngine } from "../engine/game";
 import { Audio } from "../audio/sounds";
 import { useTheme } from "../state/theme";
@@ -93,6 +93,33 @@ export function Table() {
     }, delay);
     return () => clearTimeout(t);
   }, [game.phase, game.currentPlayer, hasTransientReveal, mode]);
+
+  // SP-only: fire a bot speech bubble at each round transition (winner gloats /
+  // loser complains). Keyed on roundNumber so a new round triggers exactly once.
+  // Auto-clears the bubble after a short window via the next effect.
+  const lastReactedRound = useRef(-1);
+  useEffect(() => {
+    if (mode !== "sp") return;
+    if (game.phase !== "round_over") return;
+    if (lastReactedRound.current === game.roundNumber) return;
+    lastReactedRound.current = game.roundNumber;
+    // Small delay so the cinematic round-end stamp lands first.
+    const t = setTimeout(() => reactToRoundEnd(game), 1600);
+    return () => clearTimeout(t);
+  }, [mode, game.phase, game.roundNumber, game]);
+
+  // Auto-clear bot speech bubble ~3.5s after it appears.
+  const botSpeech = useStore((s) => s.botSpeech);
+  useEffect(() => {
+    if (!botSpeech) return;
+    const t = setTimeout(() => {
+      const latest = useStore.getState().botSpeech;
+      if (latest && latest.at === botSpeech.at) {
+        useStore.setState({ botSpeech: null });
+      }
+    }, 3500);
+    return () => clearTimeout(t);
+  }, [botSpeech]);
 
   // Auto-clear transient reveals after a short window so cards flip back.
   // Setup peek reveals are intentionally NOT auto-cleared — they stay face-up
