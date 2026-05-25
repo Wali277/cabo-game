@@ -87,10 +87,34 @@ export function MpNotices() {
   const forfeitedOpponent = disconnectedOpponents.find((d) => d.forfeited);
   const pending = disconnectedOpponents.filter((d) => !d.forfeited && !dismissed[d.id]);
 
-  // Compute whether the LOCAL viewer should see the forfeit victory overlay.
-  // Show it only when the game was in progress (not already round_over).
+  // Compute how many active players are still in the match. A player is
+  // active when they: are still a room member, are not permanently kicked,
+  // are not busted this round, and have not forfeited via the disconnect
+  // grace timer.
+  const forfeitedIds = new Set(
+    Object.entries(mp.disconnects ?? {})
+      .filter(([, d]) => d.forfeited)
+      .map(([id]) => id),
+  );
+  const activeMemberCount = mp.members.filter((m) => {
+    if (kickedSet.has(m.id)) return false;
+    if (bustedSet.has(m.id)) return false;
+    if (forfeitedIds.has(m.id)) return false;
+    return true;
+  }).length;
+
+  // Victory-by-forfeit fires ONLY when the forfeit just reduced the active
+  // count to exactly 1 (a sole survivor) AND that survivor is me. In a 3-4
+  // player match with multiple players still active, the game must continue.
+  // We still gate on game.phase !== "round_over" because round-end overlays
+  // handle their own resolution.
   const showForfeitVictory =
-    !!forfeitedOpponent && game.phase !== "round_over";
+    !!forfeitedOpponent &&
+    game.phase !== "round_over" &&
+    activeMemberCount === 1 &&
+    !kickedSet.has(humanId) &&
+    !bustedSet.has(humanId) &&
+    !forfeitedIds.has(humanId);
 
   return (
     <>

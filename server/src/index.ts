@@ -149,6 +149,47 @@ if (hasBuiltClient) {
   console.log("No built client found at cobo/dist — running in API-only mode (use Vite for the client).");
 }
 
+/**
+ * Auto-advance the turn past any player who is permanently kicked (forfeit,
+ * bust, kick). Loops in case multiple consecutive players are kicked. Resets
+ * the per-turn transient fields (drawn card / pending action) the way
+ * advanceTurn() does in the engine.
+ *
+ * Stays inside the server because it depends on `kickedIds` (a room concept,
+ * not engine state). The engine's own advanceTurn doesn't know about kicks.
+ */
+function skipKickedTurn(game: GameState, kickedIds: string[]): GameState {
+  if (game.phase === "round_over") return game;
+  if (game.players.length === 0) return game;
+  // FAST PATH — current seat is fine. Don't touch state. This is the
+  // common case (every action after a normal move), and resetting the
+  // phase here was breaking draw/flip/swap. Only intervene when we
+  // actually need to step past a kicked seat.
+  if (!kickedIds.includes(game.players[game.currentPlayer]?.id ?? "")) {
+    return game;
+  }
+  let attempts = game.players.length;
+  while (
+    attempts > 0 &&
+    kickedIds.includes(game.players[game.currentPlayer]?.id ?? "")
+  ) {
+    game.currentPlayer = (game.currentPlayer + 1) % game.players.length;
+    attempts -= 1;
+    // Stop and resolve as round_over if we wrap into the cabo caller's seat.
+    if (game.caboCallerId && game.players[game.currentPlayer]?.id === game.caboCallerId) {
+      break;
+    }
+  }
+  // We advanced past at least one kicked seat — reset per-turn transient
+  // state so the new current player starts a clean turn.
+  game.phase = "turn_start";
+  game.drawnCard = null;
+  game.drawnFrom = null;
+  game.pendingActionSource = null;
+  game.peekAndSwapPick = null;
+  return game;
+}
+
 /** Players who can still participate: not forfeited and not permanently kicked. */
 function activePlayerIds(room: { members: { playerId: string }[]; disconnects: Record<string, { forfeited: boolean }>; kickedIds: string[] }): string[] {
   return room.members
@@ -681,12 +722,37 @@ io.on("connection", (socket) => {
     if (!next || next === room.game) return cb?.({ ok: false, error: "Illegal action" });
     room.game = next;
 
+    // Defensive: if the resulting state lands the turn on a kicked
+    // (forfeited / busted-and-permanently-out) player, skip past them
+    // so the game doesn't stall waiting for someone who can't play.
+    room.game = skipKickedTurn(room.game, room.kickedIds);
+
     // After a round ends: track wins, detect busts, and determine if the game ends.
     if (room.game.phase === "round_over") {
+      // ── 0. Filter winner against kickedIds ────────────────────────────────
+      // The engine's endRound() doesn't know about room-level kicks (forfeit
+      // or prior-round busts), so a kicked player with an empty hand (0 pts)
+      // could be picked as round winner. Recompute against non-kicked
+      // players so the cinematic "X wins the round" beat shows a real player.
+      const kickedSetForWinner = new Set(room.kickedIds);
+      if (room.game.winnerId && kickedSetForWinner.has(room.game.winnerId)) {
+        const live = room.game.players
+          .filter((p) => !kickedSetForWinner.has(p.id))
+          .map((p) => ({
+            id: p.id,
+            roundScore: (room.game!.scores[p.id] ?? []).slice(-1)[0] ?? 0,
+          }));
+        if (live.length > 0) {
+          const minScore = Math.min(...live.map((l) => l.roundScore));
+          const newWinner = live.find((l) => l.roundScore === minScore);
+          if (newWinner) room.game.winnerId = newWinner.id;
+        }
+      }
+
       // ── 1. Track round wins ──────────────────────────────────────────────────
       // Increment the win counter for whoever had the lowest hand this round.
       const roundWinnerId = room.game.winnerId;
-      if (roundWinnerId) {
+      if (roundWinnerId && !kickedSetForWinner.has(roundWinnerId)) {
         room.roundWins[roundWinnerId] = (room.roundWins[roundWinnerId] ?? 0) + 1;
       }
 
@@ -834,37 +900,51 @@ io.on("connection", (socket) => {
         if (m?.connected) return;
         d.forfeited = true;
 
-        // If the forfeited player currently holds the turn, auto-advance so the
-        // game does not freeze waiting for a disconnected player to act.
         if (r.game && r.game.phase !== "round_over") {
-          const cur = r.game.players[r.game.currentPlayer];
-          if (cur && cur.id === localBound.playerId) {
-            if (r.game.phase === "turn_drawn" && r.game.drawnFrom !== "discard") {
-              // Auto-discard the drawn card without triggering any ability.
-              r.game = discardDrawnSkipAction(r.game);
-            } else if (r.game.phase === "turn_drawn" && r.game.drawnFrom === "discard") {
-              // Drawn from discard — must swap; swap into slot 0 arbitrarily.
-              r.game = swapDrawnWithHand(r.game, 0);
-            } else if (r.game.phase === "turn_start") {
-              // Auto-draw from deck and discard without action.
-              const afterDraw = drawFromDeck(r.game);
-              if (afterDraw.phase === "turn_drawn") {
-                r.game = discardDrawnSkipAction(afterDraw);
-              } else {
-                r.game = afterDraw; // round ended via drawFromDeck (deck empty edge-case)
-              }
-            } else if (
-              r.game.phase === "pending_action" ||
-              r.game.phase === "action_peek_own" ||
-              r.game.phase === "action_peek_other" ||
-              r.game.phase === "action_blind_swap" ||
-              r.game.phase === "action_peek_and_swap_pick" ||
-              r.game.phase === "action_peek_and_swap_decide"
-            ) {
-              // Skip any in-progress action and advance the turn.
-              r.game = skipPendingAction(r.game);
+          const forfeiter = r.game.players.find((p) => p.id === localBound.playerId);
+          const wasTheirTurn =
+            r.game.players[r.game.currentPlayer]?.id === localBound.playerId;
+
+          if (forfeiter) {
+            // Move their hand + any drawn card to the BOTTOM of the discard
+            // pile (unshift = oldest). Putting them at the top would let
+            // remaining players "loot" the leaver's cards via draw-from-
+            // discard, which would warp the game. Going to the bottom keeps
+            // the cards out of circulation while preserving deck count.
+            for (const card of forfeiter.hand) {
+              if (card) r.game.discard.unshift(card);
+            }
+            forfeiter.hand = [];
+            forfeiter.knownToSelf = [];
+
+            if (wasTheirTurn && r.game.drawnCard) {
+              r.game.discard.unshift(r.game.drawnCard);
+              r.game.drawnCard = null;
+              r.game.drawnFrom = null;
+              r.game.pendingActionSource = null;
+              r.game.peekAndSwapPick = null;
             }
           }
+
+          // Permanently remove them from the room's active rotation.
+          if (!r.kickedIds.includes(localBound.playerId)) {
+            r.kickedIds.push(localBound.playerId);
+          }
+
+          // If they were on the clock, advance the turn past them. The
+          // skip helper handles consecutive kicked seats too.
+          if (wasTheirTurn) {
+            r.game = skipKickedTurn(r.game, r.kickedIds);
+          }
+        }
+
+        // If the forfeit just left exactly one active player, declare them
+        // the Glorious Victor by forfeit. Otherwise the match continues
+        // with the remaining players.
+        const survivors = activePlayerIds(r);
+        if (survivors.length === 1 && !r.gloriosVictory) {
+          r.gloriosVictory = survivors[0];
+          r.gloriosVictoryReason = "survivor";
         }
 
         broadcastRoom(localBound.roomCode);
