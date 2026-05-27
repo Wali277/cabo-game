@@ -1191,6 +1191,50 @@ html, body, #root {
   /* transform applied inline with the rotation direction per seat */
 }
 
+/* ── Side player overflow row (cards 5–6 from snap penalty) ──────────────
+   When a side player exceeds 4 cards we stack the extras in a second un-
+   rotated row positioned ABOVE the main row. After the 90° rotation that
+   second row becomes a column on the table-centre side, aligned with the
+   "outer" end of the main column (top from the human's viewpoint).
+   The wrapper widens to accommodate the second column so the rotated
+   content doesn't bleed into the deck area. */
+.hand-row-side-wrap.has-overflow {
+  /* 2 columns (80 + 10 gap + 80) + 12 padding ≈ 182px → 200 with breathing room */
+  width: 200px;
+}
+.hand-row-side.has-overflow {
+  /* Switch the outer rotated container to a column flex so the two un-rotated
+     rows stack: overflow on TOP, main BELOW. */
+  flex-direction: column;
+  gap: 8px;
+  /* Keep both rows the same width so the cards in the overflow row line up
+     above the same column positions as the main row (no padding shift). */
+  align-items: stretch;
+}
+.hand-row-side.has-overflow .hand-row-side-main,
+.hand-row-side.has-overflow .hand-row-side-overflow {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  /* Match the original .hand-row padding so a snap-penalty card lines up
+     EXACTLY above its corresponding main-row slot column. */
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+}
+/* LEFT-aligned by default — left-side player. The overflow card lands above
+   the leftmost (un-rotated) card; after 90° CW rotation that's the top of
+   the column from the viewer's perspective. */
+.hand-row-side.has-overflow .hand-row-side-overflow {
+  justify-content: flex-start;
+}
+/* RIGHT-side player needs the overflow flush against the RIGHTMOST end so
+   after the -90° CCW rotation the overflow column sits at the same top
+   position as c4. */
+.hand-row-side.has-overflow .hand-row-side-overflow.align-end {
+  justify-content: flex-end;
+}
+
 /* Unused — kept for compat */
 .opponents-row { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; }
 
@@ -4618,14 +4662,23 @@ body.mobile-mode .bot-speech-bubble {
   left: calc(50% - 30px);
   transform: translateX(-50%);
   bottom: 205px;
-  /* 440px when there's room; otherwise shrink so the L/R buttons never
-     reach into the side player columns (270px L sidebar + 330px R sidebar
-     + a 50px safety margin = 650px reserved). Without this clamp, viewports
-     narrower than ~1060px push the Snap rival button under the left-side
-     player's rotated hand in 3-4 player games. */
-  width: min(440px, calc(100vw - 650px));
+  /* DEFAULT (1v1 / no side players): no need to dodge the side columns, so
+     just keep the buttons inside the viewport with a small margin. The
+     3/4-player override below tightens this back so the buttons don't slide
+     under rotated side-player hands. The previous unconditional 650px
+     reserve could collapse the snap controls to zero width in 1v1 on
+     narrower viewports, making the buttons effectively disappear during
+     the bot's turn — players would never see them. */
+  width: min(440px, calc(100vw - 100px));
   z-index: 240;
   pointer-events: none; /* children re-enable so the "You" tag stays clickable */
+}
+/* 3-4 player games have rotated side-player hands that intrude into the
+   snap-controls horizontal band. Reserve 270px L sidebar + 330px R sidebar
+   + 50px safety = 650px so the L/R buttons never reach into those columns. */
+.table-root.players-3 ~ .snap-controls,
+.table-root.players-4 ~ .snap-controls {
+  width: min(440px, calc(100vw - 650px));
 }
 .snap-controls > * { pointer-events: auto; }
 /* Snap rules card — tooltip that appears directly above the buttons.

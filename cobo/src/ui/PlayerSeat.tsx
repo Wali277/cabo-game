@@ -207,6 +207,21 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
     );
   });
 
+  // When a side player picks up snap-penalty cards their hand can exceed 4.
+  // Rather than letting the rotated row extend further down the screen and
+  // crowd the snap-controls / human seat, we drop cards 5+ into a SECOND
+  // un-rotated row positioned ABOVE the main row in un-rotated coords.
+  // After the 90° rotation that places the overflow column on the table-
+  // CENTRE side of the main column, aligned with the "outer" end:
+  //   LEFT player  (90° CW)  → overflow column on the right (toward centre),
+  //                            aligned with the top card (c1 = leftmost).
+  //   RIGHT player (-90° CCW)→ overflow column on the left (toward centre),
+  //                            aligned with the top card (c4 = rightmost).
+  // justify-content on the overflow row picks the alignment per side.
+  const sideMainSlots = isSide ? cardSlots.slice(0, 4) : cardSlots;
+  const sideOverflowSlots = isSide ? cardSlots.slice(4) : [];
+  const sideHasOverflow = isSide && sideOverflowSlots.length > 0;
+
   return (
     <div className={`player-seat seat-${seatIndex}${tablePos ? ` pos-${tablePos}` : ""}${botProfile ? ` has-bot-portrait diff-${botProfile.difficultyClass}` : ""}`}>
       {BotPortraitComp ? (
@@ -253,12 +268,30 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
       {isSide ? (
         // Fixed-size wrapper reserves the post-rotation footprint (93×266).
         // The inner hand-row is a horizontal row that gets rotated into a column.
-        <div className="hand-row-side-wrap">
+        // When the hand grows past 4 (snap penalty), `.has-overflow` widens
+        // the wrapper and switches the row to a 2-row column layout.
+        <div className={`hand-row-side-wrap${sideHasOverflow ? " has-overflow" : ""}`}>
           <div
-            className="hand-row hand-row-side"
+            className={`hand-row hand-row-side${sideHasOverflow ? " has-overflow" : ""}`}
             style={{ transform: `translateX(-50%) translateY(-50%) rotate(${sideRotateDeg}deg)` }}
           >
-            {cardSlots}
+            {sideHasOverflow ? (
+              <>
+                {/* Overflow row sits ABOVE the main row in un-rotated coords;
+                    after rotation it becomes the column on the table-centre
+                    side. RIGHT-aligned for the right-side player so the
+                    overflow cards visually anchor under the "rightmost"
+                    card of the main row. */}
+                <div
+                  className={`hand-row-side-overflow${tablePos === "right" ? " align-end" : ""}`}
+                >
+                  {sideOverflowSlots}
+                </div>
+                <div className="hand-row-side-main">{sideMainSlots}</div>
+              </>
+            ) : (
+              cardSlots
+            )}
           </div>
         </div>
       ) : (
