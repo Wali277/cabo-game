@@ -90,8 +90,17 @@ export function MenuWallpaper() {
 
   return (
     <div className="menu-wallpaper" aria-hidden="true">
-      {/* Soft ambient under-light beneath each pile — purple to harmonize
-          with the brand gradient. Pulses very slowly for that "alive" feel. */}
+      {/* Aurora background — two drifting blobs (teal + coral) on a slow
+          loop. Pure CSS animation so Firefox/Edge perform identically to
+          Chrome (no framer-motion timeline crunch on the menu screen). */}
+      <div className="menu-aurora">
+        <div className="menu-aurora-blob menu-aurora-blob-teal" />
+        <div className="menu-aurora-blob menu-aurora-blob-coral" />
+        <div className="menu-aurora-grain" />
+      </div>
+      {/* Soft ambient under-light beneath each pile — coral on the left,
+          teal on the right so the two halves of the screen each pick up a
+          different accent. Pulses very slowly for that "alive" feel. */}
       <div className="menu-wallpaper-glow menu-wallpaper-glow-left" />
       <div className="menu-wallpaper-glow menu-wallpaper-glow-right" />
 

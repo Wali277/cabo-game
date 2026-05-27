@@ -15,7 +15,7 @@ export function Menu() {
   const [showTutorial, setShowTutorial] = useState(false);
 
   return (
-    <div className="menu">
+    <div className="menu menu-refresh">
       <MenuWallpaper />
       <motion.h1
         className="title"
@@ -23,7 +23,11 @@ export function Menu() {
         animate={{ scale: 1, rotate: -6, opacity: 1 }}
         transition={{ type: "spring", stiffness: 200, damping: 14 }}
       >
-        CABO!
+        {/* `data-text` lets the CSS render an underlay copy with the
+            text-shadow stack while the foreground text hosts the
+            shine pseudo-element — keeps the heavy shadow stack out of
+            the shimmer compositing path. */}
+        <span className="title-text" data-text="CABO!">CABO!</span>
       </motion.h1>
       <motion.p
         initial={{ y: 10, opacity: 0 }}

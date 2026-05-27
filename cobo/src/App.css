@@ -40,7 +40,10 @@ html, body, #root {
 }
 
 /* ──────────── Live animated wallpaper for the Menu screen ─────────────
-   Scattered card piles on the left and right edges that gently float.
+   Scattered card piles on the left and right edges that gently float
+   on top of a drifting teal+coral aurora. The aurora is a separate
+   layer below the cards so the floating-card motion stays the visual
+   hero — the aurora reads as "atmosphere" rather than competing.
    Sits behind every other menu element; pointer-events disabled so the
    menu UI underneath remains fully clickable. */
 .menu-wallpaper {
@@ -56,40 +59,138 @@ html, body, #root {
   position: relative;
   z-index: 1;
 }
+
+/* ─── Aurora layer ──────────────────────────────────────────────────
+   Two giant blurred blobs of color (teal cool + coral warm) drifting
+   slowly over a slightly darker base. Each blob moves on its own loop
+   and curve so the meeting point of the two colors is never the same.
+   The cards float on top; the aurora is the second layer of depth the
+   user asked for, not a distraction. CSS-only animation = identical
+   behaviour in Firefox, Edge and Chrome. */
+.menu-aurora {
+  position: absolute;
+  inset: -10%; /* over-extend so blob edges never reveal a hard cut */
+  overflow: hidden;
+  z-index: 0;
+  /* Neutral dark base that mutes the body's purple gradient so the
+     teal+coral blobs paint over a clean canvas. Without this the body
+     bg dominates and the aurora reads as "purple wash with tints" —
+     the user explicitly asked for a fresh duo, so we let it speak. */
+  background:
+    radial-gradient(ellipse at 50% 0%,   oklch(0.20 0.06 240) 0%, transparent 60%),
+    radial-gradient(ellipse at 50% 100%, oklch(0.16 0.05 280) 0%, transparent 60%),
+    linear-gradient(180deg, oklch(0.14 0.04 260) 0%, oklch(0.13 0.04 280) 100%);
+}
+.menu-aurora-blob {
+  position: absolute;
+  width: 60vw;
+  height: 60vw;
+  max-width: 760px;
+  max-height: 760px;
+  border-radius: 50%;
+  filter: blur(80px);
+  /* GPU-composite the slow drift so it doesn't repaint the whole bg */
+  will-change: transform, opacity;
+  opacity: 0.65;
+}
+.menu-aurora-blob-teal {
+  /* Cool side: a fresh teal that sits just shy of cyan. The brand
+     gradient on body already has cool blues, so the teal blob pairs
+     with them rather than fighting. */
+  background:
+    radial-gradient(
+      circle at 50% 50%,
+      oklch(0.72 0.16 195) 0%,
+      oklch(0.55 0.16 195 / 0.6) 35%,
+      transparent 70%
+    );
+  top: -10%;
+  left: -10%;
+  animation: menu-aurora-drift-teal 28s ease-in-out infinite alternate;
+}
+.menu-aurora-blob-coral {
+  /* Warm side: coral with a hint of pink — playful, cartoonish, the
+     warm complement to the teal so the menu reads as one composition
+     rather than two separate effects. */
+  background:
+    radial-gradient(
+      circle at 50% 50%,
+      oklch(0.78 0.18 25) 0%,
+      oklch(0.62 0.20 20 / 0.55) 35%,
+      transparent 70%
+    );
+  bottom: -10%;
+  right: -10%;
+  animation: menu-aurora-drift-coral 34s ease-in-out infinite alternate;
+}
+@keyframes menu-aurora-drift-teal {
+  0%   { transform: translate3d(0,     0,    0) scale(1);    opacity: 0.55; }
+  50%  { transform: translate3d(8vw,   6vw,  0) scale(1.08); opacity: 0.72; }
+  100% { transform: translate3d(4vw,  12vw,  0) scale(0.96); opacity: 0.62; }
+}
+@keyframes menu-aurora-drift-coral {
+  0%   { transform: translate3d(0,     0,    0) scale(1.05); opacity: 0.6; }
+  50%  { transform: translate3d(-7vw, -5vw,  0) scale(0.95); opacity: 0.78; }
+  100% { transform: translate3d(-3vw,-10vw,  0) scale(1.1);  opacity: 0.65; }
+}
+/* Very subtle film grain so the aurora doesn't look like a synthetic
+   gradient — gives it a touch of "atmosphere" / printed-paper feel that
+   matches the cartoonish register without going noisy. */
+.menu-aurora-grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.04;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.6 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  mix-blend-mode: overlay;
+}
+
 .menu-wallpaper-card {
   position: absolute;
   will-change: transform;
+  /* Sits ABOVE the aurora layer so the cards are the hero. */
+  z-index: 1;
   /* Stronger double drop-shadow to complement the bigger cards */
   filter:
     drop-shadow(0 16px 32px rgba(0, 0, 0, 0.60))
     drop-shadow(0 6px 12px rgba(0, 0, 0, 0.40));
 }
-/* Soft ambient under-glow beneath each pile — purple to match brand. */
+/* Soft ambient under-glow beneath each pile — coral on the left, teal
+   on the right. The two halves of the screen now each pick up a
+   distinct accent so the composition reads as "warm corner, cool
+   corner" instead of one flat purple wash. */
 .menu-wallpaper-glow {
   position: absolute;
   width: 65%;
   height: 80%;
   top: 10%;
   pointer-events: none;
-  background: radial-gradient(
-    ellipse at center,
-    rgba(168, 123, 255, 0.20) 0%,
-    rgba(168, 123, 255, 0.09) 35%,
-    transparent 65%
-  );
-  /* Reduced from blur(40px) — a 40px blur forces the browser to
-     re-rasterize a huge sample area each frame and was a major
-     contributor to the menu feeling sluggish. 18px reads almost
-     identically as a soft glow but is dramatically cheaper. */
-  filter: blur(18px);
   /* will-change tells the browser to composite this on the GPU so
      the breathe animation (opacity + scale) plays as a layer
      transform, not a full repaint. */
   will-change: opacity, transform;
   animation: menuGlowBreathe 10s ease-in-out infinite alternate;
+  filter: blur(18px);
 }
-.menu-wallpaper-glow-left { left: -16%; }
-.menu-wallpaper-glow-right { right: -16%; animation-delay: -5s; }
+.menu-wallpaper-glow-left {
+  left: -16%;
+  background: radial-gradient(
+    ellipse at center,
+    oklch(0.72 0.17 25 / 0.22) 0%,
+    oklch(0.65 0.18 30 / 0.10) 35%,
+    transparent 65%
+  );
+}
+.menu-wallpaper-glow-right {
+  right: -16%;
+  animation-delay: -5s;
+  background: radial-gradient(
+    ellipse at center,
+    oklch(0.72 0.14 195 / 0.20) 0%,
+    oklch(0.60 0.15 200 / 0.10) 35%,
+    transparent 65%
+  );
+}
 
 @keyframes menuGlowBreathe {
   0%   { opacity: 0.7; transform: scale(0.95); }
@@ -101,12 +202,21 @@ html, body, #root {
 @media (max-width: 900px) {
   .menu-wallpaper-card.inner { display: none; }
   .menu-wallpaper-glow { width: 50%; }
+  /* Smaller aurora blobs on tablet/mobile so the colors don't drown
+     the smaller menu card. */
+  .menu-aurora-blob {
+    width: 90vw;
+    height: 90vw;
+  }
 }
 
-/* Respect users' reduced-motion preference: cards stay in place with no
-   float/sway, and the ambient glow stops pulsing. */
+/* Respect users' reduced-motion preference: aurora, cards, and glow all
+   freeze in their initial pose so the menu is calm for sensitive users. */
 @media (prefers-reduced-motion: reduce) {
-  .menu-wallpaper-glow { animation: none; }
+  .menu-wallpaper-glow,
+  .menu-aurora-blob {
+    animation: none;
+  }
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -704,52 +814,223 @@ html, body, #root {
 }
 
 .title {
-  font-size: clamp(64px, 14vw, 160px);
+  font-family: 'Fredoka', system-ui, sans-serif;
+  font-size: clamp(56px, 13vw, 160px);
   font-weight: 900;
   color: #f4ebff;
   margin: 0;
   letter-spacing: -2px;
-  text-shadow:
-    4px 4px 0 #6e4ec9,
-    8px 8px 0 #0d1638,
-    0 14px 30px rgba(0,0,0,0.5);
   transform: rotate(-6deg);
+  position: relative;
+  /* Containment for the shine pseudo-element so it never bleeds onto
+     the subtitle or menu card while sweeping past. */
+  isolation: isolate;
 }
+/* `.title-text` is the actual visible text. The chunky cartoonish
+   text-shadow stack pairs with a deep navy backstop and a coral
+   second-layer that picks up the warm side of the aurora. Coral on
+   the shadow side, deep navy as the well — reads as "embossed" rather
+   than "stacked text". */
+.title-text {
+  position: relative;
+  display: inline-block;
+  text-shadow:
+    /* warm coral shadow layer for personality */
+    4px 4px 0 oklch(0.58 0.18 25),
+    /* deep navy backstop = ground */
+    8px 8px 0 oklch(0.18 0.06 280),
+    /* the big diffuse drop that anchors the title on the page */
+    0 14px 30px rgba(0, 0, 0, 0.55);
+}
+/* Light sweep across the title — a thin diagonal highlight that drifts
+   from left to right every ~7 seconds. mix-blend-mode: overlay makes
+   it brighten the underlying text instead of pasting a white stripe on
+   top, so the cartoonish letters stay readable while shimmering. */
+.menu-refresh .title-text::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.0) 42%,
+    rgba(255, 255, 255, 0.55) 50%,
+    rgba(255, 255, 255, 0.0) 58%,
+    transparent 70%
+  );
+  background-size: 220% 100%;
+  background-position: -120% 0;
+  mix-blend-mode: overlay;
+  animation: titleShine 7s ease-in-out 2s infinite;
+  /* The shine should only touch the text outline, not the bounding
+     box. We approximate with a webkit-text-stroke-clip via the
+     text-shadow column above + low-opacity blend; on Firefox the
+     overlay still reads correctly because the text underneath
+     is the brightness contrast. */
+}
+@keyframes titleShine {
+  0%   { background-position: -120% 0; }
+  60%  { background-position: 220% 0; }
+  100% { background-position: 220% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .menu-refresh .title-text::after { animation: none; }
+}
+
 .subtitle {
+  font-family: 'Fredoka', system-ui, sans-serif;
   color: #f4ebff;
-  font-size: 22px;
+  font-size: clamp(16px, 2.4vw, 22px);
   font-weight: 600;
-  text-shadow: 1px 1px 0 rgba(0,0,0,0.4);
+  letter-spacing: 0.01em;
+  /* Tinted instead of pure-black shadow for softness */
+  text-shadow: 1px 1px 0 oklch(0.18 0.06 280 / 0.55);
   margin-bottom: 8px;
 }
+/* The menu card sits on top of the aurora. We give it a soft warm
+   inner glow on the top edge and a cool inset on the bottom edge so
+   it picks up the aurora's two colors without using either of them as
+   the border — the card itself stays a neutral cream that doesn't
+   compete with the bot-card colors on the next screen. */
 .menu-card {
-  background: rgba(255,255,255,0.97);
-  color: #0d1638;
+  background: oklch(0.99 0.005 90);
+  color: oklch(0.18 0.05 280);
   padding: 22px 26px;
   border-radius: 22px;
-  box-shadow: 0 20px 40px rgba(0,0,0,0.45), inset 0 0 0 4px #a87bff;
+  box-shadow:
+    /* warm coral kiss at the top */
+    inset 0 2px 0 oklch(0.92 0.10 25),
+    /* cool teal kiss at the bottom — completes the two-tone story */
+    inset 0 -3px 0 oklch(0.86 0.10 195),
+    /* the big lift off the page */
+    0 24px 56px rgba(13, 22, 56, 0.45),
+    0 4px 0 oklch(0.42 0.05 280);
   display: flex;
   flex-direction: column;
   gap: 14px;
   min-width: 340px;
+  /* Card can grow a hair on hover for a tactile premium feel. */
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 .menu-section { display: flex; flex-direction: column; gap: 8px; }
-.menu-label { font-weight: 700; font-size: 14px; color: #6e4ec9; text-transform: uppercase; letter-spacing: 1px; }
+.menu-label {
+  font-weight: 700;
+  font-size: 13px;
+  color: oklch(0.42 0.08 200);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
 .bot-picker { display: flex; gap: 8px; }
 .bot-picker .pick {
   flex: 1;
-  border: 3px solid #0d1638;
-  background: #fff;
-  border-radius: 12px;
-  padding: 10px 12px;
+  border: 2.5px solid oklch(0.18 0.05 280);
+  background: oklch(0.99 0.005 90);
+  border-radius: 14px;
+  padding: 11px 12px;
   font-weight: 700;
   font-size: 16px;
-  color: #0d1638;
-  transition: transform 0.15s, background 0.15s;
+  color: oklch(0.18 0.05 280);
+  transition: transform 0.16s cubic-bezier(0.22,1,0.36,1),
+              background 0.16s, box-shadow 0.16s;
 }
-.bot-picker .pick:hover { transform: translateY(-2px); }
-.bot-picker .pick.active { background: #a87bff; color: #0d1638; box-shadow: 0 4px 0 #6e4ec9; }
-.hint { font-size: 13px; color: #4a4356; text-align: center; }
+.bot-picker .pick:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 oklch(0.42 0.05 280 / 0.4);
+}
+/* Active opponent count picks up the TEAL side of the aurora — cool
+   accent. Switching it from purple keeps it consistent with the
+   "Play vs bots" CTA below which uses the same teal. */
+.bot-picker .pick.active {
+  background: oklch(0.72 0.14 195);
+  color: oklch(0.16 0.05 200);
+  border-color: oklch(0.45 0.13 200);
+  box-shadow: 0 4px 0 oklch(0.42 0.12 200);
+}
+.hint {
+  font-size: 12.5px;
+  color: oklch(0.42 0.03 280);
+  text-align: center;
+  font-weight: 500;
+}
+
+/* ─── Phone-first responsive menu ──────────────────────────────────
+   Triggered by VIEWPORT width (not the view-mode JS toggle) so a
+   real phone user gets the optimized layout even if they never
+   clicked the toggle. Tap targets ≥ 52px tall, single column,
+   generous padding, title scales smoothly via clamp() above. */
+@media (max-width: 640px) {
+  .menu-refresh {
+    padding: 24px 14px calc(env(safe-area-inset-bottom, 0px) + 32px);
+    gap: 8px;
+    /* Use dynamic viewport height so iOS Safari's collapsing URL bar
+       doesn't cause the menu to jump as the user scrolls. dvh is
+       supported in Firefox 101+, Chrome 108+, Safari 15.4+. Falls
+       back to 100vh in older browsers. */
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+  .menu-refresh .title {
+    letter-spacing: -1px;
+  }
+  .menu-refresh .title-text {
+    text-shadow:
+      3px 3px 0 oklch(0.58 0.18 25),
+      6px 6px 0 oklch(0.18 0.06 280),
+      0 10px 22px rgba(0, 0, 0, 0.55);
+  }
+  .menu-refresh .menu-card {
+    /* Single-column stack, snug to the viewport with breathing room.
+       min-width drops so the card sizes to the viewport instead of
+       forcing horizontal scroll. */
+    min-width: 0;
+    width: 100%;
+    max-width: 380px;
+    padding: 18px 18px;
+    border-radius: 18px;
+    gap: 12px;
+  }
+  .menu-refresh .menu-card .btn {
+    /* Bigger tap targets for fingers. Real phone min is 44px tall
+       per Apple HIG; we go 52+ for comfort. */
+    min-height: 52px;
+    font-size: 16px;
+    padding: 14px 16px;
+  }
+  .menu-refresh .menu-card .btn.big {
+    min-height: 58px;
+    font-size: 17px;
+  }
+  .menu-refresh .menu-card .btn.ghost-light {
+    min-height: 46px;
+    font-size: 14px;
+  }
+  .menu-refresh .bot-picker {
+    gap: 6px;
+  }
+  .menu-refresh .bot-picker .pick {
+    /* Three buttons in a tight row need readable text + comfy tap
+       size. 50px tall keeps them as wide-as-tall on a 360px phone. */
+    min-height: 50px;
+    font-size: 14.5px;
+    padding: 12px 8px;
+  }
+  /* Hide the inner wallpaper cards on phone — already-narrow viewport,
+     they'd crowd the menu card. Outer cards stay for the floating
+     atmosphere. */
+  .menu-wallpaper-card.inner { display: none; }
+  /* Shrink the aurora blobs so the colors don't overwhelm a small
+     screen. They're still alive, just less saturated. */
+  .menu-aurora-blob { opacity: 0.55; filter: blur(60px); }
+}
+
+/* Very narrow (older / small phones <360px) — drop title size further
+   and remove the bot-picker label margin so everything still fits. */
+@media (max-width: 360px) {
+  .menu-refresh .menu-card { padding: 14px 14px; }
+  .menu-refresh .bot-picker .pick { font-size: 13.5px; padding: 10px 4px; }
+}
 
 /* ========== Lobby ========== */
 .lobby {
@@ -942,6 +1223,128 @@ html, body, #root {
 .btn.danger { background: #c2418a; color: #fff; box-shadow: 0 4px 0 #5a1f48; border-color: #5a1f48; }
 .btn.big { font-size: 18px; padding: 14px 22px; }
 
+/* ─── Menu-only button overrides ────────────────────────────────────
+   The in-game buttons keep their purple identity (the rest of the
+   game UI is built around that). The menu screen now uses the teal +
+   coral story so it feels like a distinct premium "front door". We
+   scope these under `.menu-refresh .menu-card` so they don't bleed
+   into the bot picker, lobby, or in-game panels. */
+.menu-refresh .menu-card .btn {
+  border-width: 2.5px;
+  border-radius: 14px;
+  padding: 12px 18px;
+  font-size: 15.5px;
+  letter-spacing: 0.01em;
+  transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+              background 0.16s;
+}
+.menu-refresh .menu-card .btn.big {
+  padding: 15px 22px;
+  font-size: 17px;
+}
+/* "Play vs bots" — primary CTA. Teal foundation with a subtle vertical
+   gradient for tactile depth. The chunky 4px lift stays so it still
+   reads cartoonish-cute. */
+.menu-refresh .menu-card .btn.primary {
+  background: linear-gradient(
+    180deg,
+    oklch(0.74 0.14 195) 0%,
+    oklch(0.60 0.14 195) 100%
+  );
+  border-color: oklch(0.30 0.08 200);
+  color: oklch(0.99 0.02 195);
+  box-shadow:
+    0 4px 0 oklch(0.30 0.10 200),
+    inset 0 1.5px 0 oklch(0.92 0.08 195),
+    0 12px 24px oklch(0.30 0.10 200 / 0.4);
+}
+.menu-refresh .menu-card .btn.primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow:
+    0 6px 0 oklch(0.30 0.10 200),
+    inset 0 1.5px 0 oklch(0.95 0.08 195),
+    0 16px 32px oklch(0.30 0.10 200 / 0.5);
+}
+.menu-refresh .menu-card .btn.primary:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow:
+    0 1px 0 oklch(0.30 0.10 200),
+    inset 0 1.5px 0 oklch(0.85 0.08 195),
+    0 6px 12px oklch(0.30 0.10 200 / 0.35);
+}
+/* "Play with friends" — secondary CTA. Coral foundation, warm
+   complement to the primary. Still tactile, still chunky. */
+.menu-refresh .menu-card .btn.big:not(.primary) {
+  background: linear-gradient(
+    180deg,
+    oklch(0.99 0.005 90) 0%,
+    oklch(0.94 0.02 25) 100%
+  );
+  color: oklch(0.32 0.18 25);
+  border-color: oklch(0.45 0.16 25);
+  box-shadow:
+    0 4px 0 oklch(0.45 0.16 25),
+    inset 0 1.5px 0 oklch(1 0 0),
+    0 12px 24px oklch(0.45 0.16 25 / 0.25);
+}
+.menu-refresh .menu-card .btn.big:not(.primary):hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow:
+    0 6px 0 oklch(0.45 0.16 25),
+    inset 0 1.5px 0 oklch(1 0 0),
+    0 16px 32px oklch(0.45 0.16 25 / 0.3);
+}
+.menu-refresh .menu-card .btn.big:not(.primary):active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow:
+    0 1px 0 oklch(0.45 0.16 25),
+    inset 0 1.5px 0 oklch(1 0 0),
+    0 6px 12px oklch(0.45 0.16 25 / 0.2);
+}
+/* Ghost-light: "How to play", view-mode toggle. Softer treatment so
+   they don't compete with the two big CTAs. */
+.menu-refresh .menu-card .btn.ghost-light {
+  background: oklch(0.97 0.01 280 / 0.6);
+  border-color: oklch(0.65 0.04 280);
+  color: oklch(0.30 0.05 280);
+  box-shadow: 0 3px 0 oklch(0.65 0.04 280 / 0.6);
+  font-size: 14px;
+  padding: 10px 14px;
+}
+.menu-refresh .menu-card .btn.ghost-light:hover:not(:disabled) {
+  background: oklch(0.97 0.01 280 / 0.9);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 0 oklch(0.65 0.04 280 / 0.7);
+}
+/* "Or" divider style — subtle pill that picks up the warm tone */
+.menu-refresh .menu-card .divider {
+  text-align: center;
+  position: relative;
+  color: oklch(0.55 0.04 280);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  margin: 2px 0;
+}
+.menu-refresh .menu-card .divider::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2px;
+  background: oklch(0.85 0.02 280 / 0.5);
+  z-index: 0;
+}
+.menu-refresh .menu-card .divider span {
+  background: oklch(0.99 0.005 90);
+  padding: 0 10px;
+  position: relative;
+  z-index: 1;
+}
+
 .row { display: flex; align-items: center; }
 .row.gap { gap: 10px; }
 .row.center { justify-content: center; }
@@ -1009,6 +1412,7 @@ html, body, #root {
   flex-direction: column;
   justify-content: center; /* vertical centering of content */
   gap: 16px;
+  -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
   box-shadow: 0 14px 36px rgba(0,0,0,0.4);
 }
@@ -1567,6 +1971,7 @@ html, body, #root {
   flex-direction: column;
   gap: 8px;
   box-shadow: 0 14px 30px rgba(0,0,0,0.45);
+  -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
   font-size: 14px;
   min-width: 310px;
@@ -2247,6 +2652,7 @@ body.mobile-mode .round-start-label {
   z-index: 150;
   padding: 16px;
   background: rgba(13, 22, 56, 0.85);
+  -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
 }
 .straw-draw-card {
@@ -2580,6 +2986,7 @@ body.mobile-mode .round-start-label {
 
 .audio-panel {
   background: rgba(13,22,56,0.95);
+  -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
   border: 2px solid rgba(168,123,255,0.5);
   border-radius: 14px;
@@ -2905,6 +3312,7 @@ body.mobile-mode .round-start-label {
   right: 0;
   z-index: 55;
   background: rgba(10, 10, 28, 0.93);
+  -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   border-top: 2px solid rgba(168, 123, 255, 0.5);
   padding: 8px 14px 10px;
@@ -3076,6 +3484,7 @@ body:not(.mobile-mode) .card-wrap.layout-glide.hl {
 
 /* Toast premium feel */
 .toast {
+  -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
   background: linear-gradient(135deg, rgba(28,29,43,0.92), rgba(60,40,120,0.92)) !important;
   border: 2px solid rgba(255,216,107,0.6);
@@ -4448,6 +4857,7 @@ body.mobile-mode .glory-splash-sub {
   background: rgba(28,29,43,0.7);
   border: 1.5px solid rgba(255,255,255,0.25);
   color: #fff;
+  -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
 }
 .menu > .bot-picker-back:hover {
