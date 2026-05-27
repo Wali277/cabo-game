@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { useStore } from "../state/store";
+import { MenuWallpaper } from "./MenuWallpaper";
 import {
   createRoom as createRoomMp,
   joinRoom as joinRoomMp,
@@ -103,13 +104,14 @@ export function Lobby({ initialCode }: Props) {
     }
 
     return (
-      <div className="lobby">
+      <div className="lobby menu-refresh">
+        <MenuWallpaper />
         <motion.h1
           className="title small"
           initial={{ scale: 0.6, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
         >
-          ROOM
+          <span className="title-text">ROOM</span>
         </motion.h1>
 
         <div className="room-info-row">
@@ -192,14 +194,15 @@ export function Lobby({ initialCode }: Props) {
 
   // Not in a room yet
   return (
-    <div className="lobby">
+    <div className="lobby menu-refresh">
+      <MenuWallpaper />
       <motion.h1
         className="title"
         initial={{ scale: 0.4, rotate: -10, opacity: 0 }}
         animate={{ scale: 1, rotate: -6, opacity: 1 }}
         transition={{ type: "spring", stiffness: 200, damping: 14 }}
       >
-        CABO!
+        <span className="title-text">CABO!</span>
       </motion.h1>
       <p className="subtitle">Play with friends</p>
 

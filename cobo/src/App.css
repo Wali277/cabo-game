@@ -842,41 +842,12 @@ html, body, #root {
     /* the big diffuse drop that anchors the title on the page */
     0 14px 30px rgba(0, 0, 0, 0.55);
 }
-/* Light sweep across the title — a thin diagonal highlight that drifts
-   from left to right every ~7 seconds. mix-blend-mode: overlay makes
-   it brighten the underlying text instead of pasting a white stripe on
-   top, so the cartoonish letters stay readable while shimmering. */
-.menu-refresh .title-text::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(
-    115deg,
-    transparent 30%,
-    rgba(255, 255, 255, 0.0) 42%,
-    rgba(255, 255, 255, 0.55) 50%,
-    rgba(255, 255, 255, 0.0) 58%,
-    transparent 70%
-  );
-  background-size: 220% 100%;
-  background-position: -120% 0;
-  mix-blend-mode: overlay;
-  animation: titleShine 7s ease-in-out 2s infinite;
-  /* The shine should only touch the text outline, not the bounding
-     box. We approximate with a webkit-text-stroke-clip via the
-     text-shadow column above + low-opacity blend; on Firefox the
-     overlay still reads correctly because the text underneath
-     is the brightness contrast. */
-}
-@keyframes titleShine {
-  0%   { background-position: -120% 0; }
-  60%  { background-position: 220% 0; }
-  100% { background-position: 220% 0; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .menu-refresh .title-text::after { animation: none; }
-}
+/* The chunky multi-layer text-shadow on .title-text and the aurora
+   behind the title already provide plenty of life — earlier versions
+   tried a mix-blend-mode sweep here, but the overlay rectangle was
+   visible as a faint square behind the letters against the dark
+   aurora. Removed in favour of letting the type and the moving
+   background do the work; calmer and reads as more premium. */
 
 .subtitle {
   font-family: 'Fredoka', system-ui, sans-serif;
@@ -1030,6 +1001,309 @@ html, body, #root {
 @media (max-width: 360px) {
   .menu-refresh .menu-card { padding: 14px 14px; }
   .menu-refresh .bot-picker .pick { font-size: 13.5px; padding: 10px 4px; }
+}
+
+/* ──────────── Lobby refresh (in-register with menu) ──────────────
+   The lobby now wears the same teal+coral suit as the main menu. The
+   wallpaper, title treatment and button overrides are inherited via
+   the .menu-refresh class on .lobby; the styles below tune the
+   lobby-specific surfaces (inputs, room code, member list, badges)
+   so they belong to the same family. */
+.lobby.menu-refresh {
+  /* The .lobby base already centres + pads; the wallpaper + dvh
+     handling come from the menu-refresh inheritance. */
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+/* Ensure the wallpaper sits below the lobby content the same way
+   it does on the menu. */
+.lobby.menu-refresh > *:not(.menu-wallpaper) {
+  position: relative;
+  z-index: 1;
+}
+.lobby.menu-refresh .subtitle {
+  margin-top: -4px;
+  margin-bottom: 4px;
+}
+/* Text inputs (name entry, room code entry) ─ premium pill with a
+   focus ring that picks up the teal accent so the lobby feels
+   in-family with the primary CTAs. */
+.lobby.menu-refresh .input {
+  border: 2px solid oklch(0.80 0.02 280);
+  border-radius: 14px;
+  padding: 13px 16px;
+  font-family: 'Fredoka', system-ui, sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  background: oklch(0.99 0.005 90);
+  color: oklch(0.18 0.05 280);
+  box-shadow:
+    inset 0 1px 2px oklch(0.55 0.05 280 / 0.08),
+    0 2px 0 oklch(0.85 0.02 280);
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+.lobby.menu-refresh .input::placeholder {
+  color: oklch(0.65 0.03 280);
+  font-weight: 500;
+}
+.lobby.menu-refresh .input:focus {
+  outline: none;
+  border-color: oklch(0.55 0.14 195);
+  box-shadow:
+    inset 0 1px 2px oklch(0.55 0.05 280 / 0.10),
+    0 0 0 4px oklch(0.72 0.14 195 / 0.18);
+}
+.lobby.menu-refresh .input.mono {
+  /* The 4-character room code gets a more deliberate treatment:
+     bigger, wide tracking, slightly tinted background so it reads
+     as "the special field". */
+  background: oklch(0.97 0.01 195 / 0.6);
+  border-color: oklch(0.55 0.14 195);
+  color: oklch(0.20 0.10 200);
+  letter-spacing: 0.5em;
+  font-size: 28px;
+  font-weight: 700;
+  text-align: center;
+  padding: 14px 12px;
+}
+
+/* Room view: big code panel. The yellow-pill treatment clashed with
+   the new palette; switch to a coral-warm card so the "share this"
+   surface is the WARM moment (it's literally the invite), while the
+   "Ready to start" button stays teal. */
+.lobby.menu-refresh .big-room-code {
+  font-family: 'Fredoka', system-ui, sans-serif;
+  font-size: clamp(40px, 7vw, 56px);
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-align: center;
+  color: oklch(0.28 0.16 25);
+  background:
+    linear-gradient(180deg,
+      oklch(0.97 0.04 25) 0%,
+      oklch(0.92 0.07 25) 100%);
+  padding: 18px 12px 16px 24px;
+  border-radius: 18px;
+  border: 2.5px solid oklch(0.55 0.18 25);
+  box-shadow:
+    inset 0 2px 0 oklch(1 0 0),
+    0 5px 0 oklch(0.45 0.16 25),
+    0 14px 30px oklch(0.45 0.16 25 / 0.25);
+}
+.lobby.menu-refresh .share-row {
+  width: 100%;
+  max-width: 380px;
+  margin-bottom: 4px;
+}
+.lobby.menu-refresh .share-url {
+  flex: 1;
+  border: 2px solid oklch(0.80 0.02 280);
+  border-radius: 12px;
+  padding: 11px 14px;
+  font-family: ui-monospace, "SF Mono", Consolas, monospace;
+  font-size: 13px;
+  font-weight: 500;
+  background: oklch(0.99 0.005 90);
+  color: oklch(0.32 0.05 280);
+  box-shadow: inset 0 1px 2px oklch(0.55 0.05 280 / 0.08);
+}
+.lobby.menu-refresh .share-url:focus {
+  outline: none;
+  border-color: oklch(0.55 0.14 195);
+}
+
+/* Member list: each player is a "slot" card with a soft cream surface,
+   a left-edge dot picking up their position colour, and badges that
+   match the refreshed register (host = coral pip, ready = teal pip). */
+.lobby.menu-refresh .members {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 4px 0 6px;
+}
+.lobby.menu-refresh .member {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: oklch(0.97 0.01 195 / 0.5);
+  border: 2px solid oklch(0.85 0.04 200);
+  padding: 10px 14px;
+  border-radius: 14px;
+  font-weight: 600;
+  color: oklch(0.22 0.06 280);
+  font-size: 15px;
+  /* Tiny "occupied seat" dot so the player slots feel like real
+     seats around the table, not list rows. */
+  position: relative;
+}
+.lobby.menu-refresh .member::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: oklch(0.55 0.14 195);
+  flex: 0 0 8px;
+  box-shadow: 0 0 0 3px oklch(0.55 0.14 195 / 0.18);
+}
+.lobby.menu-refresh .member.empty {
+  background: transparent;
+  border: 2px dashed oklch(0.72 0.04 280);
+  color: oklch(0.55 0.04 280);
+  font-style: normal;
+  font-weight: 500;
+}
+.lobby.menu-refresh .member.empty::before {
+  background: oklch(0.85 0.02 280);
+  box-shadow: none;
+}
+.lobby.menu-refresh .member.offline {
+  opacity: 0.55;
+}
+.lobby.menu-refresh .mname {
+  flex: 1;
+  /* Allow names to wrap rather than overflow on phone widths. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lobby.menu-refresh .badge {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 8px;
+}
+.lobby.menu-refresh .badge.host {
+  background: oklch(0.58 0.18 25);
+  color: oklch(0.98 0.04 25);
+}
+.lobby.menu-refresh .badge.ready {
+  background: oklch(0.55 0.14 195);
+  color: oklch(0.98 0.02 195);
+}
+.lobby.menu-refresh .badge.off {
+  background: oklch(0.30 0.04 280);
+  color: oklch(0.78 0.16 25);
+}
+
+/* Ready section: notice + waiting message now match the cream + teal
+   register, replacing the old #67e0a3 bright-green that fought the
+   palette. */
+.lobby.menu-refresh .ready-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+.lobby.menu-refresh .ready-notice {
+  font-size: 14px;
+  font-weight: 600;
+  color: oklch(0.30 0.10 200);
+  background: oklch(0.55 0.14 195 / 0.14);
+  border: 1.5px solid oklch(0.55 0.14 195 / 0.55);
+  border-radius: 12px;
+  padding: 10px 14px;
+  text-align: center;
+}
+.lobby.menu-refresh .ready-timer {
+  color: oklch(0.35 0.18 30);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+.lobby.menu-refresh .ready-waiting {
+  font-size: 14px;
+  font-weight: 600;
+  color: oklch(0.45 0.04 280);
+  text-align: center;
+  padding: 6px 0;
+}
+.lobby.menu-refresh .ready-pulse {
+  animation: readyPulse 1.4s ease-in-out infinite;
+}
+
+.lobby.menu-refresh .room-nav-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.lobby.menu-refresh .room-nav-row .btn {
+  flex: 1;
+}
+.lobby.menu-refresh .room-nav-row .btn.ghost {
+  background: transparent;
+  color: oklch(0.55 0.04 280);
+  border-color: transparent;
+  box-shadow: none;
+}
+.lobby.menu-refresh .room-nav-row .btn.ghost:hover {
+  color: oklch(0.30 0.10 200);
+  background: oklch(0.97 0.01 280 / 0.5);
+}
+
+/* Error toast in the form view: warm coral instead of generic red. */
+.lobby.menu-refresh .error {
+  background: oklch(0.96 0.05 25);
+  color: oklch(0.30 0.18 25);
+  border: 1.5px solid oklch(0.62 0.20 25 / 0.6);
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 14px;
+  text-align: center;
+}
+
+/* Two-card layout for the in-room view: gets a healthy gap and on
+   phones the cards stack so each one has full width. */
+.lobby.menu-refresh .room-info-row {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  justify-content: center;
+  width: 100%;
+  max-width: 880px;
+}
+.lobby.menu-refresh .room-code-card {
+  min-width: 280px;
+  flex: 0 1 320px;
+  align-items: stretch;
+  text-align: center;
+}
+.lobby.menu-refresh .room-players-card {
+  min-width: 320px;
+  flex: 1 1 360px;
+  max-width: 460px;
+}
+
+/* Phone-first responsive Lobby ──────────────────────────────────── */
+@media (max-width: 640px) {
+  .lobby.menu-refresh {
+    padding: 24px 14px calc(env(safe-area-inset-bottom, 0px) + 32px);
+  }
+  .lobby.menu-refresh .room-info-row {
+    gap: 14px;
+  }
+  .lobby.menu-refresh .room-code-card,
+  .lobby.menu-refresh .room-players-card {
+    min-width: 0;
+    width: 100%;
+    max-width: 380px;
+  }
+  .lobby.menu-refresh .big-room-code {
+    font-size: clamp(36px, 11vw, 48px);
+    letter-spacing: 0.15em;
+    padding: 14px 8px 12px 18px;
+  }
+  .lobby.menu-refresh .input.mono {
+    font-size: 24px;
+    letter-spacing: 0.4em;
+  }
+  .lobby.menu-refresh .member {
+    font-size: 14.5px;
+    padding: 10px 12px;
+  }
 }
 
 /* ========== Lobby ========== */

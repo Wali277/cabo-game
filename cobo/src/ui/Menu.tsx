@@ -23,11 +23,11 @@ export function Menu() {
         animate={{ scale: 1, rotate: -6, opacity: 1 }}
         transition={{ type: "spring", stiffness: 200, damping: 14 }}
       >
-        {/* `data-text` lets the CSS render an underlay copy with the
-            text-shadow stack while the foreground text hosts the
-            shine pseudo-element — keeps the heavy shadow stack out of
-            the shimmer compositing path. */}
-        <span className="title-text" data-text="CABO!">CABO!</span>
+        {/* `.title-text` holds the multi-layer text-shadow stack so the
+            heavy embossed look is on a child span rather than on the
+            motion.h1 itself (rotation + the shadow stack compose
+            cleanly when they're on different elements). */}
+        <span className="title-text">CABO!</span>
       </motion.h1>
       <motion.p
         initial={{ y: 10, opacity: 0 }}
