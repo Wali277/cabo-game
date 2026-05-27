@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useStore } from "../state/store";
 import type { CoinSide } from "../state/store";
 import { Audio } from "../audio/sounds";
+import { MenuWallpaper } from "./MenuWallpaper";
 
 export function CoinToss() {
   const coinToss = useStore((s) => s.coinToss);
@@ -83,7 +84,8 @@ export function CoinToss() {
     : 0;
 
   return (
-    <div className="coin-toss-screen">
+    <div className="coin-toss-screen menu-refresh">
+      <MenuWallpaper />
       <motion.div
         className="coin-toss-card"
         initial={{ y: 30, opacity: 0, scale: 0.9 }}

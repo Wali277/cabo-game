@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../state/store";
 import { sendStrawPick } from "../state/mp";
 import { Audio } from "../audio/sounds";
+import { MenuWallpaper } from "./MenuWallpaper";
 
 const CONTINUE_TIMER_MS = 10_000;
 
@@ -101,7 +102,8 @@ export function StrawDraw() {
   const animDelay = (i: number) => (revealed ? i * 0.12 : 0);
 
   return (
-    <div className="straw-draw-screen">
+    <div className="straw-draw-screen menu-refresh">
+      <MenuWallpaper />
       <motion.div
         className="straw-draw-card"
         initial={{ y: 30, opacity: 0, scale: 0.94 }}
