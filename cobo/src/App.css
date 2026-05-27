@@ -83,44 +83,54 @@ html, body, #root {
 }
 .menu-aurora-blob {
   position: absolute;
-  width: 60vw;
-  height: 60vw;
-  max-width: 760px;
-  max-height: 760px;
+  /* Larger footprint than the previous blurred version because we
+     can't lean on filter:blur to soften the edges any more (Firefox
+     can't GPU-composite a blur >40px on an animated element and the
+     menu dropped to <5fps as a result). The radial gradient's own
+     alpha falloff now does ALL the softening, so the blob has to be
+     big enough that the tail fades naturally past the viewport. */
+  width: 110vw;
+  height: 110vw;
+  max-width: 1400px;
+  max-height: 1400px;
   border-radius: 50%;
-  filter: blur(80px);
-  /* GPU-composite the slow drift so it doesn't repaint the whole bg */
+  /* will-change + translate3d in the keyframes forces a compositor
+     layer so the drift animation never repaints the page below. */
   will-change: transform, opacity;
-  opacity: 0.65;
+  opacity: 0.7;
 }
 .menu-aurora-blob-teal {
   /* Cool side: a fresh teal that sits just shy of cyan. The brand
      gradient on body already has cool blues, so the teal blob pairs
-     with them rather than fighting. */
+     with them rather than fighting. The colour stops are pulled
+     earlier than before because the blob is bigger now — we want the
+     core to be small and saturated, then a long gentle fade. */
   background:
     radial-gradient(
       circle at 50% 50%,
-      oklch(0.72 0.16 195) 0%,
-      oklch(0.55 0.16 195 / 0.6) 35%,
-      transparent 70%
+      oklch(0.72 0.16 195 / 0.85) 0%,
+      oklch(0.55 0.16 195 / 0.45) 18%,
+      oklch(0.40 0.12 195 / 0.18) 38%,
+      transparent 58%
     );
-  top: -10%;
-  left: -10%;
+  top: -30%;
+  left: -30%;
   animation: menu-aurora-drift-teal 28s ease-in-out infinite alternate;
 }
 .menu-aurora-blob-coral {
-  /* Warm side: coral with a hint of pink — playful, cartoonish, the
-     warm complement to the teal so the menu reads as one composition
-     rather than two separate effects. */
+  /* Warm side: coral with a hint of pink, complement to the teal.
+     Same gradient strategy: small saturated core, long gentle fade
+     so no hard edge is ever visible. */
   background:
     radial-gradient(
       circle at 50% 50%,
-      oklch(0.78 0.18 25) 0%,
-      oklch(0.62 0.20 20 / 0.55) 35%,
-      transparent 70%
+      oklch(0.78 0.18 25 / 0.85) 0%,
+      oklch(0.62 0.20 20 / 0.4) 18%,
+      oklch(0.42 0.16 25 / 0.16) 38%,
+      transparent 58%
     );
-  bottom: -10%;
-  right: -10%;
+  bottom: -30%;
+  right: -30%;
   animation: menu-aurora-drift-coral 34s ease-in-out infinite alternate;
 }
 @keyframes menu-aurora-drift-teal {
@@ -134,15 +144,17 @@ html, body, #root {
   100% { transform: translate3d(-3vw,-10vw,  0) scale(1.1);  opacity: 0.65; }
 }
 /* Very subtle film grain so the aurora doesn't look like a synthetic
-   gradient — gives it a touch of "atmosphere" / printed-paper feel that
-   matches the cartoonish register without going noisy. */
+   gradient. The grain itself is a tiny tiled noise PNG embedded as
+   data-URI; no mix-blend-mode (Firefox invalidates blend layers
+   when any descendant of the blend root animates, which here means
+   re-blending the entire layer 60 times a second). Plain opacity on
+   a static layer keeps the texture without the perf cost. */
 .menu-aurora-grain {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  opacity: 0.04;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.6 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
-  mix-blend-mode: overlay;
+  opacity: 0.06;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.5 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
 }
 
 .menu-wallpaper-card {
@@ -155,42 +167,14 @@ html, body, #root {
     drop-shadow(0 16px 32px rgba(0, 0, 0, 0.60))
     drop-shadow(0 6px 12px rgba(0, 0, 0, 0.40));
 }
-/* Soft ambient under-glow beneath each pile — coral on the left, teal
-   on the right. The two halves of the screen now each pick up a
-   distinct accent so the composition reads as "warm corner, cool
-   corner" instead of one flat purple wash. */
-.menu-wallpaper-glow {
-  position: absolute;
-  width: 65%;
-  height: 80%;
-  top: 10%;
-  pointer-events: none;
-  /* will-change tells the browser to composite this on the GPU so
-     the breathe animation (opacity + scale) plays as a layer
-     transform, not a full repaint. */
-  will-change: opacity, transform;
-  animation: menuGlowBreathe 10s ease-in-out infinite alternate;
-  filter: blur(18px);
-}
-.menu-wallpaper-glow-left {
-  left: -16%;
-  background: radial-gradient(
-    ellipse at center,
-    oklch(0.72 0.17 25 / 0.22) 0%,
-    oklch(0.65 0.18 30 / 0.10) 35%,
-    transparent 65%
-  );
-}
-.menu-wallpaper-glow-right {
-  right: -16%;
-  animation-delay: -5s;
-  background: radial-gradient(
-    ellipse at center,
-    oklch(0.72 0.14 195 / 0.20) 0%,
-    oklch(0.60 0.15 200 / 0.10) 35%,
-    transparent 65%
-  );
-}
+/* The old per-side ambient glows (warm left, cool right) were
+   redundant once the aurora blobs landed and were the second
+   biggest perf hit in Firefox (each one had filter: blur(18px) and
+   animated opacity + scale on a giant element every 10s). The
+   aurora already paints the warm-corner / cool-corner story, so
+   the glows are gone. The selectors below are kept as a no-op for
+   any cached DOM but render nothing. */
+.menu-wallpaper-glow { display: none; }
 
 @keyframes menuGlowBreathe {
   0%   { opacity: 0.7; transform: scale(0.95); }
@@ -297,6 +281,35 @@ html, body, #root {
     radial-gradient(ellipse at 50% -10%, rgba(140, 220, 240, 0.30) 0%, transparent 65%),
     radial-gradient(ellipse at 50% 105%, rgba(4, 22, 38, 0.55) 0%, transparent 70%),
     linear-gradient(180deg, #04304f 0%, #0a5478 40%, #052e44 100%);
+}
+
+/* 7. Horizon — the teal+coral aurora from the menu, brought in-game as a
+   selectable table theme. Static (not animated) because the in-game
+   surface already has plenty of motion (cards, reveals, snap cinematic)
+   and an animated background would compete. The two large radial
+   blooms reproduce the menu's "warm corner, cool corner" composition
+   without paying any per-frame paint cost. Layered on a deep navy
+   so the playing-card art reads cleanly against it. */
+.table-bg[data-theme="horizon"] {
+  background:
+    /* Teal bloom — upper-left */
+    radial-gradient(
+      ellipse 60% 50% at 15% 20%,
+      oklch(0.55 0.16 195 / 0.55) 0%,
+      oklch(0.40 0.13 195 / 0.25) 35%,
+      transparent 70%
+    ),
+    /* Coral bloom — lower-right */
+    radial-gradient(
+      ellipse 65% 55% at 85% 80%,
+      oklch(0.58 0.18 25 / 0.55) 0%,
+      oklch(0.40 0.16 25 / 0.22) 35%,
+      transparent 70%
+    ),
+    /* Centre vignette so cards in the middle still get focus */
+    radial-gradient(ellipse at center, transparent 30%, oklch(0.05 0.04 280 / 0.55) 100%),
+    /* Base — a near-black tinted toward the cool side */
+    linear-gradient(180deg, oklch(0.16 0.04 240) 0%, oklch(0.14 0.04 280) 100%);
 }
 
 
@@ -475,6 +488,15 @@ html, body, #root {
     radial-gradient(circle at 18% 88%, rgba(58, 168, 103, 0.55) 0 18%, transparent 26%),
     radial-gradient(ellipse at 50% -10%, rgba(140, 220, 240, 0.45) 0%, transparent 60%),
     linear-gradient(180deg, #04304f 0%, #0a5478 40%, #052e44 100%);
+}
+/* Horizon — teal + coral aurora preview. Composes a tight version of
+   the in-game gradient so the swatch reads "warm + cool together"
+   at a glance even in a 40px chip. */
+.theme-swatch-preview[data-theme="horizon"] {
+  background:
+    radial-gradient(ellipse 70% 60% at 20% 25%, oklch(0.65 0.18 195 / 0.85) 0%, transparent 65%),
+    radial-gradient(ellipse 75% 65% at 80% 80%, oklch(0.68 0.20 25 / 0.85) 0%, transparent 65%),
+    linear-gradient(180deg, oklch(0.18 0.04 240) 0%, oklch(0.15 0.04 280) 100%);
 }
 .theme-swatch-label {
   flex: 1 1 auto;

@@ -42,6 +42,7 @@ const THEMES: TableTheme[] = [
   "northern",
   "cosmic",
   "aquarium",
+  "horizon",
 ];
 
 const SKINS: CardSkin[] = [
