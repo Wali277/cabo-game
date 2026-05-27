@@ -208,19 +208,35 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
   });
 
   // When a side player picks up snap-penalty cards their hand can exceed 4.
-  // Rather than letting the rotated row extend further down the screen and
-  // crowd the snap-controls / human seat, we drop cards 5+ into a SECOND
-  // un-rotated row positioned ABOVE the main row in un-rotated coords.
-  // After the 90° rotation that places the overflow column on the table-
-  // CENTRE side of the main column, aligned with the "outer" end:
-  //   LEFT player  (90° CW)  → overflow column on the right (toward centre),
-  //                            aligned with the top card (c1 = leftmost).
-  //   RIGHT player (-90° CCW)→ overflow column on the left (toward centre),
-  //                            aligned with the top card (c4 = rightmost).
-  // justify-content on the overflow row picks the alignment per side.
+  // The first 4 cards go in the MAIN row (original wrapper, unchanged
+  // position). Cards 5+ go in an absolutely-positioned BACK row outside the
+  // main wrapper on the OUTER (screen-edge) side — see CSS for placement.
+  //
+  // The back row uses a 4-SLOT structure (matching the main row) with
+  // empty placeholders in slots 1 and 4, so the overflow cards land
+  // EXACTLY behind main card 2 (first overflow) and main card 3 (second
+  // overflow). Without the placeholders a single overflow card would
+  // visually centre between cards 2 and 3, which felt off.
   const sideMainSlots = isSide ? cardSlots.slice(0, 4) : cardSlots;
   const sideOverflowSlots = isSide ? cardSlots.slice(4) : [];
   const sideHasOverflow = isSide && sideOverflowSlots.length > 0;
+  // Build the back-row's 4-slot array. Slots 0 and 3 are always empty
+  // placeholders; slots 1 and 2 hold the overflow cards if present.
+  // After the side player's 90° rotation, the row's un-rotated x axis
+  // becomes the rotated y axis — so slot 1 lands at the y of main card 2
+  // and slot 2 at the y of main card 3.
+  const sideBackRowSlots = sideHasOverflow
+    ? [
+        <div className="hand-slot hand-slot-placeholder" key="back-ph-0" aria-hidden />,
+        sideOverflowSlots[0] ?? (
+          <div className="hand-slot hand-slot-placeholder" key="back-ph-1" aria-hidden />
+        ),
+        sideOverflowSlots[1] ?? (
+          <div className="hand-slot hand-slot-placeholder" key="back-ph-2" aria-hidden />
+        ),
+        <div className="hand-slot hand-slot-placeholder" key="back-ph-3" aria-hidden />,
+      ]
+    : [];
 
   return (
     <div className={`player-seat seat-${seatIndex}${tablePos ? ` pos-${tablePos}` : ""}${botProfile ? ` has-bot-portrait diff-${botProfile.difficultyClass}` : ""}`}>
@@ -292,7 +308,7 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
                 className="hand-row hand-row-side"
                 style={{ transform: `translateX(-50%) translateY(-50%) rotate(${sideRotateDeg}deg)` }}
               >
-                {sideOverflowSlots}
+                {sideBackRowSlots}
               </div>
             </div>
           )}

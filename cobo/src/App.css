@@ -1215,28 +1215,36 @@ html, body, #root {
 .hand-row-side-wrap-back {
   position: absolute;
   top: 0;
-  /* Narrower than the 128px main wrapper because the back row only ever
-     holds 1-2 penalty cards. A 90px wrapper keeps the cards close to the
-     main column and reduces overlap with the side panels (LeftPanel /
-     right sidebar) on narrower viewports. The rotated 1-2 cards inside
-     are centred vertically — the back column stays visually balanced
-     regardless of how many penalty cards have been picked up. */
-  width: 90px;
+  /* Same 128×362 footprint as the main wrapper. The back row holds 4
+     "slots" (two are empty placeholders) so its rotated layout has
+     identical y positions to the main column — that's how the overflow
+     cards land EXACTLY behind main cards 2 and 3 after the rotation. */
+  width: 128px;
+  height: 362px;
   /* Sit on top of the side panels visually rather than being clipped or
      hidden behind them — penalty cards must remain readable. */
   z-index: 5;
 }
 .side-hands-group.pos-left .hand-row-side-wrap-back {
   /* Place the back wrapper to the LEFT of the main wrapper (outer side
-     for LEFT player). 6px gap so the two columns don't visually fuse. */
+     for LEFT player). 16px gap so the back column sits clearly outside
+     the main column and the two don't look like they're touching. */
   right: 100%;
-  margin-right: 6px;
+  margin-right: 16px;
 }
 .side-hands-group.pos-right .hand-row-side-wrap-back {
   /* Place the back wrapper to the RIGHT of the main wrapper (outer side
-     for RIGHT player). */
+     for RIGHT player). Same 16px breathing room as LEFT. */
   left: 100%;
-  margin-left: 6px;
+  margin-left: 16px;
+}
+/* Empty placeholders inside the back row — same footprint as a real card
+   so the layout slots stay aligned with the main row, but invisible. */
+.hand-slot-placeholder {
+  width: 80px;
+  height: 116px;
+  pointer-events: none;
+  visibility: hidden;
 }
 
 /* Unused — kept for compat */
