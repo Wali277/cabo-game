@@ -40,6 +40,7 @@ export function newGame(opts: NewGameOptions): GameState {
     hand: [],
     knownToSelf: [false, false, false, false],
     calledCabo: false,
+    snapsUsed: { other: false, self: false },
   }));
 
   // Deal 4 cards to each player
@@ -70,6 +71,8 @@ export function newGame(opts: NewGameOptions): GameState {
     animations: [],
     roundNumber: opts.roundNumber ?? 1,
     scores: opts.scores ?? Object.fromEntries(players.map((p) => [p.id, []])),
+    caboBonus: opts.caboBonus ?? Object.fromEntries(players.map((p) => [p.id, []])),
+    caboPenalty: opts.caboPenalty ?? Object.fromEntries(players.map((p) => [p.id, []])),
     winnerId: null,
     log: [],
   };
@@ -207,11 +210,13 @@ export function discardDrawn(state: GameState): GameState {
     return advanceTurn(s);
   }
   s.pendingActionSource = drawn;
+  // NEW: don't auto-activate — wait for the player to press the Action button
   s.phase = "pending_action";
   pushLog(s, `${s.players[s.currentPlayer].name} discarded a ${drawn.rank}.`);
   return s;
 }
 
+/** Player presses the Action button to activate the pending card's ability. */
 export function triggerPendingAction(state: GameState): GameState {
   if (state.phase !== "pending_action" || !state.pendingActionSource) return state;
   const s = clone(state);
@@ -231,6 +236,7 @@ export function triggerPendingAction(state: GameState): GameState {
   return s;
 }
 
+/** Player chose NOT to activate the discarded card's ability — turn ends. */
 export function skipPendingAction(state: GameState): GameState {
   if (state.phase !== "pending_action") return state;
   const s = clone(state);
@@ -371,6 +377,176 @@ export function callCabo(state: GameState): GameState {
 }
 
 
+/**
+ * Snap on an opponent's face-down card. If the card's rank matches the top
+ * of the discard pile, it's discarded and the opponent draws a fresh card
+ * from the deck (hand size preserved). If wrong, the snapper draws a penalty
+ * card from the deck into their own hand (hand size grows by 1).
+ *
+ * Snap is a side action — it does NOT advance the turn or change phase.
+ * Each player gets one snap-other and one snap-self per round; the budget
+ * is tracked on PlayerState.snapsUsed and resets when a new round starts.
+ */
+export function actionSnapOther(
+  state: GameState,
+  snapperId: string,
+  targetId: string,
+  targetIndex: number,
+): GameState {
+  // Not allowed during setup or after the round ends.
+  if (state.phase === "setup_peek" || state.phase === "round_over") return state;
+  if (snapperId === targetId) return state;
+  const snapper = state.players.find((p) => p.id === snapperId);
+  const target = state.players.find((p) => p.id === targetId);
+  if (!snapper || !target) return state;
+  if (snapper.snapsUsed.other) return state;
+  if (state.discard.length === 0) return state;
+  const targetCard = target.hand[targetIndex];
+  if (!targetCard) return state;
+
+  const top = state.discard[state.discard.length - 1];
+  const isMatch = targetCard.rank === top.rank;
+
+  const s = clone(state);
+  const snapperC = s.players.find((p) => p.id === snapperId)!;
+  const targetC = s.players.find((p) => p.id === targetId)!;
+  snapperC.snapsUsed.other = true;
+
+  if (isMatch) {
+    // Correct — discard the snapped card and replace from deck.
+    const removed = targetC.hand[targetIndex];
+    s.discard.push(removed);
+    reshuffleDiscardIntoDeck(s);
+    if (s.deck.length === 0) {
+      // Edge case: nothing to deal back. Leave the slot empty (engine
+      // tolerates variable hand size). End the round defensively.
+      targetC.hand.splice(targetIndex, 1);
+      targetC.knownToSelf.splice(targetIndex, 1);
+      pushAnim(s, "snap_correct", { snapperId, targetId, targetIndex, card: removed, isSelf: false });
+      pushLog(s, `${snapper.name} snapped ${target.name}'s ${removed.rank}!`);
+      return endRound(s);
+    }
+    const replacement = s.deck.shift()!;
+    targetC.hand[targetIndex] = replacement;
+    targetC.knownToSelf[targetIndex] = false;
+    s.reveals.push({
+      playerId: targetId,
+      index: targetIndex,
+      card: removed,
+      toPlayerIds: s.players.map((p) => p.id),
+      reason: "snap_reveal",
+    });
+    pushAnim(s, "snap_correct", { snapperId, targetId, targetIndex, card: removed, isSelf: false });
+    pushLog(s, `${snapper.name} snapped ${target.name}'s ${removed.rank}!`);
+  } else {
+    // Wrong — snapper draws a penalty card into their hand.
+    reshuffleDiscardIntoDeck(s);
+    if (s.deck.length === 0) {
+      pushAnim(s, "snap_wrong", {
+        snapperId, targetId, targetIndex,
+        expectedRank: top.rank, actualCard: targetCard,
+      });
+      pushLog(s, `${snapper.name} snapped wrong on ${target.name} (deck empty, no penalty).`);
+      return s;
+    }
+    const penalty = s.deck.shift()!;
+    snapperC.hand.push(penalty);
+    snapperC.knownToSelf.push(true);
+    s.reveals.push({
+      playerId: targetId,
+      index: targetIndex,
+      card: targetCard,
+      toPlayerIds: s.players.map((p) => p.id),
+      reason: "snap_reveal",
+    });
+    pushAnim(s, "snap_wrong", {
+      snapperId, targetId, targetIndex,
+      expectedRank: top.rank, actualCard: targetCard,
+    });
+    pushAnim(s, "snap_penalty_draw", { snapperId, card: penalty });
+    pushLog(s, `${snapper.name} snapped wrong on ${target.name} — penalty card.`);
+  }
+  return s;
+}
+
+/**
+ * Snap one of your OWN face-down cards. Same outcome shape as snap-other
+ * (correct: discard + replace; wrong: penalty card). Uses the self-snap
+ * budget. The snapper IS the target here.
+ */
+export function actionSnapSelf(
+  state: GameState,
+  snapperId: string,
+  ownIndex: number,
+): GameState {
+  if (state.phase === "setup_peek" || state.phase === "round_over") return state;
+  const snapper = state.players.find((p) => p.id === snapperId);
+  if (!snapper) return state;
+  if (snapper.snapsUsed.self) return state;
+  if (state.discard.length === 0) return state;
+  const ownCard = snapper.hand[ownIndex];
+  if (!ownCard) return state;
+
+  const top = state.discard[state.discard.length - 1];
+  const isMatch = ownCard.rank === top.rank;
+
+  const s = clone(state);
+  const snapperC = s.players.find((p) => p.id === snapperId)!;
+  snapperC.snapsUsed.self = true;
+
+  if (isMatch) {
+    const removed = snapperC.hand[ownIndex];
+    s.discard.push(removed);
+    reshuffleDiscardIntoDeck(s);
+    if (s.deck.length === 0) {
+      snapperC.hand.splice(ownIndex, 1);
+      snapperC.knownToSelf.splice(ownIndex, 1);
+      pushAnim(s, "snap_correct", { snapperId, targetId: snapperId, targetIndex: ownIndex, card: removed, isSelf: true });
+      pushLog(s, `${snapper.name} self-snapped a ${removed.rank}!`);
+      return endRound(s);
+    }
+    const replacement = s.deck.shift()!;
+    snapperC.hand[ownIndex] = replacement;
+    snapperC.knownToSelf[ownIndex] = false;
+    s.reveals.push({
+      playerId: snapperId,
+      index: ownIndex,
+      card: removed,
+      toPlayerIds: s.players.map((p) => p.id),
+      reason: "snap_reveal",
+    });
+    pushAnim(s, "snap_correct", { snapperId, targetId: snapperId, targetIndex: ownIndex, card: removed, isSelf: true });
+    pushLog(s, `${snapper.name} self-snapped a ${removed.rank}!`);
+  } else {
+    reshuffleDiscardIntoDeck(s);
+    if (s.deck.length === 0) {
+      pushAnim(s, "snap_wrong", {
+        snapperId, targetId: snapperId, targetIndex: ownIndex,
+        expectedRank: top.rank, actualCard: ownCard, isSelf: true,
+      });
+      pushLog(s, `${snapper.name} self-snapped wrong (deck empty).`);
+      return s;
+    }
+    const penalty = s.deck.shift()!;
+    snapperC.hand.push(penalty);
+    snapperC.knownToSelf.push(true);
+    s.reveals.push({
+      playerId: snapperId,
+      index: ownIndex,
+      card: ownCard,
+      toPlayerIds: s.players.map((p) => p.id),
+      reason: "snap_reveal",
+    });
+    pushAnim(s, "snap_wrong", {
+      snapperId, targetId: snapperId, targetIndex: ownIndex,
+      expectedRank: top.rank, actualCard: ownCard, isSelf: true,
+    });
+    pushAnim(s, "snap_penalty_draw", { snapperId, card: penalty });
+    pushLog(s, `${snapper.name} self-snapped wrong — penalty card.`);
+  }
+  return s;
+}
+
 function advanceTurn(state: GameState): GameState {
   if (state.phase === "round_over") return state;
   // If we were in a final round, decrement
@@ -404,13 +580,12 @@ function endRound(state: GameState): GameState {
       });
     });
   }
-  // Score
+
+  // Hand totals
   const totals = s.players.map((p) => ({ id: p.id, name: p.name, total: handScore(p.hand) }));
   const lowest = Math.min(...totals.map((t) => t.total));
-  for (const t of totals) {
-    s.scores[t.id].push(t.total);
-  }
-  // Winner of the round: lowest total. If cabo caller tied lowest, they win the tie.
+
+  // Winner of the round: lowest total. Cabo caller wins ties.
   const lowestPlayers = totals.filter((t) => t.total === lowest);
   let winner = lowestPlayers[0];
   if (s.caboCallerId) {
@@ -418,6 +593,31 @@ function endRound(state: GameState): GameState {
     if (caboLowest) winner = caboLowest;
   }
   s.winnerId = winner.id;
+
+  // Per-round scoring with Cabo bonus / penalty accounted for separately so
+  // the scoreboard can display each component on its own line.
+  for (const t of totals) {
+    const isCaboCaller = t.id === s.caboCallerId;
+    const wonRound = t.id === winner.id;
+    if (isCaboCaller && wonRound && t.total <= 7) {
+      // Successful low Cabo: round contribution is 0, AND the player's
+      // hand value is subtracted from their running total via caboBonus.
+      s.scores[t.id].push(0);
+      s.caboBonus[t.id].push(t.total);
+      s.caboPenalty[t.id].push(0);
+    } else if (isCaboCaller && !wonRound) {
+      // Failed Cabo: take the hand total PLUS a flat +5 penalty.
+      s.scores[t.id].push(t.total);
+      s.caboBonus[t.id].push(0);
+      s.caboPenalty[t.id].push(5);
+    } else {
+      // Normal round (non-caller, or caller who won with a high hand).
+      s.scores[t.id].push(t.total);
+      s.caboBonus[t.id].push(0);
+      s.caboPenalty[t.id].push(0);
+    }
+  }
+
   pushAnim(s, "round_end", { winnerId: winner.id, totals });
   pushLog(s, `Round over. ${winner.name} wins with ${winner.total} pts.`);
   return s;
@@ -430,6 +630,7 @@ function clone(state: GameState): GameState {
       ...p,
       hand: p.hand.slice(),
       knownToSelf: p.knownToSelf.slice(),
+      snapsUsed: { ...p.snapsUsed },
     })),
     deck: state.deck.slice(),
     discard: state.discard.slice(),
@@ -437,7 +638,31 @@ function clone(state: GameState): GameState {
     animations: state.animations.slice(),
     log: state.log.slice(),
     scores: Object.fromEntries(Object.entries(state.scores).map(([k, v]) => [k, v.slice()])),
+    caboBonus: Object.fromEntries(Object.entries(state.caboBonus).map(([k, v]) => [k, v.slice()])),
+    caboPenalty: Object.fromEntries(Object.entries(state.caboPenalty).map(([k, v]) => [k, v.slice()])),
   };
+}
+
+/** DEV-only: force a specific card into the drawn-card slot.
+ *  Pulls the card out of the deck if it's still there; otherwise creates a
+ *  virtual copy so the same rank can be injected multiple times in a row.
+ *  Only fires during turn_start (the human's normal draw phase). */
+export function trainingInjectCard(state: GameState, card: import("./types").Card): GameState {
+  if (state.phase !== "turn_start") return state;
+  const s = clone(state);
+  const deckIdx = s.deck.findIndex((c) => c.rank === card.rank && c.suit === card.suit);
+  let drawn: import("./types").Card;
+  if (deckIdx >= 0) {
+    drawn = s.deck.splice(deckIdx, 1)[0];
+  } else {
+    drawn = { ...card }; // virtual copy — card already played, recreate for testing
+  }
+  s.drawnCard = drawn;
+  s.drawnFrom = "deck";
+  s.phase = "turn_drawn";
+  pushAnim(s, "draw_deck", { playerId: s.players[s.currentPlayer].id, card: drawn });
+  pushLog(s, `[DEV] Injected ${drawn.rank} for testing.`);
+  return s;
 }
 
 export { cardScore, handScore, isBlackKing, actionOf };

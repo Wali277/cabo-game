@@ -14,7 +14,7 @@ import { RoundStartCinematic } from "./RoundStartCinematic";
 import { ActionLog } from "./ActionLog";
 import { TrainingPanel } from "./TrainingPanel";
 import { MpNotices } from "./MpNotices";
-import { botMove, ingestReveals, reactToRoundEnd, resetBotKnowledge } from "../ai/bot";
+import { botMove, executeBotSnap, findBotSnap, ingestReveals, reactToRoundEnd, resetBotKnowledge } from "../ai/bot";
 import { clearReveals as clearRevealsEngine } from "../engine/game";
 import { Audio } from "../audio/sounds";
 import { useTheme } from "../state/theme";
@@ -93,6 +93,40 @@ export function Table() {
     }, delay);
     return () => clearTimeout(t);
   }, [game.phase, game.currentPlayer, hasTransientReveal, mode]);
+
+  // SP-only: bot snap reactions. The trigger is a CHANGE to the discard top
+  // (i.e. a fresh card just landed), not every state tick. Watching the full
+  // players array used to re-arm this timer on every action in 3-4 player
+  // games — Bob's 320-700ms reaction window kept getting cancelled before it
+  // could fire. We key on the top card's identity instead so the timer
+  // survives until it fires (or the discard changes for real).
+  const botDifficulty = useStore((s) => s.botDifficulty);
+  const discardTopId = game.discard[game.discard.length - 1]?.id;
+  useEffect(() => {
+    if (mode === "mp") return;
+    if (!botDifficulty) return;
+    if (game.phase === "setup_peek" || game.phase === "round_over") return;
+    if (hasTransientReveal) return;
+    // Read the latest game when planning so we don't snapshot a stale view
+    // (this effect only re-runs on discard-top change, not on every action).
+    const live = useStore.getState().game;
+    if (!live) return;
+    const plan = findBotSnap(live, botDifficulty);
+    if (!plan) return;
+    const t = setTimeout(() => {
+      const latest = useStore.getState().game;
+      if (!latest) return;
+      if (latest.phase === "setup_peek" || latest.phase === "round_over") return;
+      // Re-validate: discard top might have changed, or the bot already used
+      // its snap budget via a parallel path.
+      const bot = latest.players.find((p) => p.id === plan.botId);
+      if (!bot) return;
+      if (plan.kind === "self" && bot.snapsUsed.self) return;
+      if (plan.kind === "other" && bot.snapsUsed.other) return;
+      useStore.setState({ game: executeBotSnap(latest, plan) });
+    }, plan.delayMs);
+    return () => clearTimeout(t);
+  }, [discardTopId, game.phase, mode, botDifficulty, hasTransientReveal]);
 
   // SP-only: fire a bot speech bubble at each round transition (winner gloats /
   // loser complains). Keyed on roundNumber so a new round triggers exactly once.
@@ -208,6 +242,13 @@ export function Table() {
       case "round_end":
         // Win/lose SFX is played by RoundEndOverlay on mount so it fires even
         // when this animation is consumed before a player reconnects.
+        break;
+      case "snap_correct":
+      case "snap_wrong":
+        // SFX fires inside SnapCinematic so it lines up with the splash.
+        break;
+      case "snap_penalty_draw":
+        Audio.playSfx("snap_penalty");
         break;
     }
     if (msg) setToast(msg);

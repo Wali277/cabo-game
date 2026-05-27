@@ -31,7 +31,10 @@ export type SfxName =
   | "leave"
   | "chat"
   | "straw_pick"
-  | "straw_reveal";
+  | "straw_reveal"
+  | "snap_correct"
+  | "snap_wrong"
+  | "snap_penalty";
 
 interface AudioSettings {
   musicVol: number;       // 0-1
@@ -267,6 +270,24 @@ class AudioEngine {
         // Whoosh-into-bell for the reveal animation
         this.sweep(now, 300, 900, 0.35, "triangle", 0.18);
         this.bell(now + 0.3, 587, 0.8, 0.22);
+        break;
+      case "snap_correct":
+        // Sharp clap + triumphant rising arpeggio
+        this.tone(now,        180, 0.06, "square",   0.30);
+        this.tone(now + 0.02, 380, 0.05, "square",   0.22);
+        this.tone(now + 0.10, 660, 0.10, "triangle", 0.22);
+        this.tone(now + 0.20, 880, 0.10, "triangle", 0.22);
+        this.tone(now + 0.30, 1175, 0.16, "triangle", 0.26);
+        break;
+      case "snap_wrong":
+        // Buzz-thud — a low growl with a quick downward bend
+        this.sweep(now,        260, 110, 0.32, "sawtooth", 0.24);
+        this.tone(now + 0.18,  90,  0.18, "sawtooth", 0.20);
+        break;
+      case "snap_penalty":
+        // Heavy thud + slow descending bell (penalty card landing)
+        this.tone(now,        140, 0.10, "sawtooth", 0.20);
+        this.bell(now + 0.05, 220, 0.7, 0.20);
         break;
     }
   }

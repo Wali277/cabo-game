@@ -12,6 +12,8 @@ import {
   actionPeekAndSwapPick,
   actionPeekOther,
   actionPeekOwn,
+  actionSnapOther,
+  actionSnapSelf,
   callCabo,
   clearAnimations,
   clearReveals,
@@ -271,6 +273,8 @@ type ActionMsg =
   | { type: "action_peek_and_swap_pick"; targetPlayerId: string; index: number }
   | { type: "action_peek_and_swap_decide"; doSwap: boolean; ownIndex?: number }
   | { type: "call_cabo" }
+  | { type: "action_snap_other"; targetPlayerId: string; targetIndex: number }
+  | { type: "action_snap_self"; ownIndex: number }
   | { type: "start_play" }
   | { type: "setup_peek_card"; index: number }
   | { type: "clear_animations" }
@@ -333,6 +337,11 @@ function applyAction(game: GameState, playerId: string, action: ActionMsg): Game
     case "call_cabo":
       if (!requireCurrent()) return null;
       return callCabo(game);
+    case "action_snap_other":
+      // Snap is an open action — any active player may attempt one.
+      return actionSnapOther(game, playerId, action.targetPlayerId, action.targetIndex);
+    case "action_snap_self":
+      return actionSnapSelf(game, playerId, action.ownIndex);
     case "clear_animations":
       return clearAnimations(game);
     case "clear_reveals":
@@ -638,6 +647,8 @@ io.on("connection", (socket) => {
       players,
       roundNumber: room.game.roundNumber + 1,
       scores: room.game.scores,
+      caboBonus: room.game.caboBonus,
+      caboPenalty: room.game.caboPenalty,
     });
     room.game.currentPlayer = nextStarterIdx;
     room.lastStarterIdx = nextStarterIdx;

@@ -10,7 +10,7 @@ const SLIDES: Slide[] = [
   {
     title: "Goal",
     body:
-      "Cabo is a memory game. Each round you score points equal to the cards you're holding when the round ends. The LOWEST score wins — so keep your hand low.",
+      "Cabo is a memory game. Each round you score points equal to the cards you're holding when the round ends. The LOWEST total wins — so keep your hand low.",
   },
   {
     title: "Setup",
@@ -30,27 +30,37 @@ const SLIDES: Slide[] = [
   {
     title: "Action cards",
     body:
-      "If you DISCARD a drawn action card, its power triggers:\n  • 7 or 8 — peek at one of your own cards\n  • 9 or 10 — spy on one opponent card\n  • J or Q — blind-swap one of your cards with an opponent's\n  • K (any suit) — peek at any card, then optionally swap with one of yours\n(Swapping a hand card does NOT trigger its action — only discarding the drawn card.)",
+      "If you DISCARD a drawn action card, its power triggers:\n  • 7 or 8 — peek at one of your own cards\n  • 9 or 10 — spy on one opponent card\n  • J or Q — blind-swap one of your cards with an opponent's\n  • K (any suit) — peek at any card, then optionally swap with one of yours\n(Swapping a drawn card into your hand does NOT trigger its action — only discarding does.)",
   },
   {
-    title: "Snap (throw-in)",
+    title: "Snap a rival",
     body:
-      "At any time, if you have a card matching the rank on top of the discard pile, tap it to snap. Right snap: that card leaves your hand. Wrong snap: you take a penalty card from the deck.",
+      "If you believe an opponent is holding a card whose rank matches the TOP of the discard pile, slap the Snap rival button and tap their card.\n\n  • Correct — that card is discarded and the opponent draws a fresh one.\n  • Wrong — YOU draw a penalty card straight into your hand. Your score rises.\n\nOne Snap rival per round.",
+  },
+  {
+    title: "Snap yourself",
+    body:
+      "You can also Snap one of your OWN face-down cards if you believe its rank matches the discard top. Same rules — correct discards the card, wrong adds a penalty card.\n\nOne Snap self per round. Use it to flush a high card you peeked at setup.",
   },
   {
     title: "Calling CABO",
     body:
-      "Skip your draw to call CABO. Every other player gets ONE more turn, then everyone reveals. Lowest hand total wins the round. Calling CABO doesn't protect you — if your hand isn't the lowest, you still score whatever you're holding.",
+      "Skip your draw to call CABO. Every other player gets ONE more turn, then everyone reveals.\n\n  • If your hand IS the lowest AND ≤ 7 points → that round scores zero AND your hand value is SUBTRACTED from your running total.\n  • If your hand is NOT the lowest → you score your hand + a flat 5-point penalty.\n  • Otherwise — normal scoring.\n\nCabo is a bet. Reward when you're right, punishment when you're wrong.",
   },
   {
     title: "Scoring",
     body:
-      "Ace = 1 · 2–10 = face value · J = 11 · Q = 12 · K = 13 · Joker = 0\n\nJokers are the best cards to hold — they're worth nothing! Kings are the most dangerous — they're worth 13 points. Round scores stack across rounds — lowest total after all rounds wins.",
+      "Ace = 1 · 2–10 = face value · J = 11 · Q = 12 · K = 13 · Joker = 0\n\nJokers are the best cards to hold — they're worth nothing. Kings are the worst — they're worth 13.\n\nThe scoreboard shows three columns: round score, Cabo Bonus (green, subtracted), Cabo Penalty (red, added). The Total combines all three.",
+  },
+  {
+    title: "Meet the bots",
+    body:
+      "Single-player offers three rivals:\n\n  • Billy Smalls — naive, loose, calls Cabo at random.\n  • General Marcy — composed, textbook play, snaps when she knows.\n  • Bob — adaptive, ruthless, snaps in under half a second.\n\nPick the level that matches the fight you want.",
   },
   {
     title: "Bust! (Multiplayer)",
     body:
-      "In multiplayer, your scores add up across every round. If your cumulative total exceeds 60 points you are BUSTED — permanently eliminated from the room. No rejoining, no exceptions!\n\nThe last player still standing wins a Glorious Victory. Play smart: keeping each round's score low is how you survive the long game. Kings and Jacks are your worst enemies late in a session.",
+      "In multiplayer, your scores add up across every round. If your cumulative total exceeds 60 points you are BUSTED — permanently eliminated from the room.\n\nThe last player still standing wins a Glorious Victory. Late in a match, even a small Cabo penalty can push you over. Play accordingly.",
   },
 ];
 
@@ -80,6 +90,13 @@ export function Tutorial({ onClose }: Props) {
           transition={{ type: "spring", stiffness: 220, damping: 22 }}
           onClick={(e) => e.stopPropagation()}
         >
+          <button
+            className="tut-close"
+            onClick={onClose}
+            aria-label="Close tutorial"
+          >
+            ✕
+          </button>
           <div className="tut-step">Step {idx + 1} of {SLIDES.length}</div>
           <h2>{slide.title}</h2>
           <p className="tut-body">{slide.body}</p>

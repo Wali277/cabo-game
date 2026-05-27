@@ -15,6 +15,14 @@ export type ActionKind =
   | "blind_swap"
   | "peek_and_swap";
 
+/** Per-round snap budget. Each player gets one snap targeting an opponent's
+ *  card and one targeting their own face-down card, per round. Reset to
+ *  { other: false, self: false } when a new round starts. */
+export interface SnapsUsed {
+  other: boolean;
+  self: boolean;
+}
+
 export interface PlayerState {
   id: string;
   name: string;
@@ -22,6 +30,7 @@ export interface PlayerState {
   hand: Card[];
   knownToSelf: boolean[];
   calledCabo: boolean;
+  snapsUsed: SnapsUsed;
 }
 
 export type Phase =
@@ -41,7 +50,13 @@ export interface Reveal {
   index: number;
   card: Card;
   toPlayerIds: string[];
-  reason: "setup" | "peek_own" | "peek_other" | "peek_and_swap" | "round_end";
+  reason:
+    | "setup"
+    | "peek_own"
+    | "peek_other"
+    | "peek_and_swap"
+    | "snap_reveal"
+    | "round_end";
 }
 
 export interface AnimationEvent {
@@ -56,6 +71,9 @@ export interface AnimationEvent {
     | "blind_swap"
     | "peek_and_swap"
     | "cabo_called"
+    | "snap_correct"
+    | "snap_wrong"
+    | "snap_penalty_draw"
     | "round_end";
   payload: Record<string, unknown>;
 }
@@ -75,7 +93,17 @@ export interface GameState {
   reveals: Reveal[];
   animations: AnimationEvent[];
   roundNumber: number;
+  /** Per-round hand totals (sum of card values at round end). Parallel to
+   *  caboBonus / caboPenalty so the scoreboard can show breakdowns. */
   scores: Record<string, number[]>;
+  /** Per-round cabo bonus: amount SUBTRACTED from running total when the
+   *  cabo caller wins with hand <= 7. Stored as the magnitude (positive); the
+   *  scoreboard renders it as a negative adjustment. 0 for rounds without
+   *  a bonus. */
+  caboBonus: Record<string, number[]>;
+  /** Per-round cabo penalty: flat +5 added when a player called cabo and
+   *  didn't win the round. 0 for rounds without a penalty. */
+  caboPenalty: Record<string, number[]>;
   winnerId: string | null;
   log: string[];
 }
@@ -85,4 +113,6 @@ export interface NewGameOptions {
   seed?: number;
   roundNumber?: number;
   scores?: Record<string, number[]>;
+  caboBonus?: Record<string, number[]>;
+  caboPenalty?: Record<string, number[]>;
 }

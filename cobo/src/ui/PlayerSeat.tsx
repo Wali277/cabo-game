@@ -47,7 +47,11 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
     const c = player.hand[idx];
     if (!c) return { faceUp: false, card: null };
     if (game.phase === "round_over") return { faceUp: true, card: c };
-    const r = reveals.find(
+    // findLast — when multiple reveals land on the same slot (e.g. a peek
+    // followed by a peek_and_swap, or a peek_other followed by a snap_reveal),
+    // the NEWEST should win. find() returns the first match and would freeze
+    // the slot on a stale card.
+    const r = reveals.findLast(
       (r) => r.playerId === player.id && r.index === idx && r.toPlayerIds.includes(humanId),
     );
     if (r) return { faceUp: true, card: r.card };
@@ -59,6 +63,15 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
       const peekedCount = player.knownToSelf.filter(Boolean).length;
       if (!player.knownToSelf[idx] && peekedCount < 2) return "selectable";
       return null;
+    }
+    // Snap targeting is phase-agnostic — highlights even when it's not the
+    // human's turn. Snap-self lights up the human's own face-down slots;
+    // snap-other lights up opponents'.
+    if (targeting === "snap_self_target" && isHuman) {
+      return player.knownToSelf[idx] ? "selectable" : "selectable";
+    }
+    if (targeting === "snap_other_target" && !isHuman) {
+      return "selectable";
     }
     const player1IsCurrent = isCurrent && isHuman;
     if (player1IsCurrent) {

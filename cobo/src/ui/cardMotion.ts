@@ -16,7 +16,11 @@ export function actionSwapAnimationHoldMs(
   kind: AnimationKind,
   viewMode: ViewMode,
 ): number {
-  if (viewMode === "desktop" && kind === "swap_hand") return 1000;
+  // Swap-hand is now a distance-adaptive spring (see cardLayoutTransition).
+  // 850ms covers the longest path (drawn slot → bottom row) plus a small
+  // settle margin; short side-player swaps consume the animation earlier
+  // via the natural spring decay.
+  if (viewMode === "desktop" && kind === "swap_hand") return 850;
   return viewMode === "desktop" && isActionSwapKind(kind) ? 1250 : 500;
 }
 
@@ -49,13 +53,20 @@ export function cardLayoutTransition({
     };
   }
 
-  // Hand swap: smooth tween so the card glides in crisply rather than
-  // settling slowly via an over-damped spring.
+  // Hand swap: distance-adaptive spring rather than a fixed-duration tween.
+  // The drawn slot sits in the centre, so swap_hand for the human covers a
+  // long vertical path (centre → bottom row) while a side-player bot only
+  // travels a short hop into the rotated rail. A 1s tween made the short
+  // hop drag through ease-out's slow tail and read as "clunky"; springs
+  // scale duration with distance, so short paths finish in ~0.4s while
+  // long paths still take ~0.7s. Damping is set just under critical so
+  // the card never overshoots its slot.
   if (viewMode === "desktop" && isHandSwap) {
     return {
-      type: "tween" as const,
-      duration: 1,
-      ease: [0.22, 1, 0.36, 1] as const,
+      type: "spring" as const,
+      stiffness: 230,
+      damping: 30,
+      mass: 0.85,
     };
   }
 

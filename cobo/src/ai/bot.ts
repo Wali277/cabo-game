@@ -5,6 +5,8 @@ import {
   actionPeekAndSwapPick,
   actionPeekOther,
   actionPeekOwn,
+  actionSnapOther,
+  actionSnapSelf,
   callCabo,
   discardDrawnSkipAction,
   discardDrawnWithAction,
@@ -546,4 +548,160 @@ export function reactToRoundEnd(state: GameState) {
   };
   const worst = [...bots].sort((a, b) => lastRoundScore(b.id) - lastRoundScore(a.id))[0];
   if (worst) emitBotSpeech(worst.id, "roundHighHand");
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Bot snap reactions (Table.tsx polls this and schedules the actual fire)
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface BotSnapPlan {
+  botId: string;
+  kind: "other" | "self";
+  targetId: string;
+  targetIndex: number;
+  delayMs: number;
+  /** Will the snap be correct? Used internally for reaction-time tuning;
+   *  the engine resolves the outcome on its own. */
+  isCorrect: boolean;
+}
+
+/** Find a snap a bot would attempt right now based on its beliefs.
+ *  Bob is a snap expert: fast, prefers his HIGHEST known match (so a
+ *  successful snap also flushes a high card), and targets opponents' high
+ *  known cards first (kicks a J/Q/K out of their hand when discard top
+ *  matches). Marcy plays it straight. Billy occasionally hunches and gets
+ *  it wrong. */
+export function findBotSnap(state: GameState, difficulty: BotDifficulty): BotSnapPlan | null {
+  if (state.phase === "setup_peek" || state.phase === "round_over") return null;
+  if (state.discard.length === 0) return null;
+  const top = state.discard[state.discard.length - 1];
+
+  const bots = state.players.filter((p) => p.isBot);
+  if (bots.length === 0) return null;
+
+  // Per-difficulty reaction window. Bob is FAST — beats a typical human
+  // reaction (~250-400ms) most of the time.
+  const reaction = (() => {
+    if (difficulty === "bob") return 320 + Math.floor(Math.random() * 380);    // 0.32-0.70s
+    if (difficulty === "marcy") return 900 + Math.floor(Math.random() * 500);  // 0.9-1.4s
+    return 1700 + Math.floor(Math.random() * 700);                              // Billy 1.7-2.4s
+  })();
+
+  for (const bot of bots) {
+    const k = getOrInitKnowledge(state, bot.id);
+
+    // BOB strategy: self-snap ONLY a high-value card (>=5). Flushing a
+    // Joker / Ace / low pair is a net loss — he'd give up a known low for
+    // an unknown ~6 average. Worth it only when the snap removes serious
+    // points from his hand.
+    if (difficulty === "bob" && !bot.snapsUsed.self) {
+      const selfArr = k.beliefs.get(bot.id);
+      if (selfArr) {
+        let bestIdx = -1;
+        let bestScore = 4; // strict minimum: must be at least a 5
+        for (let i = 0; i < selfArr.length; i++) {
+          const belief = selfArr[i];
+          if (belief && belief.rank === top.rank && belief.score > bestScore) {
+            bestIdx = i;
+            bestScore = belief.score;
+          }
+        }
+        if (bestIdx >= 0) {
+          return {
+            botId: bot.id,
+            kind: "self",
+            targetId: bot.id,
+            targetIndex: bestIdx,
+            delayMs: reaction,
+            isCorrect: true,
+          };
+        }
+      }
+    }
+
+    // Other-snap — look for a confidently-known opponent card matching.
+    // Bob picks the HIGHEST match (kicks a face card out of their hand);
+    // Marcy / Billy take the first match found.
+    if (!bot.snapsUsed.other) {
+      let bestOther: { oppId: string; idx: number; score: number } | null = null;
+      for (const opp of state.players) {
+        if (opp.id === bot.id) continue;
+        const arr = k.beliefs.get(opp.id);
+        if (!arr) continue;
+        for (let i = 0; i < arr.length; i++) {
+          const belief = arr[i];
+          if (!belief || belief.rank !== top.rank) continue;
+          if (difficulty === "bob") {
+            if (!bestOther || belief.score > bestOther.score) {
+              bestOther = { oppId: opp.id, idx: i, score: belief.score };
+            }
+          } else {
+            return {
+              botId: bot.id,
+              kind: "other",
+              targetId: opp.id,
+              targetIndex: i,
+              delayMs: reaction,
+              isCorrect: true,
+            };
+          }
+        }
+      }
+      if (bestOther) {
+        return {
+          botId: bot.id,
+          kind: "other",
+          targetId: bestOther.oppId,
+          targetIndex: bestOther.idx,
+          delayMs: reaction,
+          isCorrect: true,
+        };
+      }
+      // Billy hunch — 8% chance per tick to snap blindly.
+      if (difficulty === "billy" && Math.random() < 0.08) {
+        const opp = state.players.find((p) => p.id !== bot.id);
+        if (opp && opp.hand.length > 0) {
+          const idx = Math.floor(Math.random() * opp.hand.length);
+          return {
+            botId: bot.id,
+            kind: "other",
+            targetId: opp.id,
+            targetIndex: idx,
+            delayMs: reaction + 600,
+            isCorrect: opp.hand[idx]?.rank === top.rank,
+          };
+        }
+      }
+    }
+
+    // Fallback self-snap for Marcy / Billy (Bob already handled above with
+    // a smarter HIGHEST-card preference).
+    if (difficulty !== "bob" && !bot.snapsUsed.self) {
+      const selfArr = k.beliefs.get(bot.id);
+      if (selfArr) {
+        for (let i = 0; i < selfArr.length; i++) {
+          const belief = selfArr[i];
+          if (belief && belief.rank === top.rank) {
+            return {
+              botId: bot.id,
+              kind: "self",
+              targetId: bot.id,
+              targetIndex: i,
+              delayMs: reaction + 200,
+              isCorrect: true,
+            };
+          }
+        }
+      }
+    }
+  }
+  return null;
+}
+
+/** Apply a bot snap plan to the state. Pure: returns new state. */
+export function executeBotSnap(state: GameState, plan: BotSnapPlan): GameState {
+  if (plan.kind === "self") {
+    return actionSnapSelf(state, plan.botId, plan.targetIndex);
+  }
+  return actionSnapOther(state, plan.botId, plan.targetId, plan.targetIndex);
 }

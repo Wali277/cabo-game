@@ -860,6 +860,30 @@ html, body, #root {
   max-width: 520px;
   text-align: left;
   padding: 22px 28px 24px;
+  position: relative;
+}
+.tut-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1.5px solid oklch(0.45 0.04 280);
+  background: oklch(0.22 0.04 280);
+  color: oklch(0.92 0.02 290);
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 140ms ease, transform 140ms ease;
+  z-index: 2;
+}
+.tut-close:hover {
+  background: oklch(0.32 0.06 280);
+  transform: scale(1.08);
 }
 .tutorial-modal h2 {
   text-align: center;
@@ -969,7 +993,7 @@ html, body, #root {
 /* Three-column layout: left panel | table grid | right sidebar */
 .game-body {
   display: grid;
-  grid-template-columns: 270px 1fr 260px;
+  grid-template-columns: 270px 1fr 330px;
   gap: 14px;
   flex: 1;
   align-items: stretch; /* all columns fill full height */
@@ -1123,9 +1147,14 @@ html, body, #root {
     ".    top    ."
     "left center right"
     ".    bottom .";
-  grid-template-columns: auto minmax(300px, 420px) auto;
+  /* Side columns reserve 128px even when empty (3-player with only one side
+     opponent) so the centre column — and therefore the "You" tag at the
+     bottom — stays aligned with the snap-controls anchor at viewport
+     centre-30px. Without the min, an asymmetric 0/center/128 layout
+     shifts "You" 64px off the snap buttons in 3-player. */
+  grid-template-columns: minmax(128px, auto) minmax(300px, 420px) minmax(128px, auto);
   grid-template-rows: auto 1fr auto;
-  row-gap: 16px;
+  row-gap: 8px;
   column-gap: 32px; /* extra breathing room between side players and the deck area */
   width: 100%;
   height: 100%;
@@ -1477,13 +1506,14 @@ html, body, #root {
   color: #f4ebff;
   border: 2px solid rgba(168,123,255,0.55);
   border-radius: 16px;
-  padding: 12px 14px;
+  padding: 14px 16px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   box-shadow: 0 14px 30px rgba(0,0,0,0.45);
   backdrop-filter: blur(6px);
-  font-size: 13px;
+  font-size: 14px;
+  min-width: 310px;
   overflow: hidden;
 }
 .log-title {
@@ -1768,16 +1798,17 @@ body.mobile-mode .round-start-label {
 .scoreboard {
   background: rgba(255,255,255,0.95);
   color: #0d1638;
-  padding: 8px 16px;
+  padding: 10px 18px 12px;
   border-radius: 16px;
   box-shadow: 0 6px 14px rgba(0,0,0,0.35);
-  min-width: 220px;
+  min-width: 310px;
   border: 2px solid #a87bff;
+  font-size: 14px;
 }
 .sb-title { font-weight: 700; font-size: 13px; color: #6e4ec9; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
 
 /* Per-round scoreboard table */
-.sb-table { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.sb-table { display: flex; flex-direction: column; gap: 3px; font-size: 14px; }
 .sb-thead, .sb-trow {
   display: grid;
   align-items: center;
@@ -1795,7 +1826,85 @@ body.mobile-mode .round-start-label {
 }
 .sb-th, .sb-td { text-align: center; padding: 2px 0; }
 .sb-th-name, .sb-td-name { text-align: left; display: flex; align-items: center; gap: 4px; }
-.sb-th-total, .sb-td-total { font-weight: 800; }
+.sb-th-total, .sb-td-total { font-weight: 800; font-size: 15px; }
+.sb-th-bonus, .sb-th-penalty {
+  font-size: 11px;
+  letter-spacing: 0.3px;
+}
+.sb-th-total {
+  font-size: 11px;
+  letter-spacing: 0.3px;
+}
+.sb-th-bonus { color: oklch(0.55 0.16 145); }
+.sb-th-penalty { color: oklch(0.55 0.20 25); }
+.sb-td-bonus { color: oklch(0.55 0.16 145); font-weight: 800; }
+.sb-td-penalty { color: oklch(0.55 0.20 25); font-weight: 800; }
+.sb-zero { color: #4d4760; opacity: 0.85; font-weight: 700; }
+.bonus-num { color: oklch(0.55 0.16 145); }
+.penalty-num { color: oklch(0.55 0.20 25); }
+.total-num { font-weight: 800; }
+
+/* Round-cell markers — small icons indicating a Cabo bonus/penalty hit
+   that round. Sit at the top-right of the cell so they don't displace
+   the number. */
+.sb-cell-marker {
+  display: inline-block;
+  margin-left: 3px;
+  font-size: 9px;
+  vertical-align: super;
+  font-weight: 800;
+}
+.sb-cell-marker.bonus { color: oklch(0.6 0.18 145); }
+.sb-cell-marker.penalty { color: oklch(0.6 0.22 25); }
+
+/* Rolling number — subtle flash hint when value just moved. The transform
+   animation is purely cosmetic; the actual integer interpolation happens
+   in the RollingNumber component (RAF-driven). */
+.rolling-number {
+  display: inline-block;
+  transition: color 220ms ease;
+}
+.rolling-number.rolling-up {
+  animation: roll-flash-up 600ms cubic-bezier(0.22,1,0.36,1);
+}
+.rolling-number.rolling-down {
+  animation: roll-flash-down 600ms cubic-bezier(0.22,1,0.36,1);
+}
+@keyframes roll-flash-up {
+  0%   { text-shadow: 0 0 0 transparent; transform: translateY(0); }
+  30%  { text-shadow: 0 -2px 8px oklch(0.7 0.16 25 / 0.6); transform: translateY(-1px); }
+  100% { text-shadow: 0 0 0 transparent; transform: translateY(0); }
+}
+@keyframes roll-flash-down {
+  0%   { text-shadow: 0 0 0 transparent; transform: translateY(0); }
+  30%  { text-shadow: 0 2px 8px oklch(0.65 0.18 145 / 0.6); transform: translateY(1px); }
+  100% { text-shadow: 0 0 0 transparent; transform: translateY(0); }
+}
+
+/* Scoreboard header — strong dark text on the white scoreboard background. */
+.sb-title {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  font-weight: 800;
+  font-size: 14px;
+  margin-bottom: 6px;
+  color: #0d1638;
+}
+.sb-title-main {
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  color: #4a2db0;
+}
+.sb-title-sub {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #1c1d2b;
+}
+
 /* Per-round winner (lowest hand that round) — always green for clear indication. */
 .sb-td-round-win { color: #2da970 !important; font-weight: 800; }
 /* Multi-way tie at the round's lowest: bright gray so a tie reads visually
@@ -4049,6 +4158,38 @@ body.mobile-mode .skin-grid {
   text-shadow: 0 2px 8px rgba(255, 216, 107, 0.5);
 }
 
+/* Cinematic pill — small Bonus / Penalty chips that appear below the
+   round score when a Cabo bonus or penalty applied THIS round. */
+.cinematic-pill-mods {
+  margin-top: 6px;
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+.cinematic-pill-bonus,
+.cinematic-pill-penalty {
+  font-size: 13px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.04em;
+}
+.cinematic-pill-bonus {
+  background: oklch(0.32 0.13 145 / 0.85);
+  color: oklch(0.92 0.16 145);
+  border: 1px solid oklch(0.55 0.16 145);
+}
+.cinematic-pill-penalty {
+  background: oklch(0.3 0.16 25 / 0.85);
+  color: oklch(0.92 0.16 25);
+  border: 1px solid oklch(0.6 0.22 25);
+  animation: pill-penalty-pulse 1.4s ease-in-out infinite;
+}
+@keyframes pill-penalty-pulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.06); }
+}
+
 .cinematic-winner-stamp {
   font-family: 'Fredoka', system-ui, sans-serif;
   font-size: clamp(28px, 4vw, 48px);
@@ -4290,7 +4431,7 @@ body.mobile-mode .glory-splash-sub {
   cursor: pointer;
   font-family: inherit;
   box-shadow: 0 18px 36px rgba(0,0,0,0.4);
-  transition: box-shadow 200ms cubic-bezier(0.22,1,0.36,1);
+  transition: box-shadow 80ms ease;
 }
 .bot-card:hover {
   box-shadow: 0 24px 48px rgba(0,0,0,0.55);
@@ -4456,4 +4597,353 @@ body.mobile-mode .bot-speech-bubble {
   padding: 10px 14px;
   min-width: 140px;
   max-width: 70vw;
+}
+
+/* ========== Snap controls + cinematic ==========
+   Two-button vertical stack sitting just RIGHT of the human's last
+   (4th) card and just ABOVE the row, so they're easy to reach with a
+   thumb but never touch the cards. If the player loses a snap and gets
+   a penalty card (hand grows to 5+), the .shifted-up modifier moves
+   them ABOVE the hand row entirely so they don't overlap the wider
+   hand. Rules panel still expands above when armed. */
+/* Snap buttons bracket the "You" name tag — Snap rival to the LEFT,
+   Snap self to the RIGHT, equidistant. The "You" tag lives in the
+   middle column of the game-body grid (270px L sidebar / 1fr middle /
+   330px R sidebar), so the middle column's center sits 30px LEFT of
+   viewport center. We anchor the controls there so the two buttons
+   are perfectly symmetric around the "You" tag. Fixed position — does
+   NOT move when the hand grows (snap penalty doesn't relocate the UI). */
+.snap-controls {
+  position: fixed;
+  left: calc(50% - 30px);
+  transform: translateX(-50%);
+  bottom: 205px;
+  /* 440px when there's room; otherwise shrink so the L/R buttons never
+     reach into the side player columns (270px L sidebar + 330px R sidebar
+     + a 50px safety margin = 650px reserved). Without this clamp, viewports
+     narrower than ~1060px push the Snap rival button under the left-side
+     player's rotated hand in 3-4 player games. */
+  width: min(440px, calc(100vw - 650px));
+  z-index: 240;
+  pointer-events: none; /* children re-enable so the "You" tag stays clickable */
+}
+.snap-controls > * { pointer-events: auto; }
+/* Snap rules card — tooltip that appears directly above the buttons.
+   Anchored absolutely to .snap-buttons (position:relative) so it sits
+   flush above the button row regardless of the outer fixed container. */
+/* Snap rules tooltip — compact card sitting flush above the SPECIFIC
+   button being hovered. .snap-rules-other aligns with the left button
+   (Snap rival), .snap-rules-self aligns with the right button (Snap self).
+   The tail points down to each button's centre so it reads as a tooltip
+   attached to that exact button — not floating between them. */
+.snap-rules {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  width: 260px;
+  background: oklch(0.16 0.04 280);
+  color: oklch(0.97 0.02 290);
+  padding: 8px 12px 9px;
+  border-radius: 12px;
+  border: 1.5px solid oklch(0.38 0.08 280);
+  box-shadow: 0 12px 28px oklch(0.05 0.04 280 / 0.55);
+  pointer-events: none;
+}
+/* Left tooltip: left edge aligned with left button (Snap rival), extends right. */
+.snap-rules-other {
+  left: 0;
+  right: auto;
+  border-color: oklch(0.6 0.18 75);
+}
+/* Right tooltip: right edge aligned with right button (Snap self), extends left. */
+.snap-rules-self {
+  right: 0;
+  left: auto;
+  border-color: oklch(0.6 0.14 170);
+}
+.snap-rules-title {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: oklch(0.88 0.14 80);
+  margin-bottom: 3px;
+}
+.snap-rules-self .snap-rules-title { color: oklch(0.88 0.12 170); }
+.snap-rules-prompt {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+  margin-bottom: 6px;
+  color: oklch(0.95 0.02 290);
+}
+.snap-rules-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.snap-rules-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 11px;
+  line-height: 1.3;
+  color: oklch(0.86 0.03 290);
+}
+.snap-rules-list strong {
+  color: oklch(0.97 0.02 290);
+  font-weight: 800;
+}
+.snap-rules-pip {
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 9px;
+  font-weight: 800;
+  background: oklch(0.3 0.04 280);
+  color: oklch(0.92 0.02 290);
+  margin-top: 1px;
+}
+.snap-rules-pip.ok {
+  background: oklch(0.4 0.16 145);
+  color: oklch(0.97 0.12 145);
+}
+.snap-rules-pip.bad {
+  background: oklch(0.4 0.18 25);
+  color: oklch(0.97 0.14 25);
+}
+/* Downward arrow at the bottom of the tooltip pointing to the button centre.
+   Button is 138px wide, so its centre is 69px from its edge. Tail is 16px
+   wide (8+8 borders); positioning at 61px lines its centre up with 69px. */
+.snap-rules-tail {
+  position: absolute;
+  bottom: -7px;
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 7px solid oklch(0.16 0.04 280);
+}
+.snap-rules-other .snap-rules-tail {
+  left: 61px;   /* 69 (button half-width) - 8 (half tail-width) */
+  right: auto;
+}
+.snap-rules-self .snap-rules-tail {
+  right: 61px;
+  left: auto;
+}
+.snap-buttons {
+  position: relative; /* anchor for .snap-rules absolute positioning */
+  display: flex;
+  flex-direction: row;
+  gap: 0;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+}
+.snap-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  /* Both buttons share an identical fixed width so that with
+     justify-content: space-between, the gap from the centered "You"
+     tag is identical on both sides. Sized for the longest label
+     ("Snap rival" or "Cancel"). */
+  width: 138px;
+  padding: 11px 16px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  border: 2px solid;
+  white-space: nowrap;
+  transition: transform 140ms cubic-bezier(0.22,1,0.36,1),
+              box-shadow 140ms cubic-bezier(0.22,1,0.36,1),
+              opacity 140ms;
+}
+.snap-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.snap-btn-other {
+  background: linear-gradient(155deg, oklch(0.32 0.13 60), oklch(0.18 0.09 50));
+  border-color: oklch(0.75 0.16 80);
+  color: oklch(0.97 0.06 90);
+  box-shadow: 0 6px 14px oklch(0.05 0.03 50 / 0.45),
+              0 0 0 1px oklch(0.75 0.16 80 / 0.4) inset;
+}
+.snap-btn-other:hover:not(:disabled) {
+  box-shadow: 0 10px 22px oklch(0.05 0.03 50 / 0.55),
+              0 0 22px oklch(0.75 0.16 80 / 0.45);
+}
+.snap-btn-other.is-arming {
+  background: linear-gradient(155deg, oklch(0.55 0.22 75), oklch(0.42 0.18 70));
+  animation: snap-pulse 1.1s ease-in-out infinite;
+}
+.snap-btn-self {
+  background: linear-gradient(155deg, oklch(0.28 0.07 175), oklch(0.16 0.05 175));
+  border-color: oklch(0.72 0.13 170);
+  color: oklch(0.97 0.04 170);
+  box-shadow: 0 6px 14px oklch(0.05 0.03 200 / 0.45),
+              0 0 0 1px oklch(0.72 0.13 170 / 0.4) inset;
+}
+.snap-btn-self:hover:not(:disabled) {
+  box-shadow: 0 10px 22px oklch(0.05 0.03 200 / 0.55),
+              0 0 22px oklch(0.72 0.13 170 / 0.45);
+}
+.snap-btn-self.is-arming {
+  background: linear-gradient(155deg, oklch(0.55 0.16 170), oklch(0.42 0.13 170));
+  animation: snap-pulse 1.1s ease-in-out infinite;
+}
+.snap-btn-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+.snap-btn-label {
+  white-space: nowrap;
+}
+
+@keyframes snap-pulse {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-2px); }
+}
+
+/* Snap cinematic — full-screen overlay with radial spokes + word stamp */
+.snap-cine {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 320;
+}
+.snap-cine-correct {
+  background: radial-gradient(ellipse at center,
+    oklch(0.7 0.18 145 / 0.16) 0%,
+    oklch(0.05 0.04 145 / 0.3) 50%,
+    oklch(0.05 0.04 145 / 0.55) 100%);
+}
+.snap-cine-wrong {
+  background: radial-gradient(ellipse at center,
+    oklch(0.55 0.22 25 / 0.2) 0%,
+    oklch(0.05 0.04 25 / 0.35) 50%,
+    oklch(0.05 0.04 25 / 0.6) 100%);
+  animation: snap-shake 0.4s cubic-bezier(0.22,1,0.36,1);
+}
+@keyframes snap-shake {
+  0%   { transform: translateX(0); }
+  20%  { transform: translateX(-6px); }
+  40%  { transform: translateX(5px); }
+  60%  { transform: translateX(-4px); }
+  80%  { transform: translateX(3px); }
+  100% { transform: translateX(0); }
+}
+.snap-burst {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 0;
+  height: 0;
+}
+.snap-spoke {
+  position: absolute;
+  left: -3px;
+  top: -160px;
+  width: 6px;
+  height: 160px;
+  border-radius: 3px;
+  transform-origin: 50% 100%;
+  background: linear-gradient(180deg,
+    oklch(0.95 0.18 85) 0%,
+    oklch(0.95 0.18 85 / 0) 100%);
+}
+.snap-cine-wrong .snap-spoke {
+  background: linear-gradient(180deg,
+    oklch(0.7 0.22 25) 0%,
+    oklch(0.7 0.22 25 / 0) 100%);
+}
+.snap-cine-word {
+  font-family: 'Fredoka', system-ui, sans-serif;
+  font-size: clamp(96px, 18vw, 220px);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: oklch(0.97 0.05 85);
+  text-shadow: 0 4px 0 oklch(0.25 0.12 60),
+               0 14px 32px oklch(0.05 0.04 80 / 0.5);
+}
+.snap-cine-wrong .snap-cine-word {
+  color: oklch(0.78 0.22 25);
+  text-shadow: 0 4px 0 oklch(0.25 0.16 25),
+               0 14px 32px oklch(0.05 0.04 25 / 0.5);
+}
+.snap-cine-sub {
+  margin-top: 18px;
+  font-size: clamp(18px, 2.4vw, 28px);
+  font-weight: 700;
+  color: oklch(0.92 0.04 30);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+body.mobile-mode .snap-controls {
+  /* Mobile: grid collapses to one column, "You" tag is at viewport
+     center. Fixed position, no shift on hand growth. */
+  left: 50%;
+  bottom: 200px;
+  width: min(94vw, 380px);
+}
+body.mobile-mode .snap-btn {
+  font-size: 13px;
+  padding: 10px 13px;
+}
+
+/* ========== In-game Help button ==========
+   Sits bottom-right, immediately to the LEFT of the audio FAB. Same
+   visual weight as the audio fab so they feel like a pair. */
+.help-fab {
+  position: fixed;
+  bottom: 18px;
+  right: 80px;              /* audio fab is 52px wide at right:18px → leave a 10px gap */
+  z-index: 260;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 3px solid #1c1d2b;
+  background: linear-gradient(135deg, #a87bff, #6e4ec9);
+  color: #fff;
+  font-size: 28px;
+  font-weight: 800;
+  font-family: 'Fredoka', system-ui, sans-serif;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    0 8px 20px rgba(0,0,0,0.4),
+    inset 0 -3px 0 rgba(0,0,0,0.2),
+    inset 0 2px 0 rgba(255,255,255,0.2);
+  line-height: 1;
+}
+.help-fab:hover {
+  box-shadow:
+    0 10px 26px rgba(0,0,0,0.5),
+    inset 0 -3px 0 rgba(0,0,0,0.2),
+    inset 0 2px 0 rgba(255,255,255,0.25);
+}
+body.mobile-mode .help-fab {
+  width: 44px;
+  height: 44px;
+  font-size: 22px;
+  bottom: 14px;
+  right: 66px;
 }

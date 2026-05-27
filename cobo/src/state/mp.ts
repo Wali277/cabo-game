@@ -156,6 +156,8 @@ export type MpActionType =
   | "action_blind_swap"
   | "action_peek_and_swap_pick"
   | "action_peek_and_swap_decide"
+  | "action_snap_other"
+  | "action_snap_self"
   | "call_cabo"
   | "start_play"
   | "setup_peek_card"

@@ -7,6 +7,8 @@ import {
   actionPeekAndSwapPick,
   actionPeekOther,
   actionPeekOwn,
+  actionSnapOther,
+  actionSnapSelf,
   callCabo,
   clearAnimations,
   clearReveals,
@@ -90,7 +92,9 @@ export type ActionTargetingMode =
   | "blind_swap_self"
   | "blind_swap_target"
   | "peek_and_swap_target_pick"
-  | "peek_and_swap_self"; // after peek, choose own card to swap
+  | "peek_and_swap_self" // after peek, choose own card to swap
+  | "snap_other_target"  // snap mode: click an opponent's face-down card
+  | "snap_self_target";  // snap mode: click own face-down card
 
 interface StoreState {
   screen: Screen;
@@ -111,6 +115,11 @@ interface StoreState {
   chatUnread: number;
   audioOpen: boolean;
   themeOpen: boolean;
+  /** Toggle for the in-game Help / Tutorial overlay. Independent of menu's
+   *  tutorial — same Tutorial component, surfaced via this flag from a
+   *  floating in-game button. */
+  helpOpen: boolean;
+  setHelpOpen: (open: boolean) => void;
   eliminatedFromRoom: boolean;
   /** Number of bots the user has chosen on the main menu while routing to
    *  the difficulty picker. Default 1; updated when they tap a count tile. */
@@ -146,6 +155,15 @@ interface StoreState {
   discardNoAction: () => void;
   discardAndTrigger: () => void;
   callCaboAction: () => void;
+  /** Begin snap targeting on opponents (UI mode only — sends the actual snap
+   *  on card click). Press again to cancel. */
+  beginSnapOther: () => void;
+  beginSnapSelf: () => void;
+  /** Cancel any in-progress snap targeting without firing. */
+  cancelSnap: () => void;
+  /** Fire a snap (SP local or MP server). Returns whether it dispatched. */
+  doSnapOther: (targetId: string, targetIndex: number) => void;
+  doSnapSelf: (ownIndex: number) => void;
   peekSwapDecide: (doSwap: boolean, ownIndex?: number) => void;
   consumeAnimations: () => void;
   consumeReveals: () => void;
@@ -199,6 +217,8 @@ export const useStore = create<StoreState>((set, get) => ({
   chatUnread: 0,
   audioOpen: false,
   themeOpen: false,
+  helpOpen: false,
+  setHelpOpen(open) { set({ helpOpen: open }); },
   eliminatedFromRoom: false,
   pendingNumBots: 1,
   setPendingNumBots(n) { set({ pendingNumBots: n }); },
@@ -563,6 +583,12 @@ export const useStore = create<StoreState>((set, get) => ({
       return;
     }
 
+    // Snap-self targeting — runs regardless of whose turn it is.
+    if (targeting === "snap_self_target") {
+      get().doSnapSelf(index);
+      return;
+    }
+
     const player = game.players[game.currentPlayer];
     if (player.id !== humanId) return;
 
@@ -618,6 +644,11 @@ export const useStore = create<StoreState>((set, get) => ({
         import("./mp").then((m) => m.sendAction({ type: type as any, ...payload }));
       }
     };
+    // Snap targeting an opponent — phase-agnostic.
+    if (targeting === "snap_other_target") {
+      get().doSnapOther(playerId, index);
+      return;
+    }
     if (game.phase === "action_peek_other" && targeting === "peek_other") {
       if (mode === "mp") dispatch("action_peek_other", { targetPlayerId: playerId, index });
       else set({ game: actionPeekOther(game, playerId, index) });
@@ -723,6 +754,75 @@ export const useStore = create<StoreState>((set, get) => ({
     set({ game: callCabo(game) });
   },
 
+  beginSnapOther() {
+    const { game, humanId, targeting } = get();
+    if (!game) return;
+    if (game.phase === "setup_peek" || game.phase === "round_over") return;
+    const me = game.players.find((p) => p.id === humanId);
+    if (!me || me.snapsUsed.other) return;
+    // Toggle off if we're already in this targeting mode.
+    if (targeting === "snap_other_target") { set({ targeting: null }); return; }
+    // If a non-snap action is already targeting (swap_hand, peek_other,
+    // peek_and_swap_*, etc.), refuse so we don't strand the player in the
+    // middle of an action — they'd cancel the snap and find their pending
+    // action also gone. They can finish/cancel the action first.
+    if (targeting && targeting !== "snap_self_target") return;
+    set({ targeting: "snap_other_target" });
+  },
+
+  beginSnapSelf() {
+    const { game, humanId, targeting } = get();
+    if (!game) return;
+    if (game.phase === "setup_peek" || game.phase === "round_over") return;
+    const me = game.players.find((p) => p.id === humanId);
+    if (!me || me.snapsUsed.self) return;
+    if (targeting === "snap_self_target") { set({ targeting: null }); return; }
+    if (targeting && targeting !== "snap_other_target") return;
+    set({ targeting: "snap_self_target" });
+  },
+
+  cancelSnap() {
+    const t = get().targeting;
+    if (t === "snap_other_target" || t === "snap_self_target") {
+      set({ targeting: null });
+    }
+  },
+
+  doSnapOther(targetId, targetIndex) {
+    const { mode, game, humanId } = get();
+    if (mode === "mp") {
+      import("./mp").then((m) =>
+        m.sendAction(
+          { type: "action_snap_other", targetPlayerId: targetId, targetIndex },
+          // Server rejected (race against another snap, brief disconnect, etc.)
+          // — re-arm targeting so the player can pick a different card without
+          // having to click "Snap rival" again.
+          () => set({ targeting: "snap_other_target" }),
+        ),
+      );
+      set({ targeting: null });
+      return;
+    }
+    if (!game) return;
+    set({ game: actionSnapOther(game, humanId, targetId, targetIndex), targeting: null });
+  },
+
+  doSnapSelf(ownIndex) {
+    const { mode, game, humanId } = get();
+    if (mode === "mp") {
+      import("./mp").then((m) =>
+        m.sendAction(
+          { type: "action_snap_self", ownIndex },
+          () => set({ targeting: "snap_self_target" }),
+        ),
+      );
+      set({ targeting: null });
+      return;
+    }
+    if (!game) return;
+    set({ game: actionSnapSelf(game, humanId, ownIndex), targeting: null });
+  },
+
   peekSwapDecide(doSwap, ownIndex) {
     const { mode, game } = get();
     if (mode === "mp") {
@@ -781,6 +881,8 @@ export const useStore = create<StoreState>((set, get) => ({
       players: playerInputs,
       roundNumber: game.roundNumber + 1,
       scores: game.scores,
+      caboBonus: game.caboBonus,
+      caboPenalty: game.caboPenalty,
     });
     set({ game: next, setupPeekRevealed: false, targeting: null, toast: null });
   },

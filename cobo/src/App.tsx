@@ -8,9 +8,12 @@ import { Lobby } from "./ui/Lobby";
 import { CoinToss } from "./ui/CoinToss";
 import { StrawDraw } from "./ui/StrawDraw";
 import { AudioControls } from "./ui/AudioControls";
+import { HelpButton } from "./ui/HelpButton";
 import { ChatPanel } from "./ui/ChatPanel";
 import { ThemePicker } from "./ui/ThemePicker";
 import { EliminatedOverlay } from "./ui/EliminatedOverlay";
+import { SnapControls } from "./ui/SnapControls";
+import { SnapCinematic } from "./ui/SnapCinematic";
 import { BUSTED_ROOM_KEY } from "./ui/BustedOverlay";
 import { getSocket } from "./state/mp";
 import { useViewMode } from "./state/viewmode";
@@ -122,6 +125,9 @@ function App() {
       {screen === "coin_toss" && <CoinToss />}
       {screen === "straw_draw" && <StrawDraw />}
       {screen === "game" && <Table />}
+      {screen === "game" && <SnapControls />}
+      {screen === "game" && <SnapCinematic />}
+      <HelpButton />
       <AudioControls />
       <ChatPanel />
       {/* Theme picker is in-game only — it changes the table background,

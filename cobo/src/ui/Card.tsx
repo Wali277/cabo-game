@@ -108,7 +108,7 @@ export function CardView({
           : isActionCardSwap
           ? { type: "tween" as const, duration: 1.2,  ease: [0.22, 1, 0.36, 1] as const }
           : isHandSwap
-          ? { type: "tween" as const, duration: 1, ease: [0.22, 1, 0.36, 1] as const }
+          ? { type: "spring" as const, stiffness: 230, damping: 30, mass: 0.85 }
           : { type: "spring" as const, stiffness: 130, damping: 22, mass: 1.3 },
       }}
     >
