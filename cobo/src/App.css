@@ -1191,48 +1191,52 @@ html, body, #root {
   /* transform applied inline with the rotation direction per seat */
 }
 
-/* ── Side player overflow row (cards 5–6 from snap penalty) ──────────────
-   When a side player exceeds 4 cards we stack the extras in a second un-
-   rotated row positioned ABOVE the main row. After the 90° rotation that
-   second row becomes a column on the table-centre side, aligned with the
-   "outer" end of the main column (top from the human's viewpoint).
-   The wrapper widens to accommodate the second column so the rotated
-   content doesn't bleed into the deck area. */
-.hand-row-side-wrap.has-overflow {
-  /* 2 columns (80 + 10 gap + 80) + 12 padding ≈ 182px → 200 with breathing room */
-  width: 200px;
+/* ── Side player overflow back-row (cards 5–6 from snap penalty) ─────────
+   The four MAIN cards keep their original 128×362 wrapper. When a side
+   player picks up a 5th/6th card we render a SIBLING wrapper of the same
+   dimensions ABSOLUTELY POSITIONED next to the main wrapper on the OUTER
+   (screen-edge) side. Because absolute positioning takes the back wrapper
+   out of the .player-seat's measured flow, the main wrapper — and the
+   four main cards inside it — stays at EXACTLY its original position even
+   after the player picks up penalty cards. The back row forms a visual
+   "back row" of cards behind the main hand from the human's POV.
+
+   For LEFT player (90° CW):  back wrapper anchored with right: 100% so
+                              it sits to the LEFT of the main wrapper.
+   For RIGHT player (-90° CCW): back wrapper anchored with left: 100% so
+                                it sits to the RIGHT of the main wrapper. */
+.side-hands-group {
+  /* The group is just the positioning context for the absolute back-row.
+     Width and layout flow are controlled by the main wrapper inside. */
+  position: relative;
+  display: inline-flex;
+  align-items: flex-start;
 }
-.hand-row-side.has-overflow {
-  /* Switch the outer rotated container to a column flex so the two un-rotated
-     rows stack: overflow on TOP, main BELOW. */
-  flex-direction: column;
-  gap: 8px;
-  /* Keep both rows the same width so the cards in the overflow row line up
-     above the same column positions as the main row (no padding shift). */
-  align-items: stretch;
+.hand-row-side-wrap-back {
+  position: absolute;
+  top: 0;
+  /* Narrower than the 128px main wrapper because the back row only ever
+     holds 1-2 penalty cards. A 90px wrapper keeps the cards close to the
+     main column and reduces overlap with the side panels (LeftPanel /
+     right sidebar) on narrower viewports. The rotated 1-2 cards inside
+     are centred vertically — the back column stays visually balanced
+     regardless of how many penalty cards have been picked up. */
+  width: 90px;
+  /* Sit on top of the side panels visually rather than being clipped or
+     hidden behind them — penalty cards must remain readable. */
+  z-index: 5;
 }
-.hand-row-side.has-overflow .hand-row-side-main,
-.hand-row-side.has-overflow .hand-row-side-overflow {
-  display: flex;
-  flex-direction: row;
-  gap: 10px;
-  /* Match the original .hand-row padding so a snap-penalty card lines up
-     EXACTLY above its corresponding main-row slot column. */
-  padding: 0;
-  background: transparent;
-  border-radius: 0;
+.side-hands-group.pos-left .hand-row-side-wrap-back {
+  /* Place the back wrapper to the LEFT of the main wrapper (outer side
+     for LEFT player). 6px gap so the two columns don't visually fuse. */
+  right: 100%;
+  margin-right: 6px;
 }
-/* LEFT-aligned by default — left-side player. The overflow card lands above
-   the leftmost (un-rotated) card; after 90° CW rotation that's the top of
-   the column from the viewer's perspective. */
-.hand-row-side.has-overflow .hand-row-side-overflow {
-  justify-content: flex-start;
-}
-/* RIGHT-side player needs the overflow flush against the RIGHTMOST end so
-   after the -90° CCW rotation the overflow column sits at the same top
-   position as c4. */
-.hand-row-side.has-overflow .hand-row-side-overflow.align-end {
-  justify-content: flex-end;
+.side-hands-group.pos-right .hand-row-side-wrap-back {
+  /* Place the back wrapper to the RIGHT of the main wrapper (outer side
+     for RIGHT player). */
+  left: 100%;
+  margin-left: 6px;
 }
 
 /* Unused — kept for compat */

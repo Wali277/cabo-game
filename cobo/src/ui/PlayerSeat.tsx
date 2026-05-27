@@ -266,33 +266,36 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
       )}
 
       {isSide ? (
-        // Fixed-size wrapper reserves the post-rotation footprint (93×266).
-        // The inner hand-row is a horizontal row that gets rotated into a column.
-        // When the hand grows past 4 (snap penalty), `.has-overflow` widens
-        // the wrapper and switches the row to a 2-row column layout.
-        <div className={`hand-row-side-wrap${sideHasOverflow ? " has-overflow" : ""}`}>
-          <div
-            className={`hand-row hand-row-side${sideHasOverflow ? " has-overflow" : ""}`}
-            style={{ transform: `translateX(-50%) translateY(-50%) rotate(${sideRotateDeg}deg)` }}
-          >
-            {sideHasOverflow ? (
-              <>
-                {/* Overflow row sits ABOVE the main row in un-rotated coords;
-                    after rotation it becomes the column on the table-centre
-                    side. RIGHT-aligned for the right-side player so the
-                    overflow cards visually anchor under the "rightmost"
-                    card of the main row. */}
-                <div
-                  className={`hand-row-side-overflow${tablePos === "right" ? " align-end" : ""}`}
-                >
-                  {sideOverflowSlots}
-                </div>
-                <div className="hand-row-side-main">{sideMainSlots}</div>
-              </>
-            ) : (
-              cardSlots
-            )}
+        // Side player: render the main 4-card wrapper EXACTLY as before (no
+        // size change so the main row never shifts in the table layout). When
+        // the hand grows past 4 we render a SIBLING "back-row" wrapper that
+        // is ABSOLUTELY positioned next to the main wrapper on the OUTER
+        // (screen-edge) side. Because the back wrapper is absolute it
+        // doesn't contribute to the player-seat's measured size, so the
+        // main wrapper — and therefore the four main cards — stays exactly
+        // where it was before the penalty card arrived.
+        //   LEFT player  → back-row at `right: 100%` (LEFT of main wrapper).
+        //   RIGHT player → back-row at `left: 100%`  (RIGHT of main wrapper).
+        // CSS picks the side via .pos-left / .pos-right on .side-hands-group.
+        <div className={`side-hands-group pos-${tablePos}${sideHasOverflow ? " has-back" : ""}`}>
+          <div className="hand-row-side-wrap">
+            <div
+              className="hand-row hand-row-side"
+              style={{ transform: `translateX(-50%) translateY(-50%) rotate(${sideRotateDeg}deg)` }}
+            >
+              {sideMainSlots.length ? sideMainSlots : cardSlots}
+            </div>
           </div>
+          {sideHasOverflow && (
+            <div className="hand-row-side-wrap hand-row-side-wrap-back">
+              <div
+                className="hand-row hand-row-side"
+                style={{ transform: `translateX(-50%) translateY(-50%) rotate(${sideRotateDeg}deg)` }}
+              >
+                {sideOverflowSlots}
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <div className="hand-row">{cardSlots}</div>
