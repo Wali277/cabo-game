@@ -14,6 +14,8 @@ import {
   actionPeekOwn,
   actionSnapOther,
   actionSnapSelf,
+  actionStartSnapOther,
+  actionStartSnapSelf,
   callCabo,
   clearAnimations,
   clearReveals,
@@ -277,6 +279,8 @@ type ActionMsg =
   | { type: "call_cabo" }
   | { type: "action_snap_other"; targetPlayerId: string; targetIndex: number }
   | { type: "action_snap_self"; ownIndex: number }
+  | { type: "action_start_snap_other" }
+  | { type: "action_start_snap_self" }
   | { type: "start_play" }
   | { type: "setup_peek_card"; index: number }
   | { type: "clear_animations" }
@@ -339,6 +343,12 @@ function applyAction(game: GameState, playerId: string, action: ActionMsg): Game
     case "call_cabo":
       if (!requireCurrent()) return null;
       return callCabo(game);
+    case "action_start_snap_other":
+      // Open action — any active player may arm a rival snap (cinematic-first).
+      return actionStartSnapOther(game, playerId);
+    case "action_start_snap_self":
+      // Open action — any active player may arm a self snap (cinematic-first).
+      return actionStartSnapSelf(game, playerId);
     case "action_snap_other":
       // Snap is an open action — any active player may attempt one.
       return actionSnapOther(game, playerId, action.targetPlayerId, action.targetIndex);
@@ -681,7 +691,7 @@ io.on("connection", (socket) => {
       scores: room.game.scores,
       caboBonus: room.game.caboBonus,
       caboPenalty: room.game.caboPenalty,
-      // (server engine doesn't track snapBonus yet — passes through omitted)
+      snapBonus: room.game.snapBonus,
     });
     room.game.currentPlayer = nextStarterIdx;
     room.lastStarterIdx = nextStarterIdx;

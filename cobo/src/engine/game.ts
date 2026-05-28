@@ -92,7 +92,7 @@ export function newGame(opts: NewGameOptions): GameState {
       for (const i of indices) {
         p.knownToSelf[i] = true;
         state.reveals.push({
-          playerId: p.id, index: i, card: p.hand[i],
+          playerId: p.id, index: i, card: p.hand[i]!,
           toPlayerIds: [p.id], reason: "setup",
         });
       }

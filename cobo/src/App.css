@@ -3864,11 +3864,10 @@ body:not(.mobile-mode) .card-wrap.layout-glide.hl {
   100% { transform: translateY(-9px) rotate(2deg); }
 }
 
-/* Animated stars-overlay for the menu / coin-toss screen */
-.menu::after,
-/* The old colored twinkling stars layer is no longer rendered: the
-   teal+coral aurora is the new ambient layer behind the coin toss
-   card. Keyframes kept for back-compat with any cached CSS but no
+/* Animated stars-overlay for the menu / coin-toss screen.
+   The old colored twinkling stars layer (.menu::after) is no longer rendered:
+   the teal+coral aurora is the new ambient layer behind the coin toss card.
+   Keyframes kept for back-compat with any cached CSS but no
    selector applies the animation any more. */
 @keyframes twinkle {
   0%, 100% { opacity: 0.5; }
