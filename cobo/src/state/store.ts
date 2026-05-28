@@ -259,8 +259,9 @@ export { PLAYER_COLORS };
 //   - computeSpBust(...)  ↔ server lines 741-838 (round-end bust + GV detection)
 //   - skipKickedTurn(...) ↔ server lines 163-191 (auto-step past kicked seats)
 //
-// Keep them in lockstep with the server. The bust formula is the RAW sum of
-// per-round scores > 60 (no bonus/penalty deductions) to match MP.
+// Keep them in lockstep with the server. Bust uses the FULL match total
+// (round scores + cabo penalties − cabo/snap bonuses) > 60 — identical to the
+// scoreboard total, so busting matches the number the player sees.
 // ────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -297,6 +298,24 @@ function skipKickedTurn(game: GameState, kickedIds: string[]): GameState {
   next.pendingActionSource = null;
   next.peekAndSwapPick = null;
   return next;
+}
+
+/**
+ * A player's running MATCH total — the exact figure the scoreboard shows and
+ * that decides the winner: raw round scores PLUS cabo penalties MINUS cabo and
+ * snap bonuses. The bust threshold uses this (not the raw round sum) so busting
+ * matches the number the player sees: a +5 cabo penalty pushes you toward 60,
+ * while a low-cabo win or snap bonus pulls you back. MUST stay identical to the
+ * server's matchTotal and to Scoreboard.tsx buildRows().
+ */
+function matchTotal(game: GameState, id: string): number {
+  const sum = (arr?: number[]) => (arr ?? []).reduce((a, b) => a + b, 0);
+  return (
+    sum(game.scores[id]) +
+    sum(game.caboPenalty[id]) -
+    sum(game.caboBonus[id]) -
+    sum(game.snapBonus[id])
+  );
 }
 
 /**
@@ -376,9 +395,12 @@ function computeSpBust(game: GameState, prev: ElimState): ElimState {
     next.roundWins[winnerId] = (next.roundWins[winnerId] ?? 0) + 1;
   }
 
-  // Compute newly busted players (cumulative raw score > 60).
+  // Compute newly busted players. Bust on the FULL match total (the same
+  // figure the scoreboard shows and that decides the winner): round scores +
+  // cabo penalties − cabo/snap bonuses. Penalties push you toward 60; a
+  // low-cabo win or snap bonus pulls you back.
   next.bustedThisRound = game.players
-    .filter((p) => (game.scores[p.id] ?? []).reduce((a, b) => a + b, 0) > 60)
+    .filter((p) => matchTotal(game, p.id) > 60)
     .map((p) => p.id);
 
   if (next.bustedThisRound.length > 0) {

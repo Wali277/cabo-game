@@ -202,6 +202,21 @@ function activePlayerIds(room: { members: { playerId: string }[]; disconnects: R
     .filter((pid) => !room.disconnects[pid]?.forfeited && !room.kickedIds.includes(pid));
 }
 
+/** A player's running MATCH total — round scores + cabo penalties − cabo/snap
+ *  bonuses. The bust threshold uses this (NOT the raw round sum) so busting
+ *  matches the scoreboard total the players see: a +5 cabo penalty pushes you
+ *  toward 60, a low-cabo win / snap bonus pulls you back. MUST stay identical
+ *  to the client's matchTotal (cobo/src/state/store.ts) + Scoreboard.tsx. */
+function matchTotal(game: GameState, id: string): number {
+  const sum = (arr?: number[]) => (arr ?? []).reduce((a, b) => a + b, 0);
+  return (
+    sum(game.scores[id]) +
+    sum(game.caboPenalty[id]) -
+    sum(game.caboBonus[id]) -
+    sum(game.snapBonus[id])
+  );
+}
+
 function broadcastRoom(roomCode: string) {
   const room = rooms.get(roomCode);
   if (!room) return;
@@ -831,9 +846,11 @@ io.on("connection", (socket) => {
           room.roundWins[winnerId] = (room.roundWins[winnerId] ?? 0) + 1;
         }
 
-        // Compute newly busted players (cumulative score > 60).
+        // Compute newly busted players on the FULL match total (round scores +
+        // cabo penalties − cabo/snap bonuses), identical to the scoreboard
+        // total — penalties count toward busting, bonuses count against it.
         room.bustedThisRound = room.game.players
-          .filter((p) => (room.game!.scores[p.id] ?? []).reduce((a: number, b: number) => a + b, 0) > 60)
+          .filter((p) => matchTotal(room.game!, p.id) > 60)
           .map((p) => p.id);
 
         if (room.bustedThisRound.length > 0) {

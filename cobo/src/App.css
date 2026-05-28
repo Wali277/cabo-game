@@ -2688,8 +2688,12 @@ body.mobile-mode .round-start-label {
 }
 .sb-title { font-weight: 700; font-size: 13px; color: #6e4ec9; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
 
-/* Per-round scoreboard table */
-.sb-table { display: flex; flex-direction: column; gap: 3px; font-size: 14px; }
+/* Per-round scoreboard table. overflow-x:auto lets the rows keep their
+   per-column min widths and SCROLL horizontally if the container can't fit
+   them all (many rounds) instead of squishing the columns to nothing. The
+   round-end modal grows to fit instead (it's not width-constrained), so this
+   only kicks in when the column count outruns the available width. */
+.sb-table { display: flex; flex-direction: column; gap: 3px; font-size: 14px; overflow-x: auto; }
 .sb-thead, .sb-trow {
   display: grid;
   align-items: center;
@@ -3346,6 +3350,9 @@ body.mobile-mode .round-start-label {
   border-radius: 24px;
   padding: 28px 32px;
   min-width: 360px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
   text-align: center;
   border: 4px solid #a87bff;
   box-shadow: 0 20px 50px rgba(0,0,0,0.55);

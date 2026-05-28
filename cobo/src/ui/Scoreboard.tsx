@@ -203,7 +203,7 @@ export function Scoreboard() {
   }
 
   // Columns: Player | R1..Rn | Bonus | Penalty | Total
-  const gridCols = `minmax(80px, 1.2fr) repeat(${Math.max(1, roundCount)}, minmax(26px, 0.7fr)) minmax(50px, 0.95fr) minmax(54px, 0.95fr) minmax(54px, 1.1fr)`;
+  const gridCols = `minmax(72px, 1.1fr) repeat(${Math.max(1, roundCount)}, minmax(34px, 0.8fr)) minmax(46px, 0.9fr) minmax(50px, 0.9fr) minmax(54px, 1.1fr)`;
 
   const colPrefix = inSuddenDeath ? "FR" : "R";
 
@@ -466,7 +466,7 @@ export function RoundEndOverlay() {
 
   const roundCount = Math.max(0, ...allRows.map((r) => r.rounds.length));
   // Columns: name | rounds… | bonus | penalty | total
-  const modalGridCols = `minmax(90px, 1.3fr) repeat(${Math.max(1, roundCount)}, minmax(28px, 1fr)) minmax(40px, 0.9fr) minmax(40px, 0.9fr) minmax(48px, 1.1fr)`;
+  const modalGridCols = `minmax(100px, 1.3fr) repeat(${Math.max(1, roundCount)}, minmax(42px, 1fr)) minmax(46px, 0.9fr) minmax(50px, 0.9fr) minmax(56px, 1.1fr)`;
 
   const modalRoundMins: number[] = [];
   const modalLowestCounts: number[] = [];
