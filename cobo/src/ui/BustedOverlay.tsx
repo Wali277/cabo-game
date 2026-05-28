@@ -21,21 +21,27 @@ export function BustedOverlay() {
   const game = useStore((s) => s.game!);
   const humanId = useStore((s) => s.humanId);
   const mp = useStore((s) => s.mp);
+  const elim = useStore((s) => s.elim);
   const backToMenu = useStore((s) => s.backToMenu);
   const mode = useStore((s) => s.mode);
   const reduced = useReducedMotion() ?? false;
 
+  // Mode-agnostic: read from elim (mirrored from MP room, computed locally in SP).
+  // Always plays its splash when the human is in bustedThisRound — even if a
+  // Glorious Victory landed on the same tick — so the cinematic isn't skipped.
+  // The handoff to GameLostOverlay / GloriousVictory happens below, AFTER the
+  // splash exit completes.
   const isBusted =
-    mode === "mp" &&
-    !!mp &&
     game.phase === "round_over" &&
-    mp.bustedThisRound.includes(humanId) &&
-    !mp.gloriosVictory;
+    elim.bustedThisRound.includes(humanId);
 
   useEffect(() => {
-    if (!isBusted || !mp?.code) return;
+    // MP-only persistence: stores the room code so a refresh during a busted
+    // state still shows the elimination screen on rejoin. SP has no room to
+    // rejoin, so we skip this in SP.
+    if (!isBusted || mode !== "mp" || !mp?.code) return;
     localStorage.setItem(BUSTED_ROOM_KEY, JSON.stringify({ code: mp.code }));
-  }, [isBusted, mp?.code]);
+  }, [isBusted, mode, mp?.code]);
 
   // Cinematic stage. Skip straight to modal under reduced-motion.
   const [stage, setStage] = useState<"splash" | "modal">("splash");
@@ -47,6 +53,10 @@ export function BustedOverlay() {
   }, [isBusted, reduced]);
 
   if (!isBusted) return null;
+  // After the splash exits, if a Glorious Victory landed this round, hand off
+  // to GameLostOverlay / GloriousVictory instead of showing the mid-game bust
+  // modal (which is only the right UX when game continues with other players).
+  if (stage === "modal" && elim.gloriosVictory) return null;
 
   const scores = game.scores[humanId] ?? [];
   const total = scores.reduce((a, b) => a + b, 0);

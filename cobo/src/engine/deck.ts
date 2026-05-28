@@ -69,6 +69,6 @@ export function actionOf(card: Card): "peek_own" | "peek_other" | "blind_swap" |
   return null;
 }
 
-export function handScore(hand: Card[]): number {
-  return hand.reduce((s, c) => s + cardScore(c), 0);
+export function handScore(hand: (Card | null)[]): number {
+  return hand.reduce((s, c) => s + (c ? cardScore(c) : 0), 0);
 }

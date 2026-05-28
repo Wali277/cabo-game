@@ -62,6 +62,7 @@ function discardTrajectory(g: GameState): Trajectory {
     case "discard_drawn":
       return withArc({ x: -100, y: -30, rotate: -10, scale: 0.85 }, 30);
     case "swap_hand":
+    case "snap_correct":
       return withArc({ x: 0, y: 110, rotate: 6, scale: 0.85 }, 50);
     case "blind_swap":
       return withArc({ x: 0, y: 85, rotate: 4, scale: 0.85 }, 40);
@@ -105,10 +106,22 @@ function pileOffset(cardId: string, indexInStack: number): { x: number; y: numbe
 
 function captureSwapHandSourceFromBoard(game: GameState, cardId: string) {
   const latest = game.animations[game.animations.length - 1];
-  if (latest?.kind !== "swap_hand") return null;
+  if (!latest) return null;
 
-  const playerId = latest.payload.playerId as string | undefined;
-  const handIndex = latest.payload.handIndex as number | undefined;
+  // swap_hand: source slot = the snapper's own slot the drawn card swapped into.
+  // snap_correct: source slot = the target's slot the matched card came out of
+  // (target may be the snapper themselves on a self-snap).
+  let playerId: string | undefined;
+  let handIndex: number | undefined;
+  if (latest.kind === "swap_hand") {
+    playerId = latest.payload.playerId as string | undefined;
+    handIndex = latest.payload.handIndex as number | undefined;
+  } else if (latest.kind === "snap_correct") {
+    playerId = latest.payload.targetId as string | undefined;
+    handIndex = latest.payload.targetIndex as number | undefined;
+  } else {
+    return null;
+  }
   if (!playerId || typeof handIndex !== "number") return null;
 
   const sourceSlot = document.querySelector<HTMLElement>(
@@ -160,14 +173,23 @@ export function Center() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [topDiscard?.id],
   );
-  const isHandSwapDiscard = isDesktop && discardArrivalKind === "swap_hand";
+  const isHandSwapDiscard =
+    isDesktop &&
+    (discardArrivalKind === "swap_hand" || discardArrivalKind === "snap_correct");
   const isSwapDiscard =
     discardArrivalKind === "blind_swap" ||
     discardArrivalKind === "peek_and_swap" ||
-    discardArrivalKind === "swap_hand";
+    discardArrivalKind === "swap_hand" ||
+    discardArrivalKind === "snap_correct";
   const swapHandSource = useMemo(
     () => {
-      if (!topDiscard || !isDesktop || discardArrivalKind !== "swap_hand") return null;
+      if (
+        !topDiscard ||
+        !isDesktop ||
+        (discardArrivalKind !== "swap_hand" && discardArrivalKind !== "snap_correct")
+      ) {
+        return null;
+      }
       return (
         consumeSwapHandSource(topDiscard.id) ??
         captureSwapHandSourceFromBoard(game, topDiscard.id)
@@ -185,7 +207,10 @@ export function Center() {
   );
   const discardTraj = useMemo(
     () => {
-      if (isDesktop && discardArrivalKind === "swap_hand") {
+      if (
+        isDesktop &&
+        (discardArrivalKind === "swap_hand" || discardArrivalKind === "snap_correct")
+      ) {
         return swapHandDiscardTrajectory(swapHandSource);
       }
       return discardTrajectory(game);

@@ -4005,7 +4005,9 @@ body:not(.mobile-mode) .card-wrap.layout-glide.hl {
   font-variant-numeric: tabular-nums;
   font-size: 14px;
 }
-.end-score-round-h {
+/* More specific than `.end-score-table th { text-align: left }` so the round
+   headers actually center over their (centered) data cells. */
+.end-score-table th.end-score-round-h {
   text-align: center;
   font-weight: 600;
   letter-spacing: 0.04em;

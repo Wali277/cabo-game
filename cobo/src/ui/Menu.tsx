@@ -99,7 +99,7 @@ export function Menu() {
         </button>
         <div className="divider"><span>dev</span></div>
         <button
-          className="btn training-btn"
+          className="btn ghost-light"
           onClick={() => trainInit()}
         >
           🧪 Training Chamber
