@@ -1,19 +1,20 @@
 /**
  * View-mode preference — toggles between the default desktop layout and the
- * phone-optimised layout (single column, slide-up drawers, larger tap targets).
+ * phone-optimised layout (compact spatial table, top-bar overflow menu,
+ * larger tap targets).
  *
- * Persistence: localStorage under `cabo:viewmode` (matches the `cabo:*`
- * convention used by audio / theme / mp session).
+ * Persistence: an explicit choice is saved in localStorage under
+ * `cabo:viewmode`. Reactivity: components subscribe via `useViewMode()`; the
+ * mode is recomputed on the explicit toggle AND whenever the viewport crosses
+ * the phone breakpoint (resize / orientation change).
  *
- * Reactivity: components subscribe via `useViewMode()`. Updates dispatched via
- * a custom event keep multiple subscribers in sync without pulling in Zustand
- * for a purely-local visual preference. Mirrors `cobo/src/state/theme.ts`.
- *
- * Auto-detect: on a user's very first visit (no saved value), if the viewport
- * is narrow (≤820px) OR the primary pointer is coarse (touchscreen), the
- * mode defaults to "mobile" so phone users land on the right layout
- * automatically. Subsequent visits use whatever the user picked last —
- * the toggle in the main menu always wins.
+ * IMPORTANT resolution rule: a NARROW viewport (≤820px) is ALWAYS treated as
+ * mobile, regardless of any saved preference. The desktop layout overflows a
+ * phone screen, and a stale `desktop` preference must never trap a phone user
+ * in the unusable desktop layout (this was the cause of phones rendering the
+ * giant desktop table). A saved preference therefore only applies on wider
+ * screens — e.g. a desktop user previewing the phone layout, or choosing
+ * desktop on a tablet.
  */
 import { useEffect, useState } from "react";
 
@@ -23,75 +24,89 @@ export const DEFAULT_VIEW_MODE: ViewMode = "desktop";
 const STORAGE_KEY = "cabo:viewmode";
 const EVENT_NAME = "cabo:viewmode-change";
 const VALID: ReadonlyArray<ViewMode> = ["desktop", "mobile"];
+/** Phones (and most phone-width windows) sit at/under this width. */
+const NARROW_QUERY = "(max-width: 820px)";
 
 export const VIEW_MODE_LABELS: Record<ViewMode, string> = {
   desktop: "Desktop layout",
   mobile:  "Phone layout",
 };
 
-/**
- * Heuristic for "this is a phone-sized device" used only when no preference
- * has ever been saved. Either condition is enough:
- *  - narrow viewport (max-width: 820px) — covers most phone portraits
- *  - coarse pointer — covers tablets + phones that are wider than 820px
- */
-function autoDetect(): ViewMode | null {
-  if (typeof window === "undefined") return null;
+function mediaMatches(query: string): boolean {
+  if (typeof window === "undefined") return false;
   try {
-    const narrow = window.matchMedia("(max-width: 820px)").matches;
-    const coarse = window.matchMedia("(pointer: coarse)").matches;
-    if (narrow || coarse) return "mobile";
+    return window.matchMedia(query).matches;
   } catch {
-    /* matchMedia not available — fall through to desktop default */
+    return false;
+  }
+}
+
+function readSaved(): ViewMode | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw && VALID.includes(raw as ViewMode)) return raw as ViewMode;
+  } catch {
+    /* ignore */
   }
   return null;
 }
 
-function loadFromStorage(): ViewMode {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw && VALID.includes(raw as ViewMode)) {
-      return raw as ViewMode;
-    }
-    // First visit with no saved preference → try autodetect
-    const guess = autoDetect();
-    if (guess) {
-      // Persist immediately so we don't redetect on later visits (the user's
-      // explicit choice always wins from this point forward).
-      try { localStorage.setItem(STORAGE_KEY, guess); } catch { /* ignore */ }
-      return guess;
-    }
-  } catch {
-    /* ignore — fall back to default */
-  }
+/**
+ * The effective view mode for the current viewport.
+ *  1. Narrow viewport → always "mobile" (overrides any saved preference).
+ *  2. Otherwise an explicit saved preference wins.
+ *  3. First visit on a wider screen: a coarse (touch) pointer implies a
+ *     tablet that prefers the phone layout; otherwise desktop.
+ */
+function resolveMode(): ViewMode {
+  if (mediaMatches(NARROW_QUERY)) return "mobile";
+  const saved = readSaved();
+  if (saved) return saved;
+  if (mediaMatches("(pointer: coarse)")) return "mobile";
   return DEFAULT_VIEW_MODE;
 }
 
-// Module-level current value so `getViewMode()` is consistent across reads
-// and newly-mounted components hydrate to the right value immediately.
-let current: ViewMode = loadFromStorage();
-
 export function getViewMode(): ViewMode {
-  return current;
+  return resolveMode();
 }
 
 export function setViewMode(m: ViewMode): void {
   if (!VALID.includes(m)) return;
-  current = m;
-  try { localStorage.setItem(STORAGE_KEY, m); } catch { /* ignore */ }
+  try {
+    localStorage.setItem(STORAGE_KEY, m);
+  } catch {
+    /* ignore */
+  }
+  // resolveMode() may still pin "mobile" on a narrow screen — that's intended;
+  // the toggle is hidden on phones, so this only meaningfully fires on wide
+  // screens where the saved preference applies.
   window.dispatchEvent(new CustomEvent<ViewMode>(EVENT_NAME, { detail: m }));
 }
 
-/** Subscribe to the current view mode; re-renders the component on change. */
+/** Subscribe to the effective view mode; re-renders on the explicit toggle
+ *  and whenever the viewport crosses the phone breakpoint. */
 export function useViewMode(): ViewMode {
-  const [mode, setLocal] = useState<ViewMode>(current);
+  const [mode, setMode] = useState<ViewMode>(() => resolveMode());
   useEffect(() => {
-    function handler(e: Event) {
-      const detail = (e as CustomEvent<ViewMode>).detail;
-      if (detail && VALID.includes(detail)) setLocal(detail);
+    const update = () => setMode(resolveMode());
+    window.addEventListener(EVENT_NAME, update);
+    let mq: MediaQueryList | null = null;
+    try {
+      mq = window.matchMedia(NARROW_QUERY);
+      mq.addEventListener("change", update);
+    } catch {
+      /* matchMedia unavailable — fall back to the initial value */
     }
-    window.addEventListener(EVENT_NAME, handler);
-    return () => window.removeEventListener(EVENT_NAME, handler);
+    // Re-sync after mount in case the viewport differs from the initial guess.
+    update();
+    return () => {
+      window.removeEventListener(EVENT_NAME, update);
+      try {
+        mq?.removeEventListener("change", update);
+      } catch {
+        /* ignore */
+      }
+    };
   }, []);
   return mode;
 }
