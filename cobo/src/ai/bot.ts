@@ -7,6 +7,8 @@ import {
   actionPeekOwn,
   actionSnapOther,
   actionSnapSelf,
+  actionStartSnapOther,
+  actionStartSnapSelf,
   callCabo,
   discardDrawnSkipAction,
   discardDrawnWithAction,
@@ -352,6 +354,14 @@ function choosePeekAndSwapPick(state: GameState, bot: PlayerState, k: BotKnowled
 export function botMove(state: GameState): GameState {
   const bot = state.players[state.currentPlayer];
   if (!bot.isBot) return state;
+
+  // Training Chamber: draw from deck, discard immediately, nothing else.
+  if (useStore.getState().training) {
+    if (state.phase === "turn_start") return drawFromDeck(state);
+    if (state.phase === "turn_drawn") return discardDrawnSkipAction(state);
+    return state;
+  }
+
   const k = getOrInitKnowledge(state, bot.id);
   const difficulty = useStore.getState().botDifficulty ?? "marcy";
 
@@ -590,15 +600,14 @@ export function findBotSnap(state: GameState, difficulty: BotDifficulty): BotSna
   for (const bot of bots) {
     const k = getOrInitKnowledge(state, bot.id);
 
-    // BOB strategy: self-snap ONLY a high-value card (>=5). Flushing a
-    // Joker / Ace / low pair is a net loss — he'd give up a known low for
-    // an unknown ~6 average. Worth it only when the snap removes serious
-    // points from his hand.
+    // BOB strategy: self-snap any known matching card — the new rule makes
+    // self-snap a pure -1 reward, so flushing even a low card is fine. The
+    // empty slot can be filled by a wrong-snap penalty later if needed.
     if (difficulty === "bob" && !bot.snapsUsed.self) {
       const selfArr = k.beliefs.get(bot.id);
       if (selfArr) {
         let bestIdx = -1;
-        let bestScore = 4; // strict minimum: must be at least a 5
+        let bestScore = -1;
         for (let i = 0; i < selfArr.length; i++) {
           const belief = selfArr[i];
           if (belief && belief.rank === top.rank && belief.score > bestScore) {
@@ -675,7 +684,8 @@ export function findBotSnap(state: GameState, difficulty: BotDifficulty): BotSna
     }
 
     // Fallback self-snap for Marcy / Billy (Bob already handled above with
-    // a smarter HIGHEST-card preference).
+    // a smarter HIGHEST-card preference). No hand-size gate — the new rule
+    // makes self-snap available at any hand size.
     if (difficulty !== "bob" && !bot.snapsUsed.self) {
       const selfArr = k.beliefs.get(bot.id);
       if (selfArr) {
@@ -698,7 +708,18 @@ export function findBotSnap(state: GameState, difficulty: BotDifficulty): BotSna
   return null;
 }
 
-/** Apply a bot snap plan to the state. Pure: returns new state. */
+/** Arm a bot's snap (commits snapPhase + emits snap_armed_* event). The
+ *  Table.tsx polling driver should call this, render the cinematic, then
+ *  call executeBotSnap after the overlay finishes. */
+export function armBotSnap(state: GameState, plan: BotSnapPlan): GameState {
+  if (plan.kind === "self") {
+    return actionStartSnapSelf(state, plan.botId);
+  }
+  return actionStartSnapOther(state, plan.botId);
+}
+
+/** Resolve a bot's snap. Engine guards: requires snapPhase to be armed_*
+ *  for this bot first (see armBotSnap). */
 export function executeBotSnap(state: GameState, plan: BotSnapPlan): GameState {
   if (plan.kind === "self") {
     return actionSnapSelf(state, plan.botId, plan.targetIndex);

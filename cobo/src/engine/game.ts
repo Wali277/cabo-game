@@ -41,6 +41,7 @@ export function newGame(opts: NewGameOptions): GameState {
     knownToSelf: [false, false, false, false],
     calledCabo: false,
     snapsUsed: { other: false, self: false },
+    snapsCorrect: { other: false, self: false },
   }));
 
   // Deal 4 cards to each player
@@ -73,8 +74,11 @@ export function newGame(opts: NewGameOptions): GameState {
     scores: opts.scores ?? Object.fromEntries(players.map((p) => [p.id, []])),
     caboBonus: opts.caboBonus ?? Object.fromEntries(players.map((p) => [p.id, []])),
     caboPenalty: opts.caboPenalty ?? Object.fromEntries(players.map((p) => [p.id, []])),
+    snapBonus: opts.snapBonus ?? Object.fromEntries(players.map((p) => [p.id, []])),
     winnerId: null,
     log: [],
+    snapPhase: "idle",
+    snappingPlayerId: null,
   };
 
   pushAnim(state, "deal", { playerIds: players.map((p) => p.id) });
@@ -88,7 +92,7 @@ export function newGame(opts: NewGameOptions): GameState {
       for (const i of indices) {
         p.knownToSelf[i] = true;
         state.reveals.push({
-          playerId: p.id, index: i, card: p.hand[i],
+          playerId: p.id, index: i, card: p.hand[i]!,
           toPlayerIds: [p.id], reason: "setup",
         });
       }
@@ -106,10 +110,11 @@ export function setupPeekCard(state: GameState, playerId: string, index: number)
   if (player.knownToSelf[index]) return state; // already peeked
   const peeked = player.knownToSelf.filter(Boolean).length;
   if (peeked >= 2) return state;
+  const card = player.hand[index];
+  if (!card) return state; // empty slot — nothing to peek
   const s = clone(state);
   const p = s.players.find((pp) => pp.id === playerId)!;
   p.knownToSelf[index] = true;
-  const card = p.hand[index];
   s.reveals.push({
     playerId: p.id, index, card,
     toPlayerIds: [p.id], reason: "setup",
@@ -181,7 +186,9 @@ export function swapDrawnWithHand(state: GameState, handIndex: number): GameStat
   const oldCard = player.hand[handIndex];
   player.hand[handIndex] = s.drawnCard!;
   player.knownToSelf[handIndex] = true;
-  s.discard.push(oldCard);
+  // Swapping into an empty slot has no card to discard — the drawn card
+  // just fills the gap. Otherwise the displaced card goes to discard.
+  if (oldCard) s.discard.push(oldCard);
   pushAnim(s, "swap_hand", {
     playerId: player.id,
     handIndex,
@@ -261,9 +268,10 @@ export function discardDrawnSkipAction(state: GameState): GameState {
 
 export function actionPeekOwn(state: GameState, index: number): GameState {
   if (state.phase !== "action_peek_own") return state;
+  const card = state.players[state.currentPlayer].hand[index];
+  if (!card) return state; // can't peek at an empty slot
   const s = clone(state);
   const p = s.players[s.currentPlayer];
-  const card = p.hand[index];
   p.knownToSelf[index] = true;
   s.reveals.push({ playerId: p.id, index, card, toPlayerIds: [p.id], reason: "peek_own" });
   pushAnim(s, "reveal", { playerId: p.id, index, card, toPlayerIds: [p.id] });
@@ -275,10 +283,12 @@ export function actionPeekOwn(state: GameState, index: number): GameState {
 export function actionPeekOther(state: GameState, targetPlayerId: string, index: number): GameState {
   if (state.phase !== "action_peek_other") return state;
   if (targetPlayerId === state.players[state.currentPlayer].id) return state;
+  const target0 = state.players.find((p) => p.id === targetPlayerId);
+  const card = target0?.hand[index];
+  if (!card) return state; // can't peek at an empty slot
   const s = clone(state);
   const cur = s.players[s.currentPlayer];
   const target = s.players.find((p) => p.id === targetPlayerId)!;
-  const card = target.hand[index];
   s.reveals.push({ playerId: target.id, index, card, toPlayerIds: [cur.id], reason: "peek_other" });
   pushAnim(s, "reveal", { playerId: target.id, index, card, toPlayerIds: [cur.id] });
   pushLog(s, `${cur.name} spied on ${target.name}'s card.`);
@@ -294,6 +304,11 @@ export function actionBlindSwap(
 ): GameState {
   if (state.phase !== "action_blind_swap") return state;
   if (targetPlayerId === state.players[state.currentPlayer].id) return state;
+  const cur0 = state.players[state.currentPlayer];
+  const target0 = state.players.find((p) => p.id === targetPlayerId);
+  // Both slots must hold a card. Empty slots (from a prior correct self
+  // snap) are not legal swap targets.
+  if (!cur0.hand[ownIndex] || !target0?.hand[targetIndex]) return state;
   const s = clone(state);
   const cur = s.players[s.currentPlayer];
   const target = s.players.find((p) => p.id === targetPlayerId)!;
@@ -319,10 +334,12 @@ export function actionPeekAndSwapPick(
   index: number,
 ): GameState {
   if (state.phase !== "action_peek_and_swap_pick") return state;
+  const target0 = state.players.find((p) => p.id === targetPlayerId);
+  const card = target0?.hand[index];
+  if (!card) return state; // can't peek-and-swap at an empty slot
   const s = clone(state);
   const cur = s.players[s.currentPlayer];
   const target = s.players.find((p) => p.id === targetPlayerId)!;
-  const card = target.hand[index];
   s.peekAndSwapPick = { playerId: target.id, index, card };
   s.reveals.push({
     playerId: target.id, index, card,
@@ -344,17 +361,24 @@ export function actionPeekAndSwapDecide(
   const pick = s.peekAndSwapPick!;
   const target = s.players.find((p) => p.id === pick.playerId)!;
   if (doSwap && ownIndex !== undefined) {
-    const a = cur.hand[ownIndex];
-    const b = target.hand[pick.index];
-    cur.hand[ownIndex] = b;
-    target.hand[pick.index] = a;
-    cur.knownToSelf[ownIndex] = true; // Current player saw what they're getting
-    target.knownToSelf[pick.index] = false;
-    pushAnim(s, "peek_and_swap", {
-      fromPlayerId: cur.id, fromIndex: ownIndex,
-      toPlayerId: target.id, toIndex: pick.index,
-    });
-    pushLog(s, `${cur.name} peeked and swapped with ${target.name}.`);
+    // Both sides must hold a card to swap. The pick is guaranteed non-null
+    // (actionPeekAndSwapPick rejected empty slots), so we only need to
+    // guard our own slot here.
+    if (!cur.hand[ownIndex]) {
+      pushLog(s, `${cur.name} peeked but couldn't swap (empty slot).`);
+    } else {
+      const a = cur.hand[ownIndex];
+      const b = target.hand[pick.index];
+      cur.hand[ownIndex] = b;
+      target.hand[pick.index] = a;
+      cur.knownToSelf[ownIndex] = true; // Current player saw what they're getting
+      target.knownToSelf[pick.index] = false;
+      pushAnim(s, "peek_and_swap", {
+        fromPlayerId: cur.id, fromIndex: ownIndex,
+        toPlayerId: target.id, toIndex: pick.index,
+      });
+      pushLog(s, `${cur.name} peeked and swapped with ${target.name}.`);
+    }
   } else {
     pushLog(s, `${cur.name} peeked but didn't swap.`);
   }
@@ -377,15 +401,125 @@ export function callCabo(state: GameState): GameState {
 }
 
 
+// ─────────────────────────────────────────────────────────────────────────
+// SNAP — cinematic-first flow
+//
+// Press → arm (snap_armed_* event, snapPhase = armed_*) → SNAP! overlay
+// plays → player picks → engine resolves.
+//
+// For rival-snap we add a brief `revealing` step (snap_reveal event flips
+// the target card face-up) before the outcome cinematic + card motion.
+//
+// Self-snap: available any time once per round. A correct match NULLS the
+// picked slot (leaving an empty placeholder) — hand visually keeps its
+// shape but one slot is empty. A wrong self-snap deals a penalty card.
+//
+// Wrong-snap penalty placement: penalties fill the first empty slot (left
+// over from a prior correct self-snap) before extending the hand. This
+// gives the "return to 4" recovery path the rules call out.
+//
+// Rival-snap mechanic: correct = target card replaced from deck and
+// knownToSelf cleared; wrong = snapper draws a penalty (with empty-slot
+// fill-in described above).
+//
+// Each player has one snap-self and one snap-other per round; both budget
+// flags flip on RESOLUTION (correct or wrong), never on arm.
+// ─────────────────────────────────────────────────────────────────────────
+
+/** Place a penalty card into the snapper's hand: fill the first empty
+ *  slot if one exists, otherwise append to the end. Returns the index it
+ *  landed at so callers can include it in animation payloads. */
+function placePenalty(
+  hand: (import("./types").Card | null)[],
+  knownToSelf: boolean[],
+  penalty: import("./types").Card,
+): number {
+  const emptyIdx = hand.findIndex((c) => c === null);
+  if (emptyIdx >= 0) {
+    hand[emptyIdx] = penalty;
+    knownToSelf[emptyIdx] = true;
+    return emptyIdx;
+  }
+  hand.push(penalty);
+  knownToSelf.push(true);
+  return hand.length - 1;
+}
+
+/** When a player has just landed a CORRECT snap (rival or self), check
+ *  whether they now hold BOTH a correct rival-snap and a correct self-snap
+ *  for the round. If so, emit a snap_bonus animation event so the UI can
+ *  surface the in-game "Snap bonus! −5 points" overlay only to that
+ *  player. The actual −5 is applied during endRound. Idempotent — caller
+ *  fires this twice per round at most (once per correct snap) and only
+ *  the second call emits the event. */
+function maybeAwardSnapBonus(state: GameState, snapper: import("./types").PlayerState) {
+  if (!snapper.snapsCorrect.self || !snapper.snapsCorrect.other) return;
+  // Avoid double-firing: check if a snap_bonus event for this snapper
+  // already exists in this round's animation queue.
+  if (state.animations.some(
+    (a) => a.kind === "snap_bonus" && (a.payload.playerId as string) === snapper.id,
+  )) {
+    return;
+  }
+  pushAnim(state, "snap_bonus", { playerId: snapper.id, amount: 5 });
+  pushLog(state, `${snapper.name} earned a SNAP BONUS — minus 5 points!`);
+}
+
 /**
- * Snap on an opponent's face-down card. If the card's rank matches the top
- * of the discard pile, it's discarded and the opponent draws a fresh card
- * from the deck (hand size preserved). If wrong, the snapper draws a penalty
- * card from the deck into their own hand (hand size grows by 1).
+ * Begin a rival-snap. Commits the arm immediately so there's no
+ * cancel/back-out — the player MUST follow through with a pick.
+ * Sets snapPhase = 'armed_other' and emits snap_armed_other for the
+ * cinematic overlay.
+ */
+export function actionStartSnapOther(state: GameState, snapperId: string): GameState {
+  if (state.phase === "setup_peek" || state.phase === "round_over") return state;
+  if (state.snapPhase !== "idle") return state;
+  const snapper = state.players.find((p) => p.id === snapperId);
+  if (!snapper) return state;
+  if (snapper.snapsUsed.other) return state;
+  if (state.discard.length === 0) return state;
+  const s = clone(state);
+  s.snapPhase = "armed_other";
+  s.snappingPlayerId = snapperId;
+  pushAnim(s, "snap_armed_other", { snapperId });
+  pushLog(s, `${snapper.name} called SNAP on a rival!`);
+  return s;
+}
+
+/**
+ * Begin a self-snap. Available once per round, any hand size — the player
+ * is gambling that they remember a card whose rank matches the discard
+ * top. Correct → that slot empties (-1); wrong → penalty card (+1).
+ */
+export function actionStartSnapSelf(state: GameState, snapperId: string): GameState {
+  if (state.phase === "setup_peek" || state.phase === "round_over") return state;
+  if (state.snapPhase !== "idle") return state;
+  const snapper = state.players.find((p) => p.id === snapperId);
+  if (!snapper) return state;
+  if (snapper.snapsUsed.self) return state;
+  if (state.discard.length === 0) return state;
+  // Need at least one non-empty card to snap on.
+  if (!snapper.hand.some((c) => c !== null)) return state;
+  const s = clone(state);
+  s.snapPhase = "armed_self";
+  s.snappingPlayerId = snapperId;
+  pushAnim(s, "snap_armed_self", { snapperId });
+  pushLog(s, `${snapper.name} called SNAP on themselves!`);
+  return s;
+}
+
+/**
+ * Snap on an opponent's face-down card. The cinematic-first flow expects
+ * actionSnapOther to be called AFTER the rival-snap was armed (which fires
+ * the SNAP! overlay and gates input). This call resolves the snap:
+ * flips the picked card face-up (snap_reveal event + reveal entry), then
+ * runs the outcome cinematic + card motion. Both visual beats land within
+ * the same engine call; the cinematic outlasts the flip so the "hold"
+ * built into the spec reads naturally on screen.
  *
- * Snap is a side action — it does NOT advance the turn or change phase.
- * Each player gets one snap-other and one snap-self per round; the budget
- * is tracked on PlayerState.snapsUsed and resets when a new round starts.
+ * Mechanic: CORRECT → target's card is replaced from the deck and
+ * knownToSelf for that slot is cleared (nobody knows the new card). WRONG
+ * → snapper appends a penalty card from the deck.
  */
 export function actionSnapOther(
   state: GameState,
@@ -396,6 +530,9 @@ export function actionSnapOther(
   // Not allowed during setup or after the round ends.
   if (state.phase === "setup_peek" || state.phase === "round_over") return state;
   if (snapperId === targetId) return state;
+  // Must have been armed for rival-snap by THIS player.
+  if (state.snapPhase !== "armed_other") return state;
+  if (state.snappingPlayerId !== snapperId) return state;
   const snapper = state.players.find((p) => p.id === snapperId);
   const target = state.players.find((p) => p.id === targetId);
   if (!snapper || !target) return state;
@@ -411,17 +548,20 @@ export function actionSnapOther(
   const snapperC = s.players.find((p) => p.id === snapperId)!;
   const targetC = s.players.find((p) => p.id === targetId)!;
   snapperC.snapsUsed.other = true;
+  s.snapPhase = "resolving";
 
   if (isMatch) {
     // Correct — discard the snapped card and replace from deck.
-    const removed = targetC.hand[targetIndex];
+    const removed = targetC.hand[targetIndex]!;
     s.discard.push(removed);
+    snapperC.snapsCorrect.other = true;
     reshuffleDiscardIntoDeck(s);
     if (s.deck.length === 0) {
-      // Edge case: nothing to deal back. Leave the slot empty (engine
-      // tolerates variable hand size). End the round defensively.
-      targetC.hand.splice(targetIndex, 1);
-      targetC.knownToSelf.splice(targetIndex, 1);
+      // Edge case: nothing to deal back. Null the slot (preserves layout
+      // shape) and end the round defensively. The snap-bonus check happens
+      // inside endRound, so snapsCorrect.other is already set above.
+      targetC.hand[targetIndex] = null;
+      targetC.knownToSelf[targetIndex] = false;
       pushAnim(s, "snap_correct", { snapperId, targetId, targetIndex, card: removed, isSelf: false });
       pushLog(s, `${snapper.name} snapped ${target.name}'s ${removed.rank}!`);
       return endRound(s);
@@ -429,29 +569,18 @@ export function actionSnapOther(
     const replacement = s.deck.shift()!;
     targetC.hand[targetIndex] = replacement;
     targetC.knownToSelf[targetIndex] = false;
-    s.reveals.push({
-      playerId: targetId,
-      index: targetIndex,
-      card: removed,
-      toPlayerIds: s.players.map((p) => p.id),
-      reason: "snap_reveal",
-    });
+    // No slot reveal on correct rival-snap: the card flies to the discard
+    // pile (face-up there) so everyone already sees what was matched. A
+    // slot reveal would compete with the fly-to-discard animation and the
+    // new card's entrance, making the moment read muddy.
     pushAnim(s, "snap_correct", { snapperId, targetId, targetIndex, card: removed, isSelf: false });
     pushLog(s, `${snapper.name} snapped ${target.name}'s ${removed.rank}!`);
+    maybeAwardSnapBonus(s, snapperC);
   } else {
-    // Wrong — snapper draws a penalty card into their hand.
-    reshuffleDiscardIntoDeck(s);
-    if (s.deck.length === 0) {
-      pushAnim(s, "snap_wrong", {
-        snapperId, targetId, targetIndex,
-        expectedRank: top.rank, actualCard: targetCard,
-      });
-      pushLog(s, `${snapper.name} snapped wrong on ${target.name} (deck empty, no penalty).`);
-      return s;
-    }
-    const penalty = s.deck.shift()!;
-    snapperC.hand.push(penalty);
-    snapperC.knownToSelf.push(true);
+    // Wrong — snapper draws a penalty card into their hand. The slot flips
+    // face-up via snap_reveal so the snapper sees the mispicked card under
+    // the MISS! cinematic.
+    pushAnim(s, "snap_reveal", { snapperId, targetId, targetIndex, card: targetCard, isSelf: false });
     s.reveals.push({
       playerId: targetId,
       index: targetIndex,
@@ -459,20 +588,39 @@ export function actionSnapOther(
       toPlayerIds: s.players.map((p) => p.id),
       reason: "snap_reveal",
     });
+    reshuffleDiscardIntoDeck(s);
+    if (s.deck.length === 0) {
+      pushAnim(s, "snap_wrong", {
+        snapperId, targetId, targetIndex,
+        expectedRank: top.rank, actualCard: targetCard,
+      });
+      pushLog(s, `${snapper.name} snapped wrong on ${target.name} (deck empty, no penalty).`);
+      return finalizeSnap(s);
+    }
+    const penalty = s.deck.shift()!;
+    const penaltyIdx = placePenalty(snapperC.hand, snapperC.knownToSelf, penalty);
     pushAnim(s, "snap_wrong", {
       snapperId, targetId, targetIndex,
       expectedRank: top.rank, actualCard: targetCard,
     });
-    pushAnim(s, "snap_penalty_draw", { snapperId, card: penalty });
+    pushAnim(s, "snap_penalty_draw", { snapperId, card: penalty, handIndex: penaltyIdx });
     pushLog(s, `${snapper.name} snapped wrong on ${target.name} — penalty card.`);
   }
-  return s;
+  return finalizeSnap(s);
 }
 
 /**
- * Snap one of your OWN face-down cards. Same outcome shape as snap-other
- * (correct: discard + replace; wrong: penalty card). Uses the self-snap
- * budget. The snapper IS the target here.
+ * Snap one of your OWN face-down cards. Once per round, at any hand size.
+ *
+ * CORRECT: null the matched slot. The card goes to discard; the slot
+ * stays in the array as an empty placeholder so the other slots' indices
+ * (and the player's positional memory) are preserved. Effective hand
+ * size shrinks by 1; the empty slot can be filled later by a wrong-snap
+ * penalty.
+ * WRONG: penalty card from the deck. Fills the first empty slot if one
+ * exists, otherwise extends the hand.
+ *
+ * Either way, snapsUsed.self flips to true on resolution.
  */
 export function actionSnapSelf(
   state: GameState,
@@ -480,6 +628,9 @@ export function actionSnapSelf(
   ownIndex: number,
 ): GameState {
   if (state.phase === "setup_peek" || state.phase === "round_over") return state;
+  // Must have been armed for self-snap by THIS player.
+  if (state.snapPhase !== "armed_self") return state;
+  if (state.snappingPlayerId !== snapperId) return state;
   const snapper = state.players.find((p) => p.id === snapperId);
   if (!snapper) return state;
   if (snapper.snapsUsed.self) return state;
@@ -493,43 +644,25 @@ export function actionSnapSelf(
   const s = clone(state);
   const snapperC = s.players.find((p) => p.id === snapperId)!;
   snapperC.snapsUsed.self = true;
+  s.snapPhase = "resolving";
 
   if (isMatch) {
-    const removed = snapperC.hand[ownIndex];
-    s.discard.push(removed);
-    reshuffleDiscardIntoDeck(s);
-    if (s.deck.length === 0) {
-      snapperC.hand.splice(ownIndex, 1);
-      snapperC.knownToSelf.splice(ownIndex, 1);
-      pushAnim(s, "snap_correct", { snapperId, targetId: snapperId, targetIndex: ownIndex, card: removed, isSelf: true });
-      pushLog(s, `${snapper.name} self-snapped a ${removed.rank}!`);
-      return endRound(s);
-    }
-    const replacement = s.deck.shift()!;
-    snapperC.hand[ownIndex] = replacement;
+    // CORRECT self-snap: null the slot, no deck replacement. The card
+    // flies to the discard pile (face-up there) so the snapper sees what
+    // they matched. The empty slot stays in the array so layout doesn't
+    // collapse — a future wrong-snap penalty will refill it.
+    const removed = snapperC.hand[ownIndex]!;
+    snapperC.hand[ownIndex] = null;
     snapperC.knownToSelf[ownIndex] = false;
-    s.reveals.push({
-      playerId: snapperId,
-      index: ownIndex,
-      card: removed,
-      toPlayerIds: s.players.map((p) => p.id),
-      reason: "snap_reveal",
-    });
+    s.discard.push(removed);
     pushAnim(s, "snap_correct", { snapperId, targetId: snapperId, targetIndex: ownIndex, card: removed, isSelf: true });
     pushLog(s, `${snapper.name} self-snapped a ${removed.rank}!`);
+    snapperC.snapsCorrect.self = true;
+    maybeAwardSnapBonus(s, snapperC);
   } else {
-    reshuffleDiscardIntoDeck(s);
-    if (s.deck.length === 0) {
-      pushAnim(s, "snap_wrong", {
-        snapperId, targetId: snapperId, targetIndex: ownIndex,
-        expectedRank: top.rank, actualCard: ownCard, isSelf: true,
-      });
-      pushLog(s, `${snapper.name} self-snapped wrong (deck empty).`);
-      return s;
-    }
-    const penalty = s.deck.shift()!;
-    snapperC.hand.push(penalty);
-    snapperC.knownToSelf.push(true);
+    // WRONG self-snap: flip the slot face-up via snap_reveal so the player
+    // sees what they mispicked, then deal a penalty card.
+    pushAnim(s, "snap_reveal", { snapperId, targetId: snapperId, targetIndex: ownIndex, card: ownCard, isSelf: true });
     s.reveals.push({
       playerId: snapperId,
       index: ownIndex,
@@ -537,14 +670,36 @@ export function actionSnapSelf(
       toPlayerIds: s.players.map((p) => p.id),
       reason: "snap_reveal",
     });
+    reshuffleDiscardIntoDeck(s);
+    if (s.deck.length === 0) {
+      pushAnim(s, "snap_wrong", {
+        snapperId, targetId: snapperId, targetIndex: ownIndex,
+        expectedRank: top.rank, actualCard: ownCard, isSelf: true,
+      });
+      pushLog(s, `${snapper.name} self-snapped wrong (deck empty).`);
+      return finalizeSnap(s);
+    }
+    const penalty = s.deck.shift()!;
+    const penaltyIdx = placePenalty(snapperC.hand, snapperC.knownToSelf, penalty);
     pushAnim(s, "snap_wrong", {
       snapperId, targetId: snapperId, targetIndex: ownIndex,
       expectedRank: top.rank, actualCard: ownCard, isSelf: true,
     });
-    pushAnim(s, "snap_penalty_draw", { snapperId, card: penalty });
+    pushAnim(s, "snap_penalty_draw", { snapperId, card: penalty, handIndex: penaltyIdx });
     pushLog(s, `${snapper.name} self-snapped wrong — penalty card.`);
   }
-  return s;
+  return finalizeSnap(s);
+}
+
+/**
+ * Clears snap-phase state at the end of a resolution. Caller is expected
+ * to have already pushed the outcome animation (snap_correct / snap_wrong)
+ * so consumers can finish their cinematic before the next action lands.
+ */
+function finalizeSnap(state: GameState): GameState {
+  state.snapPhase = "idle";
+  state.snappingPlayerId = null;
+  return state;
 }
 
 function advanceTurn(state: GameState): GameState {
@@ -570,9 +725,10 @@ function advanceTurn(state: GameState): GameState {
 function endRound(state: GameState): GameState {
   const s = state;
   s.phase = "round_over";
-  // Reveal all hands
+  // Reveal all hands (skip empty slots — nothing to reveal there).
   for (const p of s.players) {
     p.hand.forEach((card, i) => {
+      if (!card) return;
       s.reveals.push({
         playerId: p.id, index: i, card,
         toPlayerIds: s.players.map((pp) => pp.id),
@@ -597,6 +753,9 @@ function endRound(state: GameState): GameState {
   // Per-round scoring with Cabo bonus / penalty accounted for separately so
   // the scoreboard can display each component on its own line.
   for (const t of totals) {
+    const player = s.players.find((pp) => pp.id === t.id)!;
+    const earnedSnapBonus =
+      player.snapsCorrect.self && player.snapsCorrect.other;
     const isCaboCaller = t.id === s.caboCallerId;
     const wonRound = t.id === winner.id;
     if (isCaboCaller && wonRound && t.total <= 7) {
@@ -616,6 +775,11 @@ function endRound(state: GameState): GameState {
       s.caboBonus[t.id].push(0);
       s.caboPenalty[t.id].push(0);
     }
+    // Snap bonus is independent of Cabo math: -5 off the running total
+    // whenever the player landed BOTH a correct rival-snap and a correct
+    // self-snap this round. Stored as a positive magnitude; the scoreboard
+    // renders it as a negative adjustment.
+    s.snapBonus[t.id].push(earnedSnapBonus ? 5 : 0);
   }
 
   pushAnim(s, "round_end", { winnerId: winner.id, totals });
@@ -631,6 +795,7 @@ function clone(state: GameState): GameState {
       hand: p.hand.slice(),
       knownToSelf: p.knownToSelf.slice(),
       snapsUsed: { ...p.snapsUsed },
+      snapsCorrect: { ...p.snapsCorrect },
     })),
     deck: state.deck.slice(),
     discard: state.discard.slice(),
@@ -640,6 +805,7 @@ function clone(state: GameState): GameState {
     scores: Object.fromEntries(Object.entries(state.scores).map(([k, v]) => [k, v.slice()])),
     caboBonus: Object.fromEntries(Object.entries(state.caboBonus).map(([k, v]) => [k, v.slice()])),
     caboPenalty: Object.fromEntries(Object.entries(state.caboPenalty).map(([k, v]) => [k, v.slice()])),
+    snapBonus: Object.fromEntries(Object.entries(state.snapBonus).map(([k, v]) => [k, v.slice()])),
   };
 }
 

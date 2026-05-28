@@ -57,7 +57,7 @@ export function EndScoreboard({ rows, winnerId, humanId, variant, mainRoundsCoun
   // Helper: column label + class for an index. Splits at mainRoundsCount.
   const splitAt = typeof mainRoundsCount === "number" ? mainRoundsCount : null;
   const isFinalIndex = (i: number) => splitAt !== null && i >= splitAt;
-  const labelFor = (i: number) => isFinalIndex(i) ? `F${i - (splitAt ?? 0) + 1}` : `R${i + 1}`;
+  const labelFor = (i: number) => isFinalIndex(i) ? `FR${i - (splitAt ?? 0) + 1}` : `R${i + 1}`;
 
   return (
     <div className={`end-scoreboard end-scoreboard-${variant}`}>

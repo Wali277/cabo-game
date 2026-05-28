@@ -4,22 +4,27 @@ import { useStore } from "../state/store";
 import { Audio } from "../audio/sounds";
 
 /**
- * Two-button cluster near the discard pile. The wording "Snap rival" and
- * "Snap self" maps directly to the per-round budget (one each) so the UI
- * disables the right button independently when used. Phase-agnostic.
+ * Two-button cluster near the discard pile. Cinematic-first flow:
+ * one click COMMITS the snap (no second confirm). The engine immediately
+ * flips snapPhase to armed_* and emits a snap_armed_* event, which
+ * SnapCinematic uses to show the big "SNAP!" overlay. Then the snapper
+ * picks a card and the engine resolves.
+ *
+ * Locked states:
+ *  - Snap rival: locked when snapsUsed.other === true → "Already used this round".
+ *  - Snap self:  locked when snapsUsed.self  === true → "Already used this round".
  *
  * Visible during play (turn_start / turn_drawn / pending_action / action
  * phases). Hidden during setup_peek and round_over.
  *
- * Rules tooltip shows on hover (pre-education) AND while armed (confirmation).
+ * While snapPhase !== 'idle' both buttons are disabled so a player can't
+ * spam the second snap mid-resolution.
  */
 export function SnapControls() {
   const game = useStore((s) => s.game);
   const humanId = useStore((s) => s.humanId);
-  const targeting = useStore((s) => s.targeting);
   const beginSnapOther = useStore((s) => s.beginSnapOther);
   const beginSnapSelf = useStore((s) => s.beginSnapSelf);
-  const cancelSnap = useStore((s) => s.cancelSnap);
 
   const [hoveringOther, setHoveringOther] = useState(false);
   const [hoveringSelf, setHoveringSelf] = useState(false);
@@ -30,101 +35,137 @@ export function SnapControls() {
   if (!me) return null;
   if (game.discard.length === 0) return null;
 
+  const snapPhase = game.snapPhase;
+  const snapBusy = snapPhase !== "idle";
+  const iAmSnapping = snapBusy && game.snappingPlayerId === humanId;
+
   const otherUsed = me.snapsUsed.other;
   const selfUsed = me.snapsUsed.self;
-  const armingOther = targeting === "snap_other_target";
-  const armingSelf = targeting === "snap_self_target";
+
+  // Reason a button is locked, used to render the tooltip + disable.
+  const otherLockReason: string | null = otherUsed ? "Already used this round" : null;
+  const selfLockReason: string | null = selfUsed ? "Already used this round" : null;
+
+  const otherDisabled = snapBusy || !!otherLockReason;
+  const selfDisabled = snapBusy || !!selfLockReason;
+
+  // Highlight the button we're mid-snap with (so the player has visual
+  // feedback that their press committed).
+  const isArmingOther = iAmSnapping && snapPhase === "armed_other";
+  const isArmingSelf = iAmSnapping && snapPhase === "armed_self";
 
   function clickOther() {
+    if (otherDisabled) return;
     Audio.playSfx("click");
-    if (armingOther) cancelSnap();
-    else beginSnapOther();
+    beginSnapOther();
   }
   function clickSelf() {
+    if (selfDisabled) return;
     Audio.playSfx("click");
-    if (armingSelf) cancelSnap();
-    else beginSnapSelf();
+    beginSnapSelf();
   }
 
-  // Show "other" rules when hovering the button (and it's still usable) OR while armed.
-  // Show "self" rules similarly. Both can't show simultaneously — "other" wins.
-  const showOther = armingOther || (hoveringOther && !otherUsed);
-  const showSelf  = armingSelf  || (hoveringSelf  && !selfUsed);
+  // Tooltip visibility — show rules / lock-reason on hover, regardless of
+  // disable state. Disabled buttons still need their hover state so the
+  // locked-reason tooltip can surface.
+  const showOther = hoveringOther && !snapBusy;
+  const showSelf = hoveringSelf && !snapBusy;
   const armingKind: "other" | "self" | null = showOther ? "other" : showSelf ? "self" : null;
+
+  // Tooltip body: either the lock-reason (concise) or the full rules card.
+  const otherTooltip = otherLockReason
+    ? { locked: true as const, text: otherLockReason }
+    : { locked: false as const, text: null };
+  const selfTooltip = selfLockReason
+    ? { locked: true as const, text: selfLockReason }
+    : { locked: false as const, text: null };
 
   return (
     <div className="snap-controls">
       <div className="snap-buttons">
-        {/* Rules tooltip — absolutely positioned directly above the button row */}
         <AnimatePresence>
           {armingKind && (
             <motion.div
               key={`rules-${armingKind}`}
-              className={`snap-rules snap-rules-${armingKind}`}
+              className={`snap-rules snap-rules-${armingKind}${
+                (armingKind === "other" ? otherTooltip.locked : selfTooltip.locked) ? " snap-rules-locked" : ""
+              }`}
               initial={{ opacity: 0, y: 8, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 4, scale: 0.97 }}
               transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
             >
-              <div className="snap-rules-title">
-                {armingKind === "other" ? "Snap a rival" : "Snap yourself"}
-              </div>
-              <div className="snap-rules-prompt">
-                {armingKind === "other"
-                  ? "Tap a rival's face-down card you believe matches the rank on top of the discard pile."
-                  : "Tap one of your own face-down cards you believe matches the rank on top of the discard pile."}
-              </div>
-              <ul className="snap-rules-list">
-                <li>
-                  <span className="snap-rules-pip ok">✓</span>
-                  <span>
-                    <strong>Correct:</strong> the card hits the discard and a fresh card replaces it.
-                  </span>
-                </li>
-                <li>
-                  <span className="snap-rules-pip bad">✕</span>
-                  <span>
-                    <strong>Wrong:</strong> you draw a penalty card into your hand and your score rises.
-                  </span>
-                </li>
-                <li>
-                  <span className="snap-rules-pip">◷</span>
-                  <span>
-                    <strong>One shot each round</strong> — one snap on a rival, one on yourself.
-                  </span>
-                </li>
-              </ul>
+              {(armingKind === "other" ? otherTooltip.locked : selfTooltip.locked) ? (
+                // Locked variant — show the spec-exact reason text only.
+                <div className="snap-rules-prompt snap-rules-locked-text">
+                  {armingKind === "other" ? otherTooltip.text : selfTooltip.text}
+                </div>
+              ) : (
+                <>
+                  <div className="snap-rules-title">
+                    {armingKind === "other" ? "Snap a rival" : "Snap yourself"}
+                  </div>
+                  <div className="snap-rules-prompt">
+                    {armingKind === "other"
+                      ? "Tap a rival's face-down card you believe matches the rank on top of the discard pile."
+                      : "Tap one of your own face-down cards you believe matches the rank on top of the discard pile."}
+                  </div>
+                  <ul className="snap-rules-list">
+                    <li>
+                      <span className="snap-rules-pip ok">✓</span>
+                      <span>
+                        <strong>Correct:</strong>{" "}
+                        {armingKind === "other"
+                          ? "the rival's card hits the discard and they're dealt a fresh face-down card in its place."
+                          : "your card hits the discard and the slot empties — your hand shrinks by one until a penalty fills the gap."}
+                      </span>
+                    </li>
+                    <li>
+                      <span className="snap-rules-pip bad">✕</span>
+                      <span>
+                        <strong>Wrong:</strong> you draw a penalty card into your hand and your score rises. If you have an empty slot from a previous self-snap, the penalty refills it.
+                      </span>
+                    </li>
+                    <li>
+                      <span className="snap-rules-pip">◷</span>
+                      <span>
+                        <strong>One shot each round</strong> — one snap on a rival, one on yourself.
+                      </span>
+                    </li>
+                  </ul>
+                </>
+              )}
               <span className="snap-rules-tail" />
             </motion.div>
           )}
         </AnimatePresence>
         <motion.button
-          className={`snap-btn snap-btn-other${armingOther ? " is-arming" : ""}`}
+          className={`snap-btn snap-btn-other${isArmingOther ? " is-arming" : ""}`}
           onClick={clickOther}
-          disabled={otherUsed && !armingOther}
-          whileHover={{ scale: otherUsed ? 1 : 1.04 }}
+          disabled={otherDisabled}
+          aria-disabled={otherDisabled}
+          title={otherLockReason ?? undefined}
+          whileHover={{ scale: otherDisabled ? 1 : 1.04 }}
           whileTap={{ scale: 0.96 }}
           onMouseEnter={() => setHoveringOther(true)}
           onMouseLeave={() => setHoveringOther(false)}
         >
           <span className="snap-btn-icon" aria-hidden>⚡</span>
-          <span className="snap-btn-label">
-            {armingOther ? "Cancel" : "Snap rival"}
-          </span>
+          <span className="snap-btn-label">Snap rival</span>
         </motion.button>
         <motion.button
-          className={`snap-btn snap-btn-self${armingSelf ? " is-arming" : ""}`}
+          className={`snap-btn snap-btn-self${isArmingSelf ? " is-arming" : ""}`}
           onClick={clickSelf}
-          disabled={selfUsed && !armingSelf}
-          whileHover={{ scale: selfUsed ? 1 : 1.04 }}
+          disabled={selfDisabled}
+          aria-disabled={selfDisabled}
+          title={selfLockReason ?? undefined}
+          whileHover={{ scale: selfDisabled ? 1 : 1.04 }}
           whileTap={{ scale: 0.96 }}
           onMouseEnter={() => setHoveringSelf(true)}
           onMouseLeave={() => setHoveringSelf(false)}
         >
           <span className="snap-btn-icon" aria-hidden>✋</span>
-          <span className="snap-btn-label">
-            {armingSelf ? "Cancel" : "Snap self"}
-          </span>
+          <span className="snap-btn-label">Snap self</span>
         </motion.button>
       </div>
     </div>

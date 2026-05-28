@@ -14,6 +14,7 @@ import { ThemePicker } from "./ui/ThemePicker";
 import { EliminatedOverlay } from "./ui/EliminatedOverlay";
 import { SnapControls } from "./ui/SnapControls";
 import { SnapCinematic } from "./ui/SnapCinematic";
+import { SnapBonusOverlay } from "./ui/SnapBonusOverlay";
 import { BUSTED_ROOM_KEY } from "./ui/BustedOverlay";
 import { getSocket } from "./state/mp";
 import { useViewMode } from "./state/viewmode";
@@ -127,6 +128,7 @@ function App() {
       {screen === "game" && <Table />}
       {screen === "game" && <SnapControls />}
       {screen === "game" && <SnapCinematic />}
+      {screen === "game" && <SnapBonusOverlay />}
       <HelpButton />
       <AudioControls />
       <ChatPanel />

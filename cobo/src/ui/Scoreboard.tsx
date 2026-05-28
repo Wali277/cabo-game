@@ -192,7 +192,7 @@ export function Scoreboard() {
   // Columns: Player | R1..Rn | Bonus | Penalty | Total
   const gridCols = `minmax(80px, 1.2fr) repeat(${Math.max(1, roundCount)}, minmax(26px, 0.7fr)) minmax(50px, 0.95fr) minmax(54px, 0.95fr) minmax(54px, 1.1fr)`;
 
-  const colPrefix = inSuddenDeath ? "F" : "R";
+  const colPrefix = inSuddenDeath ? "FR" : "R";
 
   return (
     <div className="scoreboard">
@@ -200,7 +200,7 @@ export function Scoreboard() {
         <span className="sb-title-main">Scoreboard</span>
         <span className="sb-title-sub">
           {inSuddenDeath
-            ? `Sudden Death · Round F${Math.max(1, roundCount)}`
+            ? `Sudden Death · FR${Math.max(1, roundCount)}`
             : `Round ${game.roundNumber} · lowest wins`}
         </span>
       </div>
@@ -494,7 +494,7 @@ export function RoundEndOverlay() {
                 {isRoundTie
                   ? "It's a tie"
                   : inSuddenDeath
-                  ? `Sudden Death · F${Math.max(1, roundCount)}`
+                  ? `Sudden Death · FR${Math.max(1, roundCount)}`
                   : "Round Over"}
               </motion.h1>
 
@@ -547,8 +547,8 @@ export function RoundEndOverlay() {
           <div className="modal-subtitle">
             {inSuddenDeath
               ? (isTie
-                  ? `Sudden Death · F${Math.max(1, roundCount)} · tied — play again`
-                  : `Sudden Death · F${Math.max(1, roundCount)}`)
+                  ? `Sudden Death · FR${Math.max(1, roundCount)} · tied — play again`
+                  : `Sudden Death · FR${Math.max(1, roundCount)}`)
               : isTie
               ? `Tied at ${lowestCum} pts · lowest wins`
               : "Leaderboard · lowest total wins"}
@@ -561,7 +561,7 @@ export function RoundEndOverlay() {
                   key={i}
                   className={`sb-th sb-th-round${inSuddenDeath ? " sb-th-final" : ""}`}
                 >
-                  {roundCount > 0 ? `${inSuddenDeath ? "F" : "R"}${i + 1}` : "—"}
+                  {roundCount > 0 ? `${inSuddenDeath ? "FR" : "R"}${i + 1}` : "—"}
                 </div>
               ))}
               <div className="sb-th sb-th-bonus" title="Bonuses subtracted — Cabo bonus and Snap bonus combined.">Bonus</div>

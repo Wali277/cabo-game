@@ -58,17 +58,36 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
     return { faceUp: false, card: c };
   }
 
+  // Snap pick-gating is phase-agnostic — it's driven by game.snapPhase +
+  // game.snappingPlayerId. The snapping player can ONLY click into the
+  // valid pick set; everyone else is read-only until the snap resolves.
+  const iAmSnapping =
+    (game.snapPhase === "armed_self" || game.snapPhase === "armed_other") &&
+    game.snappingPlayerId === humanId;
+  const someoneIsSnapping = game.snapPhase !== "idle";
+
   function cardHighlight(idx: number) {
     if (game.phase === "setup_peek" && isHuman) {
       const peekedCount = player.knownToSelf.filter(Boolean).length;
       if (!player.knownToSelf[idx] && peekedCount < 2) return "selectable";
       return null;
     }
-    // Snap targeting is phase-agnostic — highlights even when it's not the
-    // human's turn. Snap-self lights up the human's own face-down slots;
-    // snap-other lights up opponents'.
+    // Cinematic-first snap pick-gating. Engine snapPhase is the source of
+    // truth — the local targeting flag follows it but the engine state is
+    // what matters for cross-client correctness.
+    if (iAmSnapping && game.snapPhase === "armed_self" && isHuman) {
+      return "selectable";
+    }
+    if (iAmSnapping && game.snapPhase === "armed_other" && !isHuman) {
+      return "selectable";
+    }
+    // While ANY snap is in flight, suppress all other selectable highlights
+    // so the player can't double-dip into a different action mid-snap.
+    if (someoneIsSnapping) return null;
+    // Legacy targeting flags (still used in conjunction with snapPhase as a
+    // belt-and-braces — store sets these alongside the engine arm action).
     if (targeting === "snap_self_target" && isHuman) {
-      return player.knownToSelf[idx] ? "selectable" : "selectable";
+      return "selectable";
     }
     if (targeting === "snap_other_target" && !isHuman) {
       return "selectable";
@@ -88,6 +107,24 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
   }
 
   function handleClick(idx: number) {
+    // While a snap is in flight: only the snapping player can pick, and
+    // only inside the valid set (own cards for armed_self, opponent cards
+    // for armed_other). Everyone else's clicks are no-ops.
+    if (someoneIsSnapping) {
+      if (!iAmSnapping) return;
+      if (game.snapPhase === "armed_self") {
+        if (!isHuman) return;
+        clickOwnCard(idx);
+        return;
+      }
+      if (game.snapPhase === "armed_other") {
+        if (isHuman) return;
+        clickOtherCard(player.id, idx);
+        return;
+      }
+      // revealing / resolving — input is fully gated.
+      return;
+    }
     if (isHuman) clickOwnCard(idx);
     else clickOtherCard(player.id, idx);
   }
@@ -152,6 +189,23 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
       return { ...offset, opacity: 0, scale: 0.85, rotate: (idx - 1.5) * 4 };
     }
 
+    // Rival/self snap success — only the TARGET slot gets a new card; it
+    // should glide in from the deck (centre of table) so the player sees
+    // the replacement arrive. Direction matches the deal animation so the
+    // single new card reads as "fresh deal into this slot".
+    if (lastAnim.kind === "snap_correct") {
+      const targetId = lastAnim.payload.targetId as string | undefined;
+      const targetIndex = lastAnim.payload.targetIndex as number | undefined;
+      if (targetId === player.id && targetIndex === idx) {
+        const offset =
+          tablePos === "bottom" ? { y: -90 } :
+          tablePos === "top"    ? { y: 90 }  :
+          tablePos === "left"   ? { x: 60 }  :
+          tablePos === "right"  ? { x: -60 } : {};
+        return { ...offset, opacity: 0, scale: 0.85, rotate: 0 };
+      }
+    }
+
     return {};
   }
 
@@ -170,6 +224,28 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
   const sideRotateDeg = tablePos === "right" ? -90 : 90;
 
   const cardSlots = player.hand.map((c, idx) => {
+    // Empty slot left over from a correct self-snap. Render a placeholder
+    // that keeps the row's spacing but isn't interactive — the slot can
+    // later be refilled by a wrong-snap penalty card. Match the ghost
+    // dimensions to the active card size so the row's width is stable.
+    if (!c) {
+      const ghostW = cardSize === "lg" ? 110 : cardSize === "md" ? 80 : 56;
+      const ghostH = Math.round(ghostW * 1.45);
+      return (
+        <div
+          className="hand-slot hand-slot-empty"
+          key={`empty-${player.id}-${idx}`}
+          data-player-id={player.id}
+          data-hand-index={idx}
+          aria-hidden
+        >
+          <div
+            className="hand-slot-empty-ghost"
+            style={{ width: ghostW, height: ghostH }}
+          />
+        </div>
+      );
+    }
     const { faceUp, card } = cardFaceUp(idx);
     const hl = cardHighlight(idx);
     const knownDot = isHuman && known[idx] && !faceUp;
