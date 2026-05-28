@@ -83,7 +83,6 @@ export function CardView({
         width: w,
         height: h,
         cursor: onClick ? "pointer" : "default",
-        perspective: 800,
       }}
       onClick={onClick}
       animate={shake ? { x: [0, -6, 6, -4, 4, 0] } : {}}
@@ -118,6 +117,11 @@ export function CardView({
           : { type: "spring" as const, stiffness: 130, damping: 22, mass: 1.3 },
       }}
     >
+      {/* Perspective-only scene wrapper. It MUST NOT receive any transform
+          or will-change — putting perspective on the same element that Framer
+          animates (or that CSS promotes to a compositing layer) causes mobile
+          browsers to rasterize the subtree flat, breaking backface-visibility. */}
+      <div className="card-scene">
       <motion.div
         className="card-inner"
         initial={{ rotateY: faceUp ? 0 : 180 }}
@@ -135,6 +139,7 @@ export function CardView({
         <CardFace card={card} w={w} h={h} skin={skin} viewMode={viewMode} />
         <CardBack w={w} h={h} skin={skin} />
       </motion.div>
+      </div>{/* end .card-scene */}
     </motion.div>
   );
 }
