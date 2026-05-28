@@ -311,7 +311,12 @@ export function Table() {
   // This keeps each player's view consistent (the same opponent appears in the
   // same relative position from every viewer's POV).
   const humanIdx = game.players.findIndex((p) => p.id === humanId);
-  const human = game.players[humanIdx];
+  // In MP a player who busts is removed from the next round's roster, so on
+  // THEIR client `humanId` is no longer in `game.players` (humanIdx === -1).
+  // Keep `human` nullable and render a spectator note instead of a PlayerSeat
+  // with an undefined player — the latter threw inside PlayerSeat and tore the
+  // whole table down (the "frozen, unresponsive screen after a bust" bug).
+  const human = humanIdx >= 0 ? game.players[humanIdx] : null;
   const playerCount = game.players.length;
 
   const sortedOthers = game.players
@@ -523,16 +528,22 @@ export function Table() {
               </div>
             )}
 
-            {/* Bottom — human player */}
+            {/* Bottom — human player (or a spectator note once eliminated). */}
             <div className="tslot tslot-bottom">
-              <PlayerSeat
-                player={human}
-                seatIndex={humanIdx}
-                totalSeats={game.players.length}
-                isCurrent={game.players[game.currentPlayer].id === humanId}
-                isHuman={true}
-                tablePos="bottom"
-              />
+              {human ? (
+                <PlayerSeat
+                  player={human}
+                  seatIndex={humanIdx}
+                  totalSeats={game.players.length}
+                  isCurrent={game.players[game.currentPlayer]?.id === humanId}
+                  isHuman={true}
+                  tablePos="bottom"
+                />
+              ) : (
+                <div className="spectator-note">
+                  You&apos;ve been eliminated — spectating
+                </div>
+              )}
             </div>
           </div>
 

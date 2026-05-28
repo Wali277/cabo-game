@@ -2202,6 +2202,17 @@ html, body, #root {
   align-items: center;
   gap: 8px;
 }
+/* Shown in place of the human's seat once they've been eliminated (busted /
+   kicked in MP) and are spectating the remaining players. */
+.spectator-note {
+  font-family: 'Fredoka', system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  color: rgba(244, 235, 255, 0.7);
+  text-align: center;
+  padding: 14px 18px;
+  letter-spacing: 0.02em;
+}
 .player-tag {
   padding: 6px 14px;
   border-radius: 999px;

@@ -152,10 +152,23 @@ export function Scoreboard() {
   // contestants seated). At trigger time, game.players still has all 4.
   const sdArmed = !!elim.suddenDeath?.active;
   const sdContestants = sdArmed ? new Set(elim.suddenDeath!.contestants) : null;
+  // SD has actually STARTED only once a fresh SD game is seated (just the
+  // contestants). Guard the SD-TRIGGER round_over where everyone left busts
+  // together: the roster then coincidentally equals the contestant set, but
+  // no F-round has been played yet (contestant score arrays are still
+  // mainRoundsCount long). Treating that as "started" would slice the score
+  // arrays to empty and render a blank, all-zero "tie" board (the round-5 /
+  // all-bust corruption that also broke MP bust display).
+  const sdMainCount = elim.suddenDeath?.mainRoundsCount ?? 0;
+  const sdTriggerRoundOver =
+    game.phase === "round_over" &&
+    !!sdContestants &&
+    [...sdContestants].every((id) => (game.scores[id]?.length ?? 0) <= sdMainCount);
   const sdStarted =
     sdArmed && !!sdContestants &&
     game.players.every((p) => sdContestants.has(p.id)) &&
-    game.players.length === sdContestants.size;
+    game.players.length === sdContestants.size &&
+    !sdTriggerRoundOver;
   const inSuddenDeath = sdStarted;
   const startIndex = inSuddenDeath ? elim.suddenDeath!.mainRoundsCount : 0;
   const exclude = new Set(elim.kickedIds);
@@ -342,10 +355,23 @@ export function RoundEndOverlay() {
   // round_over still shows R-columns rather than an empty F-slice.
   const sdArmed = !!elim.suddenDeath?.active;
   const sdContestants = sdArmed ? new Set(elim.suddenDeath!.contestants) : null;
+  // SD has actually STARTED only once a fresh SD game is seated (just the
+  // contestants). Guard the SD-TRIGGER round_over where everyone left busts
+  // together: the roster then coincidentally equals the contestant set, but
+  // no F-round has been played yet (contestant score arrays are still
+  // mainRoundsCount long). Treating that as "started" would slice the score
+  // arrays to empty and render a blank, all-zero "tie" board (the round-5 /
+  // all-bust corruption that also broke MP bust display).
+  const sdMainCount = elim.suddenDeath?.mainRoundsCount ?? 0;
+  const sdTriggerRoundOver =
+    game.phase === "round_over" &&
+    !!sdContestants &&
+    [...sdContestants].every((id) => (game.scores[id]?.length ?? 0) <= sdMainCount);
   const sdStarted =
     sdArmed && !!sdContestants &&
     game.players.every((p) => sdContestants.has(p.id)) &&
-    game.players.length === sdContestants.size;
+    game.players.length === sdContestants.size &&
+    !sdTriggerRoundOver;
   const inSuddenDeath = sdStarted;
   const startIndex = inSuddenDeath ? elim.suddenDeath!.mainRoundsCount : 0;
   const kickedSet = new Set(elim.kickedIds);
