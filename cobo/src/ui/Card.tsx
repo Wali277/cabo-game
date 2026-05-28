@@ -267,7 +267,10 @@ function CardFace({
         alignItems: "flex-start",
         justifyContent: "space-between",
         textAlign: "left",
-        padding: "6px 8px",
+        // Proportional padding so the rank/suit corners always fit inside the
+        // card. A fixed 6px/8px was proportionally too large on the small
+        // mobile cards (xs/sm), pushing the bottom corner past the edge.
+        padding: `${Math.max(2, Math.round(w * 0.055))}px ${Math.max(2, Math.round(w * 0.073))}px`,
         overflow: "hidden",
         fontFamily: font,
         color,

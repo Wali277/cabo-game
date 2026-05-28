@@ -4352,6 +4352,19 @@ body.mobile-mode .deck-area {
   border-width: 2px;
   gap: 8px;
   border-radius: 20px;
+  /* Align the deck / drawn / discard CARDS along their top edge. The piles
+     have different heights (deck has a 2-line "Deck · N" label, discard a
+     1-line label, the drawn slot none), so the default center-alignment left
+     the three cards at different vertical positions. */
+  align-items: flex-start;
+}
+/* Compact, single-line pile labels so "Deck · N" doesn't wrap and widen the
+   deck pile (which was part of the misalignment). */
+body.mobile-mode .pile-label {
+  font-size: 10px;
+  padding: 3px 8px;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
 }
 /* Center pile container sizing — match the mobile card sizes from Card.tsx
    (deck/discard md = 50×72, drawn lg = 64×93) so empty placeholders line up
