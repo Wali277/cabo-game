@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { useStore } from "../state/store";
+import { useViewMode } from "../state/viewmode";
 import { Audio } from "../audio/sounds";
 import { MenuWallpaper } from "./MenuWallpaper";
 import { BOT_PROFILES, type BotDifficulty } from "../ai/bots";
@@ -45,6 +46,10 @@ function BotCard({
 }: BotCardProps) {
   const bot = BOT_PROFILES[id];
   const Portrait = bot.Portrait;
+  // Phones get a smaller portrait so the card stays compact; the SVG is
+  // viewBox-scaled, so a smaller size renders crisply (no cropping). The
+  // CSS .bot-card-portrait circle is sized to match under body.mobile-mode.
+  const portraitSize = useViewMode() === "mobile" ? 64 : 140;
 
   // Hover/dim effects only apply once the whole group has settled, so the
   // user never sees a card highlighted before they actually moved the mouse.
@@ -83,7 +88,7 @@ function BotCard({
         {bot.difficultyLabel}
       </span>
       <div className="bot-card-portrait">
-        <Portrait size={140} />
+        <Portrait size={portraitSize} />
       </div>
       <div className="bot-card-name" style={{ color: bot.accent }}>
         {bot.baseName}

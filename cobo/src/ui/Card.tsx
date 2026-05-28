@@ -28,7 +28,7 @@ const SUIT_GLYPH: Record<string, string> = { S: "♠", H: "♥", D: "♦", C: "�
 
 const SIZE_PX: Record<"desktop" | "mobile", Record<"xs" | "sm" | "md" | "lg", number>> = {
   desktop: { xs: 44, sm: 56, md: 80, lg: 110 },
-  mobile:  { xs: 32, sm: 48, md: 54, lg: 80 },
+  mobile:  { xs: 32, sm: 48, md: 50, lg: 66 },
 };
 
 /** Pixel width of a card at a given size + view mode. Exported so seats can
@@ -132,7 +132,7 @@ export function CardView({
         }
         style={{ width: "100%", height: "100%", transformStyle: "preserve-3d", position: "relative" }}
       >
-        <CardFace card={card} w={w} h={h} skin={skin} />
+        <CardFace card={card} w={w} h={h} skin={skin} viewMode={viewMode} />
         <CardBack w={w} h={h} skin={skin} />
       </motion.div>
     </motion.div>
@@ -147,12 +147,20 @@ function suitTextColor(suit: string, skin: import("./cardSkins").SkinStyle): str
 }
 
 function CardFace({
-  card, w, h, skin,
+  card, w, h, skin, viewMode,
 }: {
   card?: CardT | null;
   w: number; h: number;
   skin: import("./cardSkins").SkinStyle;
+  viewMode: "desktop" | "mobile";
 }) {
+  // Mobile cards are physically small; enlarge the rank/suit glyphs relative
+  // to the card so they stay legible. Multipliers are tuned to the
+  // space-between column budget below — 2*(rank + cornerSuit) + pip must stay
+  // under the inner height (~1.45w − 2*pad) or the bottom corner clips.
+  // Desktop keeps its original values.
+  const mobile = viewMode === "mobile";
+
   // Empty-slot placeholder (no card in this hand index).
   if (!card) {
     return (
@@ -178,7 +186,7 @@ function CardFace({
     // when faceBg is a gradient — skin.jesterBg is precisely this.
     const jesterCutoutBg = skin.jesterBg ?? "#ffd86b";
 
-    const letterFs = w * 0.11;
+    const letterFs = w * (mobile ? 0.15 : 0.11);
     // Each letter sits in a fixed-width "cell" so the J/O/K/E/R stack
     // shares a single visual axis. Without this, the natural widths of
     // the letters (K and R are wide, J is narrow) leave a ragged
@@ -186,6 +194,10 @@ function CardFace({
     // wider than the widest letter at this font, giving small visual
     // breathing room on either side of each glyph.
     const cellSize = letterFs * 1.05;
+    // Corner inset for the JOKER stacks. A fixed 6px is proportionally too
+    // large on small phone cards; scale it down so the stacks clear the
+    // centre jester while staying inside the card.
+    const jokerInset = mobile ? Math.max(3, Math.round(w * 0.05)) : 6;
     const letterStyle: React.CSSProperties = {
       fontSize: letterFs,
       fontWeight: 900,
@@ -203,7 +215,7 @@ function CardFace({
       display: "block",
     };
 
-    const jesterSize = w * 0.56;
+    const jesterSize = w * (mobile ? 0.48 : 0.56);
 
     return (
       <div
@@ -220,7 +232,7 @@ function CardFace({
           fontFamily: skin.font ?? "'Fredoka', system-ui, sans-serif",
         }}
       >
-        <div style={{ position: "absolute", top: 6, left: 6, ...letterStyle }}>
+        <div style={{ position: "absolute", top: jokerInset, left: jokerInset, ...letterStyle }}>
           {"JOKER".split("").map((ch, i) => (
             <span key={i} style={letterCellStyle}>{ch}</span>
           ))}
@@ -235,8 +247,8 @@ function CardFace({
         </div>
         <div style={{
           position: "absolute",
-          bottom: 6,
-          right: 6,
+          bottom: jokerInset,
+          right: jokerInset,
           transform: "rotate(180deg)",
           ...letterStyle,
         }}>
@@ -251,6 +263,12 @@ function CardFace({
   const color = suitTextColor(card.suit, skin);
   const glyph = SUIT_GLYPH[card.suit];
   const font = skin.font ?? "'Fredoka', system-ui, sans-serif";
+
+  // Glyph sizes — enlarged on mobile (see budget note at top of CardFace).
+  // 2*(rankFs + cornerSuitFs) + pipFs must stay under the inner height.
+  const rankFs = w * (mobile ? 0.30 : 0.22);
+  const cornerSuitFs = w * (mobile ? 0.19 : 0.17);
+  const pipFs = w * (mobile ? 0.32 : 0.48);
 
   return (
     <div
@@ -292,18 +310,18 @@ function CardFace({
 
       {/* Top-left corner */}
       <div style={{
-        fontSize: w * 0.22, lineHeight: 1, fontWeight: 700,
+        fontSize: rankFs, lineHeight: 1, fontWeight: 700,
         whiteSpace: "nowrap", zIndex: 1, position: "relative",
       }}>
         {card.rank}
-        <div style={{ fontSize: w * 0.17, lineHeight: 1 }}>{glyph}</div>
+        <div style={{ fontSize: cornerSuitFs, lineHeight: 1 }}>{glyph}</div>
       </div>
 
       {/* Centre suit glyph */}
       <div
         style={{
           alignSelf: "center",
-          fontSize: w * 0.48,
+          fontSize: pipFs,
           lineHeight: 1,
           textShadow: `1px 2px 0 rgba(0,0,0,0.12)`,
           zIndex: 1,
@@ -318,7 +336,7 @@ function CardFace({
         style={{
           alignSelf: "flex-end",
           transform: "rotate(180deg)",
-          fontSize: w * 0.22,
+          fontSize: rankFs,
           lineHeight: 1,
           fontWeight: 700,
           whiteSpace: "nowrap",
@@ -327,7 +345,7 @@ function CardFace({
         }}
       >
         {card.rank}
-        <div style={{ fontSize: w * 0.17, lineHeight: 1 }}>{glyph}</div>
+        <div style={{ fontSize: cornerSuitFs, lineHeight: 1 }}>{glyph}</div>
       </div>
     </div>
   );

@@ -31,6 +31,7 @@ import { actionSwapAnimationHoldMs } from "./cardMotion";
 export function Table() {
   const game = useStore((s) => s.game!);
   const humanId = useStore((s) => s.humanId);
+  const targeting = useStore((s) => s.targeting);
   const mode = useStore((s) => s.mode);
   const toast = useStore((s) => s.toast);
   const setToast = useStore((s) => s.setToast);
@@ -46,6 +47,18 @@ export function Table() {
   // up as a bottom sheet via the 📊 Scores top-bar button.
   const viewMode = useViewMode();
   const isMobile = viewMode === "mobile";
+  // Mobile: when the human must pick a card on the BOARD (a swap / peek /
+  // blind-swap / peek-and-swap target, or an armed snap they're taking),
+  // collapse the inline action panel so it never covers the cards they need
+  // to tap. The peek-and-swap DECIDE step is excluded — it shows Yes/No
+  // buttons in the panel and needs no board pick. (The snap-trigger buttons
+  // live in their own bottom bar, not this panel, so snapping still works.)
+  const humanSnapping =
+    (game.snapPhase === "armed_self" || game.snapPhase === "armed_other") &&
+    game.snappingPlayerId === humanId;
+  const boardPickActive =
+    (targeting !== null || humanSnapping) &&
+    game.phase !== "action_peek_and_swap_decide";
   const [rightDrawerOpen, setRightDrawerOpen] = useState(false);
   // Phone overflow menu — consolidates the theme / sound / help / chat FABs
   // (which otherwise float over the cards) into one top-bar dropdown.
@@ -523,7 +536,7 @@ export function Table() {
                 the lower band is never an empty dead zone. Hidden only at
                 round_over, where the round-end overlay takes over. */}
             {isMobile && game.phase !== "round_over" && (
-              <div className="tslot tslot-action">
+              <div className={`tslot tslot-action${boardPickActive ? " tslot-action-hidden" : ""}`}>
                 <LeftPanel />
               </div>
             )}

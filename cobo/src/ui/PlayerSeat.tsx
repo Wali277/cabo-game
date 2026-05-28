@@ -316,9 +316,15 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
   // EXACTLY behind main card 2 (first overflow) and main card 3 (second
   // overflow). Without the placeholders a single overflow card would
   // visually centre between cards 2 and 3, which felt off.
-  const sideMainSlots = isSide ? cardSlots.slice(0, 4) : cardSlots;
-  const sideOverflowSlots = isSide ? cardSlots.slice(4) : [];
-  const sideHasOverflow = isSide && sideOverflowSlots.length > 0;
+  // On MOBILE, side players render ALL their cards in the single rotated row
+  // so snap-penalty cards simply CONTINUE the column (the line grows toward
+  // the centre / downward) instead of tucking behind cards 2–3. The wrapper
+  // height is sized to the card count below so the longer column has room and
+  // the portrait stays clear above it. DESKTOP keeps the main(4)+back-row
+  // (overflow tucked outside) behaviour unchanged.
+  const sideMainSlots = isSide ? (isMobile ? cardSlots : cardSlots.slice(0, 4)) : cardSlots;
+  const sideOverflowSlots = isSide && !isMobile ? cardSlots.slice(4) : [];
+  const sideHasOverflow = isSide && !isMobile && sideOverflowSlots.length > 0;
   // Build the back-row's 4-slot array. Slots 0 and 3 are always empty
   // placeholders; slots 1 and 2 hold the overflow cards if present.
   // After the side player's 90° rotation, the row's un-rotated x axis
@@ -393,7 +399,18 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
         //   RIGHT player → back-row at `left: 100%`  (RIGHT of main wrapper).
         // CSS picks the side via .pos-left / .pos-right on .side-hands-group.
         <div className={`side-hands-group pos-${tablePos}${sideHasOverflow ? " has-back" : ""}`}>
-          <div className="hand-row-side-wrap">
+          <div
+            className="hand-row-side-wrap"
+            // Mobile: grow the rotated column to fit the (possibly >4) cards so
+            // penalty cards continue the line instead of overflowing the fixed
+            // 4-card box. xs card = 32px wide, 4px gap; +12 matches the base
+            // box's padding so a 4-card hand keeps its original 152px height.
+            style={
+              isMobile && isSide
+                ? { height: handLen * cardPx("xs", viewMode) + (handLen - 1) * 4 + 12 }
+                : undefined
+            }
+          >
             <div
               className="hand-row hand-row-side"
               style={{ transform: `translateX(-50%) translateY(-50%) rotate(${sideRotateDeg}deg)` }}
