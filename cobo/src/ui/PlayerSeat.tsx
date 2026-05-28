@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { CardView } from "./Card";
+import { CardView, cardPx } from "./Card";
 import type { PlayerState } from "../engine/types";
 import { useStore, PLAYER_COLORS } from "../state/store";
 import { useViewMode } from "../state/viewmode";
@@ -26,7 +26,26 @@ const CARD_SPRING = { type: "spring" as const, stiffness: 140, damping: 22, mass
 export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: Props) {
   const viewMode = useViewMode();
   const isMobile = viewMode === "mobile";
-  const cardSize = isHuman ? "lg" : "md";
+  // Card size hierarchy. Desktop keeps the original lg/md split. Mobile packs
+  // a compact spatial table: your hand stays large (lg), the front opponent
+  // gets a medium strip (sm), and the slim left/right side rails get the
+  // smallest cards (xs) so a 2×2 cluster fits a narrow gutter.
+  // Your hand shrinks as snap penalties push it past 4 cards so the row keeps
+  // fitting the screen width instead of overflowing the edges.
+  const handLen = player.hand.length;
+  const cardSize: "xs" | "sm" | "md" | "lg" = isHuman
+    ? !isMobile
+      ? "lg"
+      : handLen > 6
+      ? "sm"
+      : handLen > 4
+      ? "md"
+      : "lg"
+    : !isMobile
+    ? "md"
+    : tablePos === "top"
+    ? "sm"
+    : "xs";
   const game = useStore((s) => s.game!);
   const targeting = useStore((s) => s.targeting);
   const humanId = useStore((s) => s.humanId);
@@ -220,7 +239,11 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
   // horizontal row at the top of the screen, so left/right players are
   // rendered identically to the top player (no fixed-size wrapper, no
   // absolute positioning, no 90° transform).
-  const isSide = !isMobile && (tablePos === "left" || tablePos === "right");
+  // Side players render their hand as a single horizontal row rotated 90° so
+  // it reads as a vertical column on the rail (matching the desktop/web look),
+  // with snap-penalty overflow cards tucked behind the 2nd/3rd cards. Enabled
+  // on mobile too — the wrapper is sized down for the small xs cards in CSS.
+  const isSide = tablePos === "left" || tablePos === "right";
   const sideRotateDeg = tablePos === "right" ? -90 : 90;
 
   const cardSlots = player.hand.map((c, idx) => {
@@ -229,7 +252,7 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
     // later be refilled by a wrong-snap penalty card. Match the ghost
     // dimensions to the active card size so the row's width is stable.
     if (!c) {
-      const ghostW = cardSize === "lg" ? 110 : cardSize === "md" ? 80 : 56;
+      const ghostW = cardPx(cardSize, viewMode);
       const ghostH = Math.round(ghostW * 1.45);
       return (
         <div
@@ -324,7 +347,7 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
           className={`bot-portrait-wrap bot-portrait-identifier${isCurrent ? " is-current" : ""}`}
           style={{ borderColor: botProfile!.accent }}
         >
-          <BotPortraitComp size={isMobile ? 56 : 72} />
+          <BotPortraitComp size={isMobile ? (tablePos === "left" || tablePos === "right" ? 38 : 52) : 72} />
           {player.calledCabo && <span className="cabo-badge bot-cabo-badge">CABO!</span>}
           <AnimatePresence>
             {hasSpeech && (

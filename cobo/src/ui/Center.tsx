@@ -287,7 +287,7 @@ export function Center() {
                 <CardView
                   card={drawn}
                   faceUp={isHumanTurn}
-                  size="lg"
+                  size={isDesktop ? "lg" : "md"}
                   layoutId={drawn.id}
                 />
               </motion.div>

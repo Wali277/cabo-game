@@ -16,7 +16,7 @@ interface Props {
   faceUp: boolean;
   highlight?: "selectable" | "selected" | "winner" | "lost" | null;
   onClick?: () => void;
-  size?: "sm" | "md" | "lg";
+  size?: "xs" | "sm" | "md" | "lg";
   flipDuration?: number;
   shake?: boolean;
   layoutId?: string;
@@ -26,10 +26,16 @@ interface Props {
 
 const SUIT_GLYPH: Record<string, string> = { S: "♠", H: "♥", D: "♦", C: "♣" };
 
-const SIZE_PX: Record<"desktop" | "mobile", Record<"sm" | "md" | "lg", number>> = {
-  desktop: { sm: 56, md: 80, lg: 110 },
-  mobile:  { sm: 40, md: 60, lg: 60  },
+const SIZE_PX: Record<"desktop" | "mobile", Record<"xs" | "sm" | "md" | "lg", number>> = {
+  desktop: { xs: 44, sm: 56, md: 80, lg: 110 },
+  mobile:  { xs: 32, sm: 48, md: 54, lg: 80 },
 };
+
+/** Pixel width of a card at a given size + view mode. Exported so seats can
+ *  size their empty-slot ghosts to match the real cards. */
+export function cardPx(size: "xs" | "sm" | "md" | "lg", viewMode: "desktop" | "mobile"): number {
+  return SIZE_PX[viewMode][size];
+}
 
 export function CardView({
   card,

@@ -47,6 +47,13 @@ export function Table() {
   const viewMode = useViewMode();
   const isMobile = viewMode === "mobile";
   const [rightDrawerOpen, setRightDrawerOpen] = useState(false);
+  // Phone overflow menu — consolidates the theme / sound / help / chat FABs
+  // (which otherwise float over the cards) into one top-bar dropdown.
+  const [moreOpen, setMoreOpen] = useState(false);
+  const setAudioOpen = useStore((s) => s.setAudioOpen);
+  const setThemeOpen = useStore((s) => s.setThemeOpen);
+  const setHelpOpen = useStore((s) => s.setHelpOpen);
+  const setChatOpen = useStore((s) => s.setChatOpen);
 
   // CABO letter-burst particle anchor — set when a "cabo_called" animation
   // event lands. Cleared 1.2s later so the burst auto-unmounts.
@@ -319,7 +326,18 @@ export function Table() {
     .map((x) => x.player);
 
   type SlotName = "top" | "left" | "right";
-  const slotByIndex: SlotName[] = ["top", "right", "left"];
+  // Desktop fills top → right → left. On mobile the compact spatial layout
+  // reads best when 2-player puts the lone opponent in front (top), 3-player
+  // flanks you left + right, and 4-player uses front + both flanks. Order is
+  // still keyed purely on turn-distance, so every viewer (incl. MP) sees a
+  // consistent arrangement.
+  const slotByIndex: SlotName[] = isMobile
+    ? playerCount <= 2
+      ? ["top"]
+      : playerCount === 3
+      ? ["left", "right"]
+      : ["top", "left", "right"]
+    : ["top", "right", "left"];
   const slotMap: Partial<Record<SlotName, (typeof game.players)[number]>> = {};
   sortedOthers.forEach((p, i) => {
     const slot = slotByIndex[i];
@@ -379,6 +397,58 @@ export function Table() {
             >
               📊 Scores
             </button>
+          )}
+          {isMobile && (
+            <div className="top-more-wrap">
+              <button
+                className={`btn ghost mobile-drawer-btn top-more-btn ${moreOpen ? "active" : ""}`}
+                onClick={() => {
+                  Audio.playSfx("click");
+                  setMoreOpen((o) => !o);
+                }}
+                aria-label="More options"
+                aria-expanded={moreOpen}
+              >
+                ⋯
+              </button>
+              {moreOpen && (
+                <>
+                  <div
+                    className="top-more-backdrop"
+                    onClick={() => setMoreOpen(false)}
+                    aria-hidden="true"
+                  />
+                  <div className="top-more-menu" role="menu">
+                    <button
+                      role="menuitem"
+                      onClick={() => { Audio.playSfx("click"); setMoreOpen(false); setThemeOpen(true); }}
+                    >
+                      🎨 Theme
+                    </button>
+                    <button
+                      role="menuitem"
+                      onClick={() => { Audio.playSfx("click"); setMoreOpen(false); setAudioOpen(true); }}
+                    >
+                      🔊 Sound
+                    </button>
+                    <button
+                      role="menuitem"
+                      onClick={() => { Audio.playSfx("click"); setMoreOpen(false); setHelpOpen(true); }}
+                    >
+                      ❓ Help
+                    </button>
+                    {mode === "mp" && (
+                      <button
+                        role="menuitem"
+                        onClick={() => { Audio.playSfx("click"); setMoreOpen(false); setChatOpen(true); }}
+                      >
+                        💬 Chat
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
           )}
         </div>
 
@@ -441,19 +511,17 @@ export function Table() {
               )}
             </div>
 
-            {/* Mobile-only: inline action panel between the deck and the
-                human's cards. Shows up only when it's the human's turn (or
-                during setup_peek where every player taps to start). Hidden
-                during bot turns and round_over so it doesn't take up screen
-                space when there's nothing to do. */}
-            {isMobile &&
-              (game.players[game.currentPlayer].id === humanId ||
-                game.phase === "setup_peek") &&
-              game.phase !== "round_over" && (
-                <div className="tslot tslot-action">
-                  <LeftPanel />
-                </div>
-              )}
+            {/* Mobile-only: contextual action / status bar between the deck
+                and the human's cards. Present throughout play — on your turn
+                it holds the action buttons; on an opponent's turn LeftPanel
+                shows a slim "… is thinking" status. Keeping it mounted means
+                the lower band is never an empty dead zone. Hidden only at
+                round_over, where the round-end overlay takes over. */}
+            {isMobile && game.phase !== "round_over" && (
+              <div className="tslot tslot-action">
+                <LeftPanel />
+              </div>
+            )}
 
             {/* Bottom — human player */}
             <div className="tslot tslot-bottom">

@@ -4157,122 +4157,184 @@ body.mobile-mode .mobile-drawer-btn.active {
   border-color: rgba(168, 123, 255, 0.8);
 }
 
-/* Strip the desktop 16px side padding so every pixel is available for cards */
+/* Strip the desktop 16px side padding so every pixel is available for cards.
+   Set an EXPLICIT height (not just the inherited min-height) so the flex
+   column actually redistributes the full viewport height to .game-body —
+   min-height alone leaves Chromium sizing game-body to its content, which
+   left a dead band at the bottom of the screen. */
 body.mobile-mode .table-root {
   padding-left: 0 !important;
   padding-right: 0 !important;
-}
-
-/* ── Game body: single column ───────────────────────────────────────────── */
-body.mobile-mode .game-body {
-  grid-template-columns: 1fr !important;
+  padding-top: 6px;
+  padding-bottom: 0;
   gap: 6px;
-  padding: 0 4px;
+  height: 100vh;
+  height: 100dvh;
 }
 
-/* ── Player slot reflow: opponents → centre → you (top to bottom) ──────────
-   The center tslot uses flex:1 so it absorbs whatever vertical space is left
-   over after fixed-height opponent rows + the human row. This gives natural
-   breathing space between the deck and the human's cards, and adapts to any
-   number of bots (1–3): with 1 bot there's lots of empty space around the
-   deck, with 3 bots the deck snaps closer to the centre with less padding. */
+/* ── Game body: full-bleed wrapper around the table grid ────────────────── */
+body.mobile-mode .game-body {
+  display: block !important;
+  grid-template-columns: none !important;
+  gap: 0;
+  padding: 0 4px;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ── COMPACT SPATIAL TABLE (portrait phones) ──────────────────────────────
+   Keeps the desktop's around-the-table feel, packed for a narrow screen:
+   the front opponent runs across the top, the left / right opponents sit on
+   slim side rails flanking the centred deck, the contextual action bar sits
+   beneath, and the human's hand owns the very bottom. Only the middle band
+   (sides + centre) is flexible, so it soaks up spare height — no dead gap
+   like the old single-column stack, and 3-4 player hands never overflow and
+   clip the way they used to. Column widths are tuned per player-count below. */
 body.mobile-mode .table-grid {
-  display: flex !important;
-  flex-direction: column;
-  gap: 8px;
-  padding: 4px 2px 0;
-  grid-template-areas: none !important;
-  grid-template-columns: 1fr !important;
-  grid-template-rows: none !important;
-  justify-items: stretch;
-  align-items: stretch;
-  column-gap: 0;
-  row-gap: 8px;
-  min-height: 100%;
+  display: grid !important;
+  grid-template-columns: minmax(66px, 0.85fr) minmax(0, 2.3fr) minmax(66px, 0.85fr);
+  grid-template-rows: auto minmax(0, 1fr) auto auto !important;
+  grid-template-areas:
+    "top    top     top"
+    "left   center  right"
+    "action action  action"
+    "bottom bottom  bottom" !important;
+  gap: 4px;
+  column-gap: 4px;
+  row-gap: 4px;
+  /* Bottom padding reserves room for the fixed snap bar pinned to the very
+     bottom (see body.mobile-mode .snap-controls) so it never overlaps the
+     hand or action panel. */
+  padding: 6px 2px calc(env(safe-area-inset-bottom, 0px) + 56px);
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  justify-items: center;
+  align-items: center;
 }
 body.mobile-mode .tslot {
-  grid-area: unset !important;
+  grid-area: auto;
   width: 100%;
-  overflow: hidden;
-  flex: 0 0 auto;
+  overflow: visible;
+  flex: initial;
+  min-width: 0;
 }
-body.mobile-mode .tslot-top     { order: 1; }
-body.mobile-mode .tslot-left    { order: 2; }
-body.mobile-mode .tslot-right   { order: 3; }
-body.mobile-mode .tslot-center  {
-  order: 4;
+body.mobile-mode .tslot-top    { grid-area: top;    align-self: start; }
+body.mobile-mode .tslot-left   { grid-area: left;   align-self: center; }
+body.mobile-mode .tslot-right  { grid-area: right;  align-self: center; }
+body.mobile-mode .tslot-center {
+  grid-area: center;
   display: flex;
   align-items: center;
   justify-content: center;
+  align-self: center;
 }
-/* Inline action panel sits BETWEEN the deck and the human cards.
-   Reserves space when shown, collapses to 0px when no human action is
-   needed (bot turn / round_over). */
-body.mobile-mode .tslot-action  { order: 5; }
-body.mobile-mode .tslot-bottom  {
-  order: 6;
-  /* margin-top:auto sucks up all leftover vertical space so the human
-     cards stay glued to the bottom of the screen while opponents +
-     center + action panel cluster at the top */
-  margin-top: auto;
+/* Contextual action bar — between the deck and the human's hand. Renders
+   only on the human's turn / setup; collapses to 0 otherwise so a bot turn
+   reclaims the space. */
+body.mobile-mode .tslot-action { grid-area: action; align-self: end; }
+body.mobile-mode .tslot-bottom { grid-area: bottom; align-self: end; }
+
+/* Per-count column tuning. 2-player has no side rails, so the centre runs
+   full-width (deck + your hand get the whole screen). 3/4-player reserve the
+   slim flanking rails for the left/right opponents. */
+body.mobile-mode .players-2 .table-grid {
+  grid-template-columns: 0 minmax(0, 1fr) 0;
+}
+body.mobile-mode .players-3 .table-grid,
+body.mobile-mode .players-4 .table-grid {
+  grid-template-columns: minmax(58px, 0.7fr) minmax(0, 2.6fr) minmax(58px, 0.7fr);
 }
 
-/* Kill the 90deg rotation on side-player hand rows in mobile mode.
-   IMPORTANT: .hand-row-side-wrap has a fixed 128×362 size + position:relative
-   and .hand-row-side is position:absolute inside it — both must be reset so
-   the card row flows as normal horizontal flex, same as the top opponent. */
-body.mobile-mode .hand-row-side-wrap {
-  width: auto !important;
-  height: auto !important;
-  position: static !important;
-  flex-shrink: 1 !important;
-}
-body.mobile-mode .hand-row-side,
-body.mobile-mode .hand-row-side-md {
-  position: static !important;
-  top: auto !important;
-  left: auto !important;
-  display: flex !important;
-  transform: none !important;
-  width: auto !important;
-  height: auto !important;
-  flex-direction: row !important;
-  gap: 5px;
-}
-/* Opponent layout: COLUMN with badge above cards, matching the human player's
-   layout exactly. This makes every player visually align on the same vertical
-   centreline (name pill + centered card row), which is what the user expects
-   when looking at the table top-down. Row layout left-aligned badges and
-   pushed cards to the side — the screenshot showed Beep at the left edge
-   with cards flowing right, while You was centered, so they didn't line up. */
-body.mobile-mode .tslot-left .player-seat,
-body.mobile-mode .tslot-right .player-seat,
+/* ── Opponent seats ───────────────────────────────────────────────────────
+   Front (top) opponent: a horizontal strip — portrait/name beside the hand —
+   so it stays short and reads as "the player across from you". Left/right
+   opponents: compact columns on the slim side rails, their 4 cards wrapped
+   into a 2×2 cluster that fits the narrow gutter. Card pixel sizes come from
+   Card.tsx (front = sm, sides = xs). */
+
+/* Front opponent — horizontal strip across the top */
 body.mobile-mode .tslot-top .player-seat {
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+}
+/* The bot portrait wrap carries auto margins for the desktop column layout;
+   zero them here so it doesn't absorb the row's free space and shove the
+   hand to the edge. flex:0 0 auto keeps both children at content width. */
+body.mobile-mode .tslot-top .bot-portrait-wrap,
+body.mobile-mode .tslot-top .player-tag {
+  margin: 0 !important;
+  flex: 0 0 auto;
+}
+body.mobile-mode .tslot-top .hand-row {
+  gap: 4px;
+  padding: 2px;
+  justify-content: center;
+  flex-wrap: nowrap;
+  flex: 0 0 auto;
+}
+
+/* Side opponents — compact column on the rail. The hand uses the desktop
+   rotated single-row (.hand-row-side), sized down for xs cards so it reads as
+   a slim vertical line of 4 on the narrow rail; snap-penalty overflow tucks
+   behind the 2nd/3rd cards via the back-row (same as web). */
+body.mobile-mode .tslot-left .player-seat,
+body.mobile-mode .tslot-right .player-seat {
   flex-direction: column;
   gap: 4px;
   align-items: center;
   width: 100%;
 }
+/* xs card = 32×46. Horizontal row of 4 ≈ 4×32 + 3×4 = 140 wide × 46 tall →
+   after the 90° rotation the wrapper reserves ~48 wide × ~152 tall. */
+body.mobile-mode .hand-row-side-wrap,
+body.mobile-mode .hand-row-side-wrap-back {
+  width: 48px;
+  height: 152px;
+}
+body.mobile-mode .hand-row-side-wrap {
+  position: relative;
+  z-index: 1;
+}
+body.mobile-mode .hand-row-side {
+  gap: 4px;
+}
+body.mobile-mode .hand-slot-placeholder {
+  width: 32px;
+  height: 46px;
+}
+/* The narrow phone rail has no room to throw the overflow column out toward
+   the screen edge (it'd clip), so tuck it just behind the main column and
+   peeking slightly inward — penalty cards read as a back row behind the
+   2nd/3rd cards. */
+body.mobile-mode .side-hands-group.pos-left .hand-row-side-wrap-back {
+  left: 0;
+  right: auto;
+  margin: 0;
+  transform: translateX(13px);
+  z-index: 0;
+}
+body.mobile-mode .side-hands-group.pos-right .hand-row-side-wrap-back {
+  left: auto;
+  right: 0;
+  margin: 0;
+  transform: translateX(-13px);
+  z-index: 0;
+}
 
-/* Opponent name pills: compact but full-shape pill (no truncation needed
-   since they sit above a card row, not squeezed beside it) */
+/* Opponent name pills (MP humans): compact */
 body.mobile-mode .tslot-top .player-tag,
 body.mobile-mode .tslot-left .player-tag,
 body.mobile-mode .tslot-right .player-tag {
-  font-size: 12px;
-  padding: 3px 12px;
-}
-
-/* Card sizes are now controlled at the React level (Card.tsx reads useViewMode
-   and picks smaller pixel values for mobile). The hand-row stays tight and
-   gets `justify-content: center` so each opponent's 4 cards line up on the
-   same vertical axis as the human's 4 cards below. */
-body.mobile-mode .tslot-top .hand-row,
-body.mobile-mode .tslot-left .hand-row,
-body.mobile-mode .tslot-right .hand-row {
-  gap: 5px;
-  padding: 4px 6px;
-  justify-content: center;
+  font-size: 11px;
+  padding: 2px 9px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Centre deck / discard pile — small but visible */
@@ -4281,29 +4343,31 @@ body.mobile-mode .tslot-center {
 }
 body.mobile-mode .center-area {
   flex-direction: row;
-  gap: 12px;
+  gap: 8px;
   justify-content: center;
   align-items: center;
 }
 body.mobile-mode .deck-area {
-  padding: 10px;
-  border-width: 3px;
-  gap: 10px;
+  padding: 7px 10px;
+  border-width: 2px;
+  gap: 8px;
+  border-radius: 20px;
 }
 /* Center pile container sizing — match the mobile card sizes from Card.tsx
-   (md = lg = 60×87) so empty placeholders line up with rendered cards */
+   (deck/discard md = 50×72, drawn lg = 64×93) so empty placeholders line up
+   with the rendered cards. */
 body.mobile-mode .empty-pile {
-  width: 60px !important;
-  height: 87px !important;
-  font-size: 11px;
+  width: 54px !important;
+  height: 78px !important;
+  font-size: 10px;
 }
 body.mobile-mode .discard-card-area {
-  width: 60px !important;
-  height: 87px !important;
+  width: 54px !important;
+  height: 78px !important;
 }
 body.mobile-mode .drawn-slot {
-  width: 64px !important;
-  height: 93px !important;
+  width: 54px !important;
+  height: 78px !important;
 }
 
 /* ── Human player at the bottom ──────────────────────────────────────────
@@ -4441,60 +4505,102 @@ body.mobile-mode .right-sidebar.open {
   to   { opacity: 1; }
 }
 
-/* ── FABs: move from bottom-right to top-right so they don't overlap cards ─ */
-body.mobile-mode .audio-fab {
-  top: 12px !important;
-  right: 12px !important;
+/* ── Phone chrome: fold the floating FABs into the top-bar ⋯ menu ──────────
+   The theme / sound / help / chat buttons used to float over the cards. On
+   phones we hide those FABs and surface the same panels from the top-bar
+   overflow menu instead, so nothing covers the play area. Panels are pinned
+   just beneath the top bar. */
+body.mobile-mode .audio-fab,
+body.mobile-mode .theme-fab,
+body.mobile-mode .help-fab,
+body.mobile-mode .chat-toggle {
+  display: none !important;
+}
+/* The now-empty FAB containers shouldn't trap taps over the table. */
+body.mobile-mode .audio-controls,
+body.mobile-mode .theme-picker {
+  position: fixed !important;
+  top: 0 !important;
+  right: 0 !important;
   bottom: auto !important;
-  width: 44px !important;
-  height: 44px !important;
+  pointer-events: none;
+}
+body.mobile-mode .audio-panel,
+body.mobile-mode .theme-popover,
+body.mobile-mode .chat-panel {
+  position: fixed !important;
+  top: 54px !important;
+  right: 10px !important;
+  left: auto !important;
+  bottom: auto !important;
+  pointer-events: auto;
+  z-index: 300;
 }
 body.mobile-mode .audio-panel {
-  top: 62px !important;
-  right: 12px !important;
-  bottom: auto !important;
-  min-width: 200px;
-  max-width: calc(100vw - 24px);
-}
-body.mobile-mode .theme-picker {
-  top: 64px !important;
-  right: 12px !important;
-  bottom: auto !important;
-}
-body.mobile-mode .theme-picker.sp {
-  /* in single-player chat is hidden, so theme drops to chat's slot —
-     in mobile we override that since we're stacking from the top instead */
-  top: 64px !important;
-}
-body.mobile-mode .theme-fab {
-  width: 44px !important;
-  height: 44px !important;
+  min-width: 220px;
+  max-width: calc(100vw - 20px);
 }
 body.mobile-mode .theme-popover {
-  top: 116px !important;
-  bottom: auto !important;
-  right: 12px !important;
-  width: calc(100vw - 24px);
-  max-width: 280px;
-}
-body.mobile-mode .chat-toggle {
-  top: 116px !important;
-  right: 12px !important;
-  bottom: auto !important;
-  width: 44px !important;
-  height: 44px !important;
+  width: calc(100vw - 20px);
+  max-width: 300px;
 }
 body.mobile-mode .chat-panel {
-  top: 168px !important;
-  right: 12px !important;
-  bottom: auto !important;
-  width: calc(100vw - 24px) !important;
+  width: calc(100vw - 20px) !important;
   max-width: 380px;
-  height: 50vh !important;
-  max-height: 380px;
+  height: 56vh !important;
+  max-height: 420px;
 }
-/* In mobile mode the theme picker doesn't need to swap slots — it's just
-   stacked from the top, so the .sp override stays at top: 64px. */
+
+/* ── Top-bar overflow (⋯) menu ───────────────────────────────────────────── */
+body.mobile-mode .top-more-wrap {
+  position: relative;
+  display: inline-flex;
+}
+body.mobile-mode .top-more-btn {
+  font-size: 18px;
+  line-height: 1;
+  padding: 6px 12px;
+}
+body.mobile-mode .top-more-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 280;
+}
+body.mobile-mode .top-more-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 285;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 150px;
+  padding: 6px;
+  background: rgba(13, 22, 56, 0.97);
+  border: 1.5px solid rgba(168, 123, 255, 0.5);
+  border-radius: 12px;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.5);
+}
+body.mobile-mode .top-more-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: #f4ebff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+body.mobile-mode .top-more-menu button:hover,
+body.mobile-mode .top-more-menu button:active {
+  background: rgba(168, 123, 255, 0.18);
+}
 
 /* ── Toast notifications: narrower, smaller text on phones ──────────────── */
 body.mobile-mode .toast {
@@ -4570,6 +4676,16 @@ body.mobile-mode .btn:not(.mobile-drawer-btn):not(.pick):not(.menu-back) {
    so the cards sit still until tapped. */
 body.mobile-mode .card-wrap.hl {
   animation: none;
+  position: relative;
+}
+/* Finger-friendly tap target: a transparent overlay grows the clickable area
+   of a small, selectable opponent card toward the ~44px guideline without
+   changing its visual size. */
+body.mobile-mode .card-wrap.hl::before {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  z-index: 3;
 }
 body.mobile-mode .card-wrap.hl::after {
   /* Replace the bobbing motion with a gentle glow-only pulse */
@@ -5968,15 +6084,25 @@ body.mobile-mode .bot-speech-bubble {
 }
 
 body.mobile-mode .snap-controls {
-  /* Mobile: grid collapses to one column, "You" tag is at viewport
-     center. Fixed position, no shift on hand growth. */
+  /* Pinned to the very bottom-centre as a slim bar. The table grid reserves
+     matching bottom padding (see .table-grid) so the snap bar never overlaps
+     the human's hand or the action panel above it. */
+  position: fixed;
   left: 50%;
-  bottom: 200px;
-  width: min(94vw, 380px);
+  transform: translateX(-50%);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 6px);
+  top: auto;
+  width: min(96vw, 400px);
+  z-index: 200;
+}
+body.mobile-mode .snap-buttons {
+  justify-content: center;
+  gap: 8px;
 }
 body.mobile-mode .snap-btn {
   font-size: 13px;
-  padding: 10px 13px;
+  padding: 9px 14px;
+  flex: 0 1 auto;
 }
 
 /* ========== In-game Help button ==========
