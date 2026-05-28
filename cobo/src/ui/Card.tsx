@@ -423,7 +423,10 @@ function CardBack({
       className="card-back"
       style={{
         width: w, height: h, position: "absolute", inset: 0,
-        backfaceVisibility: "hidden", transform: "rotateY(180deg)",
+        // translateZ pushes the back out of the front's plane so mobile GPUs
+        // don't z-fight the coplanar faces (front bleeding through). Pairs
+        // with `.card-face { transform: translateZ(1px) }` in App.css.
+        backfaceVisibility: "hidden", transform: "rotateY(180deg) translateZ(1px)",
         borderRadius: 12,
         border: `${skin.backBorderWidth ?? 3}px solid ${skin.backBorder}`,
         background: skin.backBg,

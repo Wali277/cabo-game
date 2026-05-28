@@ -2327,6 +2327,14 @@ html, body, #root {
   position: relative;
   transition: transform 0.15s;
 }
+/* Push the front face slightly out of the flip plane. The front and back
+   are otherwise coplanar (both at local Z=0 after the back's 180° flip),
+   which makes mobile GPUs z-fight the two surfaces — the face-down card's
+   front bleeds through the back. A 1px offset on each face (back gets its
+   own in Card.tsx) gives the depth buffer something to sort cleanly. */
+.card-face {
+  transform: translateZ(1px);
+}
 .card-wrap.hl {
   z-index: 3;
   animation: cardLift 1.6s ease-in-out infinite;
