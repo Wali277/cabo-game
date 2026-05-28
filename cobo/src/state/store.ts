@@ -9,6 +9,8 @@ import {
   actionPeekOwn,
   actionSnapOther,
   actionSnapSelf,
+  actionStartSnapOther,
+  actionStartSnapSelf,
   callCabo,
   clearAnimations,
   clearReveals,
@@ -16,6 +18,7 @@ import {
   discardDrawnWithAction,
   drawFromDeck,
   drawFromDiscard,
+  handScore,
   newGame,
   setupPeekCard,
   skipPendingAction,
@@ -81,8 +84,49 @@ export interface MpRoom {
   bustedThisRound: string[];
   kickedIds: string[];
   gloriosVictory: string | null;
-  gloriosVictoryReason: "survivor" | "more_wins" | "final_round" | null;
+  gloriosVictoryReason: "survivor" | "more_wins" | "final_round" | "sudden_death" | null;
+  /** Sudden-death tiebreaker state, mirrored from the server.
+   *  - null when no sudden death has been triggered this game.
+   *  - { active: true, contestants, mainRoundsCount } when SD is in progress. */
+  suddenDeath: { active: boolean; contestants: string[]; mainRoundsCount: number } | null;
 }
+
+/**
+ * ElimState — round-bust / kick / glorious-victory tracking.
+ *
+ * Mirrors the room-level concepts from the MP server (see Room in
+ * `server/src/rooms.ts`) so that BOTH modes can read elimination state from a
+ * single place. In MP we copy the server's broadcast into here from
+ * `applyMpRoom`; in SP we compute it locally from `computeSpBust()` whenever a
+ * round ends.
+ *
+ * Default value across the board is empty / null. Cleared on backToMenu, on
+ * fresh init/trainInit, and on switching modes.
+ */
+export interface ElimState {
+  bustedThisRound: string[];
+  kickedIds: string[];
+  gloriosVictory: string | null;
+  gloriosVictoryReason: "survivor" | "more_wins" | "final_round" | "sudden_death" | null;
+  roundWins: Record<string, number>;
+  /** Sudden-death tiebreaker state.
+   *  - null when no sudden death has ever been triggered this game.
+   *  - { active: true, contestants, mainRoundsCount } during SD.
+   *  - contestants stays frozen across repeat SD rounds.
+   *  - mainRoundsCount = scores[id].length captured at the moment SD first
+   *    triggers, used to split R-rounds (< this) from F-rounds (≥ this) in
+   *    the UI scoreboards. */
+  suddenDeath: { active: boolean; contestants: string[]; mainRoundsCount: number } | null;
+}
+
+const EMPTY_ELIM: ElimState = {
+  bustedThisRound: [],
+  kickedIds: [],
+  gloriosVictory: null,
+  gloriosVictoryReason: null,
+  roundWins: {},
+  suddenDeath: null,
+};
 
 export type ActionTargetingMode =
   | null
@@ -101,6 +145,11 @@ interface StoreState {
   mode: GameMode;
   training: boolean;
   mp: MpRoom | null;
+  /** Elimination state — single source of truth for BustedOverlay /
+   *  GloriousVictory / GameLostOverlay / Scoreboard kicks across both modes.
+   *  In MP this is mirrored from the room broadcast; in SP it's computed
+   *  locally by `computeSpBust()` after every round_over transition. */
+  elim: ElimState;
   game: GameState | null;
   pendingGame: GameState | null;  // game state created during coin toss, applied once toss is done
   coinToss: CoinTossState | null;
@@ -174,6 +223,11 @@ interface StoreState {
   leaveRoomToLobby: () => void;
   enterLobby: () => void;
   applyMpRoom: (room: MpRoom) => void;
+  /** SP-only: commit a botMove() result through the bust/skip pipeline.
+   *  Table.tsx's bot-driver effect calls this instead of writing directly to
+   *  game so that round-end busts and kicked-seat skipping fire for bot
+   *  actions too (e.g. when a bot's discard pushes them past 60). */
+  applyBotMove: (next: GameState) => void;
   proceedFromStrawDraw: () => void;
   receiveChatMessage: (msg: ChatMessage) => void;
   setChatOpen: (open: boolean) => void;
@@ -198,11 +252,265 @@ function makePlayers(numBots: number, difficulty: BotDifficulty | null) {
 
 export { PLAYER_COLORS };
 
+// ────────────────────────────────────────────────────────────────────────────
+// SP bust / kick helpers
+//
+// These mirror the MP server logic in `server/src/index.ts`:
+//   - computeSpBust(...)  ↔ server lines 741-838 (round-end bust + GV detection)
+//   - skipKickedTurn(...) ↔ server lines 163-191 (auto-step past kicked seats)
+//
+// Keep them in lockstep with the server. The bust formula is the RAW sum of
+// per-round scores > 60 (no bonus/penalty deductions) to match MP.
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Auto-advance past any kicked players that the engine landed on. The engine
+ * itself doesn't know about kicks (that's a room/store concept), so after
+ * every action we need to step the turn forward until we hit a non-kicked
+ * seat. Fast-path: if the current seat is fine, return the game untouched.
+ */
+function skipKickedTurn(game: GameState, kickedIds: string[]): GameState {
+  if (game.phase === "round_over") return game;
+  if (game.players.length === 0) return game;
+  if (kickedIds.length === 0) return game;
+  if (!kickedIds.includes(game.players[game.currentPlayer]?.id ?? "")) {
+    return game;
+  }
+  // Work on a copy so React/Zustand sees a fresh reference.
+  const next: GameState = { ...game };
+  let attempts = next.players.length;
+  let cur = next.currentPlayer;
+  while (
+    attempts > 0 &&
+    kickedIds.includes(next.players[cur]?.id ?? "")
+  ) {
+    cur = (cur + 1) % next.players.length;
+    attempts -= 1;
+    if (next.caboCallerId && next.players[cur]?.id === next.caboCallerId) {
+      break;
+    }
+  }
+  next.currentPlayer = cur;
+  next.phase = "turn_start";
+  next.drawnCard = null;
+  next.drawnFrom = null;
+  next.pendingActionSource = null;
+  next.peekAndSwapPick = null;
+  return next;
+}
+
+/**
+ * Round-end bust + glorious-victory resolution for SP. Mirrors the MP server
+ * algorithm exactly (see server/src/index.ts:741-838).
+ *
+ * Returns the next ElimState to commit. The store is responsible for
+ * orchestrating the call once `game.phase === "round_over"` lands.
+ */
+function computeSpBust(game: GameState, prev: ElimState): ElimState {
+  // Start from prev — we keep kickedIds + roundWins between rounds. The
+  // bustedThisRound / gloriosVictory fields are recomputed each round.
+  const next: ElimState = {
+    bustedThisRound: [],
+    kickedIds: [...prev.kickedIds],
+    gloriosVictory: prev.gloriosVictory,
+    gloriosVictoryReason: prev.gloriosVictoryReason,
+    roundWins: { ...prev.roundWins },
+    suddenDeath: prev.suddenDeath
+      ? {
+          active: prev.suddenDeath.active,
+          contestants: [...prev.suddenDeath.contestants],
+          mainRoundsCount: prev.suddenDeath.mainRoundsCount,
+        }
+      : null,
+  };
+
+  // The engine's declared round winner is passed through unchanged, even if
+  // they happen to be on kickedIds. (Winner reassignment was removed per the
+  // updated spec — the round win stays with whoever the engine declared.)
+  const winnerId = game.winnerId;
+
+  // ── Sudden-death resolution branch ──────────────────────────────────────
+  // If we're in an active sudden-death round, resolve it by lowest-unique
+  // hand among the locked contestants. Tied hands → another SD round.
+  if (prev.suddenDeath?.active) {
+    // Track the engine's declared winner for history.
+    if (winnerId) {
+      next.roundWins[winnerId] = (next.roundWins[winnerId] ?? 0) + 1;
+    }
+
+    const contestantHands = prev.suddenDeath.contestants.map((id) => {
+      const player = game.players.find((p) => p.id === id);
+      return { id, handTotal: player ? handScore(player.hand) : Infinity };
+    });
+    const minHand = Math.min(...contestantHands.map((c) => c.handTotal));
+    const atMin = contestantHands.filter((c) => c.handTotal === minHand);
+
+    if (atMin.length === 1) {
+      // Unique winner — declare GV, kick the other contestants.
+      const victorId = atMin[0].id;
+      const losers = prev.suddenDeath.contestants.filter((id) => id !== victorId);
+      for (const id of losers) {
+        if (!next.kickedIds.includes(id)) next.kickedIds.push(id);
+      }
+      next.gloriosVictory = victorId;
+      next.gloriosVictoryReason = "sudden_death";
+      // Keep the SD record so the end-of-game scoreboard can still split
+      // R/F columns, but mark inactive so no further SD logic fires.
+      next.suddenDeath = {
+        active: false,
+        contestants: prev.suddenDeath.contestants,
+        mainRoundsCount: prev.suddenDeath.mainRoundsCount,
+      };
+    } else {
+      // Multiple tied at min — another sudden-death round needed.
+      // Preserve the contestants list (frozen). Don't declare GV yet.
+      next.gloriosVictory = null;
+      next.gloriosVictoryReason = null;
+    }
+    return next;
+  }
+
+  // ── Normal path ─────────────────────────────────────────────────────────
+  // Track round wins (engine's declared winner, even if kicked — per spec).
+  if (winnerId) {
+    next.roundWins[winnerId] = (next.roundWins[winnerId] ?? 0) + 1;
+  }
+
+  // Compute newly busted players (cumulative raw score > 60).
+  next.bustedThisRound = game.players
+    .filter((p) => (game.scores[p.id] ?? []).reduce((a, b) => a + b, 0) > 60)
+    .map((p) => p.id);
+
+  if (next.bustedThisRound.length > 0) {
+    const allEliminated = new Set([...next.kickedIds, ...next.bustedThisRound]);
+    // SP "active" = all players in the current game minus eliminated.
+    const survivors = game.players
+      .map((p) => p.id)
+      .filter((pid) => !allEliminated.has(pid));
+
+    if (survivors.length === 1) {
+      for (const id of next.bustedThisRound) {
+        if (!next.kickedIds.includes(id)) next.kickedIds.push(id);
+      }
+      next.gloriosVictory = survivors[0];
+      next.gloriosVictoryReason = "survivor";
+
+    } else if (survivors.length === 0) {
+      // Simultaneous bust — tiebreaker.
+      const contestants = next.bustedThisRound.filter(
+        (pid) => !next.kickedIds.includes(pid),
+      );
+
+      if (contestants.length === 1) {
+        // Only one active buster — they win by default.
+        const gloriousWinnerId = contestants[0];
+        next.bustedThisRound = next.bustedThisRound.filter((id) => id !== gloriousWinnerId);
+        for (const id of next.bustedThisRound) {
+          if (!next.kickedIds.includes(id)) next.kickedIds.push(id);
+        }
+        next.gloriosVictory = gloriousWinnerId;
+        next.gloriosVictoryReason = "survivor";
+      } else if (contestants.length > 1) {
+        const maxWins = Math.max(...contestants.map((pid) => next.roundWins[pid] ?? 0));
+        const topByWins = contestants.filter((pid) => (next.roundWins[pid] ?? 0) === maxWins);
+        if (topByWins.length === 1) {
+          const gloriousWinnerId = topByWins[0];
+          next.bustedThisRound = next.bustedThisRound.filter((id) => id !== gloriousWinnerId);
+          for (const id of next.bustedThisRound) {
+            if (!next.kickedIds.includes(id)) next.kickedIds.push(id);
+          }
+          next.gloriosVictory = gloriousWinnerId;
+          next.gloriosVictoryReason = "more_wins";
+        } else if (winnerId && topByWins.includes(winnerId)) {
+          // Last-round winner is in the tied set → they take it.
+          const gloriousWinnerId = winnerId;
+          next.bustedThisRound = next.bustedThisRound.filter((id) => id !== gloriousWinnerId);
+          for (const id of next.bustedThisRound) {
+            if (!next.kickedIds.includes(id)) next.kickedIds.push(id);
+          }
+          next.gloriosVictory = gloriousWinnerId;
+          next.gloriosVictoryReason = "final_round";
+        } else {
+          // NEW: Sudden Death trigger. The tied-on-wins set plays another
+          // round to break the tie. Kick the players who busted but aren't
+          // in the tied set (they lost the wins tiebreaker outright).
+          const losers = next.bustedThisRound.filter(
+            (id) => !topByWins.includes(id) && !next.kickedIds.includes(id),
+          );
+          for (const id of losers) {
+            if (!next.kickedIds.includes(id)) next.kickedIds.push(id);
+          }
+          // Remove SD contestants from bustedThisRound — they're playing
+          // the tiebreaker, not eliminated. Leaving them in would cause
+          // BustedOverlay to incorrectly show them the "Busted" splash +
+          // "Return to menu" modal at SD trigger round_over.
+          next.bustedThisRound = next.bustedThisRound.filter(
+            (id) => !topByWins.includes(id),
+          );
+          // Set sudden-death state — DO NOT declare GV yet.
+          const anyPlayerId = game.players[0]?.id;
+          const mainRoundsCount = anyPlayerId
+            ? (game.scores[anyPlayerId]?.length ?? 0)
+            : 0;
+          next.suddenDeath = {
+            active: true,
+            contestants: topByWins,
+            mainRoundsCount,
+          };
+        }
+      }
+    }
+    // survivors.length > 1: normal play-again flow — busts are moved into
+    // kickedIds on the playAgain() click, not here.
+  }
+
+  return next;
+}
+
+/**
+ * Mirror an MP room's bust/kick fields onto our local `elim`. Called from
+ * `applyMpRoom`. This is what lets UI components read `elim` regardless of
+ * mode — the MP server is still the source of truth, we just normalise the
+ * shape so consumers don't care which path the data took.
+ */
+function elimFromMpRoom(room: MpRoom, prevRoundWins: Record<string, number>): ElimState {
+  return {
+    bustedThisRound: room.bustedThisRound ?? [],
+    kickedIds: room.kickedIds ?? [],
+    gloriosVictory: room.gloriosVictory ?? null,
+    gloriosVictoryReason: room.gloriosVictoryReason ?? null,
+    // Server doesn't broadcast roundWins (only used for SP tiebreaker);
+    // preserve what we had, default to {}.
+    roundWins: prevRoundWins,
+    suddenDeath: room.suddenDeath ?? null,
+  };
+}
+
+/**
+ * Post-process an SP engine result before committing. This is the ONE place
+ * we add the cross-cutting bust + skip-kicked logic that the engine doesn't
+ * know about. Returns the patch object to pass to set().
+ *
+ * Sequence:
+ *  1. Skip past any kicked seats so the new currentPlayer is alive.
+ *  2. If the round just ended, compute the bust state.
+ *  3. Return the updated game + elim.
+ */
+function applySpResult(rawGame: GameState, prevElim: ElimState): { game: GameState; elim: ElimState } {
+  const game = skipKickedTurn(rawGame, prevElim.kickedIds);
+  if (game.phase === "round_over") {
+    const elim = computeSpBust(game, prevElim);
+    return { game, elim };
+  }
+  return { game, elim: prevElim };
+}
+
 export const useStore = create<StoreState>((set, get) => ({
   screen: "menu",
   mode: "sp",
   training: false,
   mp: null,
+  elim: EMPTY_ELIM,
   game: null,
   pendingGame: null,
   coinToss: null,
@@ -234,6 +542,7 @@ export const useStore = create<StoreState>((set, get) => ({
     // pendingGame until the toss completes and decides the starting player.
     set({
       mode: "sp", training: false, mp: null,
+      elim: EMPTY_ELIM,
       game: null,
       pendingGame: game,
       screen: "coin_toss",
@@ -257,7 +566,9 @@ export const useStore = create<StoreState>((set, get) => ({
     // Skip the coin toss in training mode — human always starts for predictable testing.
     const game = newGame({ players: makePlayers(1, null) });
     set({
-      mode: "sp", training: true, mp: null, game, screen: "game",
+      mode: "sp", training: true, mp: null,
+      elim: EMPTY_ELIM,
+      game, screen: "game",
       pendingGame: null, coinToss: null,
       humanId: "p_human",
       setupPeekRevealed: false, targeting: null, toast: null,
@@ -332,20 +643,20 @@ export const useStore = create<StoreState>((set, get) => ({
   },
 
   trainingInjectCard(card) {
-    const { game, training } = get();
+    const { game, training, elim } = get();
     if (!game || !training) return;
-    set({ game: engineTrainingInject(game, card) });
+    set(applySpResult(engineTrainingInject(game, card), elim));
   },
 
   start() {
-    const { mode, game } = get();
+    const { mode, game, elim } = get();
     if (mode === "mp") {
       // server-side action
       import("./mp").then((m) => m.sendAction({ type: "start_play" }));
       return;
     }
     if (!game) return;
-    set({ game: startPlay(game), setupPeekRevealed: true });
+    set({ ...applySpResult(startPlay(game), elim), setupPeekRevealed: true });
   },
 
   enterLobby() {
@@ -354,6 +665,10 @@ export const useStore = create<StoreState>((set, get) => ({
 
   applyMpRoom(room) {
     const prev = get();
+    // Mirror the room's bust/kick/GV fields onto our local elim so UI
+    // components can read elim regardless of mode. Preserve our prev
+    // roundWins (server doesn't broadcast it — only used for SP tiebreaker).
+    const elim = elimFromMpRoom(room, prev.elim.roundWins);
 
     // When a multiplayer game first starts (lobby → game), route through the
     // coin-toss screen to reveal who goes first. The server already chose
@@ -374,6 +689,7 @@ export const useStore = create<StoreState>((set, get) => ({
       if (playerCount === 2 && room.coinToss && !room.coinToss.result) {
         set({
           mp: room,
+          elim,
           humanId: room.viewerId,
           mode: "mp",
           game: null,
@@ -393,6 +709,7 @@ export const useStore = create<StoreState>((set, get) => ({
       } else if (playerCount >= 3 && room.strawDraw && !room.strawDraw.result) {
         set({
           mp: room,
+          elim,
           humanId: room.viewerId,
           mode: "mp",
           game: null,
@@ -404,6 +721,7 @@ export const useStore = create<StoreState>((set, get) => ({
       } else {
         set({
           mp: room,
+          elim,
           humanId: room.viewerId,
           mode: "mp",
           game: room.game,
@@ -417,7 +735,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
     // Live straw-draw updates: someone picked, or the result just arrived.
     if (prev.screen === "straw_draw" && room.strawDraw) {
-      set({ mp: room });
+      set({ mp: room, elim });
       return;
     }
 
@@ -436,6 +754,7 @@ export const useStore = create<StoreState>((set, get) => ({
         const winnerPlayerId = ct.result === "heads" ? ct.choices.heads : ct.choices.tails;
         set({
           mp: room,
+          elim,
           coinToss: {
             humanChoice: myChoice,
             botChoice: otherChoice,
@@ -459,6 +778,7 @@ export const useStore = create<StoreState>((set, get) => ({
         : prev.coinToss!.countdownEndsAt;
       set({
         mp: room,
+        elim,
         coinToss: { ...prev.coinToss!, humanChoice: myChoice, botChoice: otherChoice, countdownEndsAt },
       });
       return;
@@ -478,6 +798,34 @@ export const useStore = create<StoreState>((set, get) => ({
     let pendingBlindSwapOwnIndex = prev.pendingBlindSwapOwnIndex;
     const g = room.game;
     if (g) {
+      // Cinematic-first snap is phase-agnostic and supersedes normal turn
+      // targeting while snapPhase !== 'idle'. If I'm the snapper, set
+      // targeting to the snap pick set; if someone else is, clear mine.
+      if (g.snapPhase !== "idle") {
+        if (g.snappingPlayerId === room.viewerId) {
+          targeting = g.snapPhase === "armed_self"
+            ? "snap_self_target"
+            : g.snapPhase === "armed_other"
+            ? "snap_other_target"
+            : null;
+        } else {
+          targeting = null;
+        }
+        pendingBlindSwapOwnIndex = null;
+        // Skip the normal-turn switch below — snap takes priority.
+        set({
+          mp: room,
+          elim,
+          game: g,
+          humanId: room.viewerId,
+          screen,
+          mode: "mp",
+          setupPeekRevealed: isFreshRound ? false : prev.setupPeekRevealed,
+          targeting,
+          pendingBlindSwapOwnIndex,
+        });
+        return;
+      }
       const isMyTurn = g.players[g.currentPlayer]?.id === room.viewerId;
       if (isMyTurn) {
         switch (g.phase) {
@@ -519,6 +867,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
     set({
       mp: room,
+      elim,
       game: room.game,
       humanId: room.viewerId,
       screen,
@@ -529,28 +878,39 @@ export const useStore = create<StoreState>((set, get) => ({
     });
   },
 
+  applyBotMove(next) {
+    const { elim, mode } = get();
+    if (mode !== "sp") return;
+    set(applySpResult(next, elim));
+  },
+
   setSetupPeekRevealed(v) {
     set({ setupPeekRevealed: v });
   },
 
   draw() {
-    const { mode, game } = get();
+    const { mode, game, elim } = get();
+    // Snap pauses the world: while snapPhase !== "idle", no draws / plays /
+    // swaps / cabo-calls resolve for ANY player. The drawn card (if any)
+    // and pending action stay frozen until the snap finishes.
+    if (game && game.snapPhase !== "idle") return;
     if (mode === "mp") {
       import("./mp").then((m) => m.sendAction({ type: "draw_deck" }));
       return;
     }
     if (!game) return;
-    set({ game: drawFromDeck(game) });
+    set(applySpResult(drawFromDeck(game), elim));
   },
 
   drawDiscard() {
-    const { mode, game } = get();
+    const { mode, game, elim } = get();
+    if (game && game.snapPhase !== "idle") return;
     if (mode === "mp") {
       import("./mp").then((m) => m.sendAction({ type: "draw_discard" }));
       return;
     }
     if (!game) return;
-    set({ game: drawFromDiscard(game) });
+    set(applySpResult(drawFromDiscard(game), elim));
   },
 
   setTargeting(m) {
@@ -558,7 +918,7 @@ export const useStore = create<StoreState>((set, get) => ({
   },
 
   clickOwnCard(index) {
-    const { game, targeting, humanId, mode } = get();
+    const { game, targeting, humanId, mode, elim } = get();
     if (!game) return;
 
     // Fire-and-forget for non-critical actions. For actions that change targeting
@@ -579,15 +939,29 @@ export const useStore = create<StoreState>((set, get) => ({
     // Setup peek: any player may tap up to 2 of THEIR OWN cards.
     if (game.phase === "setup_peek") {
       if (mode === "mp") dispatch("setup_peek_card", { index });
-      else set({ game: setupPeekCard(game, humanId, index) });
+      else set(applySpResult(setupPeekCard(game, humanId, index), elim));
       return;
     }
 
-    // Snap-self targeting — runs regardless of whose turn it is.
+    // Cinematic-first snap: the engine's snapPhase is the source of truth.
+    // If we armed self-snap and the human clicks one of their cards, this
+    // is the resolving pick. Phase-agnostic (any turn-phase).
+    if (
+      game.snapPhase === "armed_self" &&
+      game.snappingPlayerId === humanId
+    ) {
+      get().doSnapSelf(index);
+      return;
+    }
+    // Local targeting fallback (still set by beginSnapSelf for highlight).
     if (targeting === "snap_self_target") {
       get().doSnapSelf(index);
       return;
     }
+
+    // Snap pauses the world: non-snap card clicks (swap_hand pick, peek_own,
+    // blind_swap pick, peek+swap pick) are inert until the snap resolves.
+    if (game.snapPhase !== "idle") return;
 
     const player = game.players[game.currentPlayer];
     if (player.id !== humanId) return;
@@ -600,7 +974,7 @@ export const useStore = create<StoreState>((set, get) => ({
           set({ targeting: "swap_hand" });
         });
       } else {
-        set({ game: swapDrawnWithHand(game, index) });
+        set(applySpResult(swapDrawnWithHand(game, index), elim));
       }
       set({ targeting: null });
       return;
@@ -609,7 +983,7 @@ export const useStore = create<StoreState>((set, get) => ({
       if (mode === "mp") {
         dispatch("action_peek_own", { index }, () => set({ targeting: "peek_own" }));
       } else {
-        set({ game: actionPeekOwn(game, index) });
+        set(applySpResult(actionPeekOwn(game, index), elim));
       }
       set({ targeting: null });
       return;
@@ -629,7 +1003,7 @@ export const useStore = create<StoreState>((set, get) => ({
           () => set({ targeting: "peek_and_swap_self" }),
         );
       } else {
-        set({ game: actionPeekAndSwapDecide(game, true, index) });
+        set(applySpResult(actionPeekAndSwapDecide(game, true, index), elim));
       }
       set({ targeting: null });
       return;
@@ -637,21 +1011,32 @@ export const useStore = create<StoreState>((set, get) => ({
   },
 
   clickOtherCard(playerId, index) {
-    const { game, targeting, pendingBlindSwapOwnIndex, mode } = get();
+    const { game, targeting, pendingBlindSwapOwnIndex, mode, humanId, elim } = get();
     if (!game) return;
     const dispatch = (type: string, payload: Record<string, any> = {}) => {
       if (mode === "mp") {
         import("./mp").then((m) => m.sendAction({ type: type as any, ...payload }));
       }
     };
-    // Snap targeting an opponent — phase-agnostic.
+    // Cinematic-first snap: engine snapPhase is the source of truth.
+    if (
+      game.snapPhase === "armed_other" &&
+      game.snappingPlayerId === humanId
+    ) {
+      get().doSnapOther(playerId, index);
+      return;
+    }
+    // Local targeting fallback (still set by beginSnapOther for highlight).
     if (targeting === "snap_other_target") {
       get().doSnapOther(playerId, index);
       return;
     }
+    // Snap pauses the world: non-snap clicks on rival cards (peek_other,
+    // blind_swap target, peek+swap pick) are inert until the snap resolves.
+    if (game.snapPhase !== "idle") return;
     if (game.phase === "action_peek_other" && targeting === "peek_other") {
       if (mode === "mp") dispatch("action_peek_other", { targetPlayerId: playerId, index });
-      else set({ game: actionPeekOther(game, playerId, index) });
+      else set(applySpResult(actionPeekOther(game, playerId, index), elim));
       set({ targeting: null });
       return;
     }
@@ -668,7 +1053,7 @@ export const useStore = create<StoreState>((set, get) => ({
         });
       } else {
         const updated = actionBlindSwap(game, pendingBlindSwapOwnIndex, playerId, index);
-        set({ game: updated });
+        set(applySpResult(updated, elim));
       }
       set({ targeting: null, pendingBlindSwapOwnIndex: null });
       return;
@@ -678,7 +1063,7 @@ export const useStore = create<StoreState>((set, get) => ({
       targeting === "peek_and_swap_target_pick"
     ) {
       if (mode === "mp") dispatch("action_peek_and_swap_pick", { targetPlayerId: playerId, index });
-      else set({ game: actionPeekAndSwapPick(game, playerId, index) });
+      else set(applySpResult(actionPeekAndSwapPick(game, playerId, index), elim));
       set({ targeting: null });
       return;
     }
@@ -686,18 +1071,20 @@ export const useStore = create<StoreState>((set, get) => ({
 
   /** Pure discard — no ability triggered, even if the card has one. */
   discardNoAction() {
-    const { mode, game } = get();
+    const { mode, game, elim } = get();
+    if (game && game.snapPhase !== "idle") return;
     if (mode === "mp") {
       import("./mp").then((m) => m.sendAction({ type: "discard_and_skip" }));
       return;
     }
     if (!game) return;
-    set({ game: discardDrawnSkipAction(game), targeting: null });
+    set({ ...applySpResult(discardDrawnSkipAction(game), elim), targeting: null });
   },
 
   /** Discard and immediately activate the card's ability. */
   discardAndTrigger() {
-    const { mode, game } = get();
+    const { mode, game, elim } = get();
+    if (game && game.snapPhase !== "idle") return;
     if (mode === "mp") {
       import("./mp").then((m) => m.sendAction({ type: "discard_and_trigger" }));
       return;
@@ -712,11 +1099,12 @@ export const useStore = create<StoreState>((set, get) => ({
       case "action_peek_and_swap_pick": targeting = "peek_and_swap_target_pick"; break;
       default: break;
     }
-    set({ game: next, targeting });
+    set({ ...applySpResult(next, elim), targeting });
   },
 
   triggerAction() {
-    const { mode, game } = get();
+    const { mode, game, elim } = get();
+    if (game && game.snapPhase !== "idle") return;
     if (mode === "mp") {
       import("./mp").then((m) => m.sendAction({ type: "trigger_action" } as any));
       return;
@@ -731,65 +1119,98 @@ export const useStore = create<StoreState>((set, get) => ({
       case "action_peek_and_swap_pick": targeting = "peek_and_swap_target_pick"; break;
       default: break;
     }
-    set({ game: next, targeting });
+    set({ ...applySpResult(next, elim), targeting });
   },
 
   skipAction() {
-    const { mode, game } = get();
+    const { mode, game, elim } = get();
+    if (game && game.snapPhase !== "idle") return;
     if (mode === "mp") {
       import("./mp").then((m) => m.sendAction({ type: "skip_action" } as any));
       return;
     }
     if (!game) return;
-    set({ game: skipPendingAction(game), targeting: null });
+    set({ ...applySpResult(skipPendingAction(game), elim), targeting: null });
   },
 
   callCaboAction() {
-    const { mode, game } = get();
+    const { mode, game, elim } = get();
+    if (game && game.snapPhase !== "idle") return;
     if (mode === "mp") {
       import("./mp").then((m) => m.sendAction({ type: "call_cabo" }));
       return;
     }
     if (!game) return;
-    set({ game: callCabo(game) });
+    set(applySpResult(callCabo(game), elim));
   },
 
+  // ─────────────────────────────────────────────────────────────────────
+  // Snap — cinematic-first flow.
+  //
+  // Pressing a Snap button COMMITS via the engine's actionStartSnap*: the
+  // game's snapPhase flips to armed_*, snap_armed_* event fires, and the
+  // SNAP! overlay plays before the player picks. No cancel — the player
+  // must follow through with a pick. Targeting is still set locally so the
+  // PlayerSeat highlight logic doesn't change.
+  // ─────────────────────────────────────────────────────────────────────
   beginSnapOther() {
-    const { game, humanId, targeting } = get();
+    const { mode, game, humanId, targeting } = get();
     if (!game) return;
     if (game.phase === "setup_peek" || game.phase === "round_over") return;
+    if (game.snapPhase !== "idle") return;
     const me = game.players.find((p) => p.id === humanId);
     if (!me || me.snapsUsed.other) return;
-    // Toggle off if we're already in this targeting mode.
-    if (targeting === "snap_other_target") { set({ targeting: null }); return; }
-    // If a non-snap action is already targeting (swap_hand, peek_other,
-    // peek_and_swap_*, etc.), refuse so we don't strand the player in the
-    // middle of an action — they'd cancel the snap and find their pending
-    // action also gone. They can finish/cancel the action first.
-    if (targeting && targeting !== "snap_self_target") return;
-    set({ targeting: "snap_other_target" });
+    // Refuse if a non-snap action is already targeting — finishing the
+    // pending action takes priority.
+    if (targeting && targeting !== "snap_self_target" && targeting !== "snap_other_target") return;
+    if (mode === "mp") {
+      import("./mp").then((m) =>
+        m.sendAction(
+          { type: "action_start_snap_other" },
+          () => set({ targeting: null }),
+        ),
+      );
+      set({ targeting: "snap_other_target" });
+      return;
+    }
+    const next = actionStartSnapOther(game, humanId);
+    if (next === game) return; // engine rejected
+    const elim = get().elim;
+    set({ ...applySpResult(next, elim), targeting: "snap_other_target" });
   },
 
   beginSnapSelf() {
-    const { game, humanId, targeting } = get();
+    const { mode, game, humanId, targeting } = get();
     if (!game) return;
     if (game.phase === "setup_peek" || game.phase === "round_over") return;
+    if (game.snapPhase !== "idle") return;
     const me = game.players.find((p) => p.id === humanId);
     if (!me || me.snapsUsed.self) return;
-    if (targeting === "snap_self_target") { set({ targeting: null }); return; }
-    if (targeting && targeting !== "snap_other_target") return;
-    set({ targeting: "snap_self_target" });
+    if (targeting && targeting !== "snap_self_target" && targeting !== "snap_other_target") return;
+    if (mode === "mp") {
+      import("./mp").then((m) =>
+        m.sendAction(
+          { type: "action_start_snap_self" },
+          () => set({ targeting: null }),
+        ),
+      );
+      set({ targeting: "snap_self_target" });
+      return;
+    }
+    const next = actionStartSnapSelf(game, humanId);
+    if (next === game) return;
+    const elim = get().elim;
+    set({ ...applySpResult(next, elim), targeting: "snap_self_target" });
   },
 
+  /** No-op kept for backwards compatibility — the cinematic flow has no
+   *  cancel path. Callers that used to cancel a snap now simply do nothing. */
   cancelSnap() {
-    const t = get().targeting;
-    if (t === "snap_other_target" || t === "snap_self_target") {
-      set({ targeting: null });
-    }
+    /* intentionally empty — snap commits on press */
   },
 
   doSnapOther(targetId, targetIndex) {
-    const { mode, game, humanId } = get();
+    const { mode, game, humanId, elim } = get();
     if (mode === "mp") {
       import("./mp").then((m) =>
         m.sendAction(
@@ -804,11 +1225,11 @@ export const useStore = create<StoreState>((set, get) => ({
       return;
     }
     if (!game) return;
-    set({ game: actionSnapOther(game, humanId, targetId, targetIndex), targeting: null });
+    set({ ...applySpResult(actionSnapOther(game, humanId, targetId, targetIndex), elim), targeting: null });
   },
 
   doSnapSelf(ownIndex) {
-    const { mode, game, humanId } = get();
+    const { mode, game, humanId, elim } = get();
     if (mode === "mp") {
       import("./mp").then((m) =>
         m.sendAction(
@@ -820,11 +1241,11 @@ export const useStore = create<StoreState>((set, get) => ({
       return;
     }
     if (!game) return;
-    set({ game: actionSnapSelf(game, humanId, ownIndex), targeting: null });
+    set({ ...applySpResult(actionSnapSelf(game, humanId, ownIndex), elim), targeting: null });
   },
 
   peekSwapDecide(doSwap, ownIndex) {
-    const { mode, game } = get();
+    const { mode, game, elim } = get();
     if (mode === "mp") {
       if (doSwap && ownIndex === undefined) {
         set({ targeting: "peek_and_swap_self" });
@@ -841,7 +1262,7 @@ export const useStore = create<StoreState>((set, get) => ({
       set({ targeting: "peek_and_swap_self" });
       return;
     }
-    set({ game: actionPeekAndSwapDecide(game, doSwap, ownIndex), targeting: null });
+    set({ ...applySpResult(actionPeekAndSwapDecide(game, doSwap, ownIndex), elim), targeting: null });
   },
 
   consumeAnimations() {
@@ -868,7 +1289,7 @@ export const useStore = create<StoreState>((set, get) => ({
   },
 
   playAgain() {
-    const { mode, game } = get();
+    const { mode, game, elim } = get();
     if (mode === "mp") {
       import("./mp").then((m) =>
         m.getSocket().emit("room:play_again", {}, () => undefined),
@@ -876,15 +1297,110 @@ export const useStore = create<StoreState>((set, get) => ({
       return;
     }
     if (!game) return;
-    const playerInputs = game.players.map((p) => ({ id: p.id, name: p.name, isBot: p.isBot }));
+    if (elim.gloriosVictory) return; // game over, nothing to play
+
+    // Sudden-death path: contestants play another tie-breaker round. Their
+    // busted-but-not-kicked status is preserved (they're still "in" — playing
+    // the tiebreaker). Filter the next round's seat list to ONLY the SD
+    // contestants. Preserve all scoring history.
+    if (elim.suddenDeath?.active) {
+      const contestantSet = new Set(elim.suddenDeath.contestants);
+      const playerInputs = game.players
+        .filter((p) => contestantSet.has(p.id))
+        .map((p) => ({ id: p.id, name: p.name, isBot: p.isBot }));
+      if (playerInputs.length < 2) {
+        // Defensive: SD should never trigger with <2 contestants, but if
+        // somehow we land here, declare the lone remaining player.
+        const survivor = playerInputs[0]?.id ?? null;
+        set({
+          elim: {
+            ...elim,
+            bustedThisRound: [],
+            gloriosVictory: survivor,
+            gloriosVictoryReason: survivor ? "sudden_death" : null,
+            // Keep the SD record (inactive) so end-of-game scoreboards can
+            // still split R/F columns.
+            suddenDeath: elim.suddenDeath
+              ? {
+                  active: false,
+                  contestants: elim.suddenDeath.contestants,
+                  mainRoundsCount: elim.suddenDeath.mainRoundsCount,
+                }
+              : null,
+          },
+        });
+        return;
+      }
+      const next = newGame({
+        players: playerInputs,
+        roundNumber: game.roundNumber + 1,
+        scores: game.scores,
+        caboBonus: game.caboBonus,
+        caboPenalty: game.caboPenalty,
+        snapBonus: game.snapBonus,
+      });
+      set({
+        game: next,
+        elim: {
+          ...elim,
+          // bustedThisRound resets for the new round; contestants remain
+          // "in" (no migration to kickedIds during a SD transition).
+          bustedThisRound: [],
+        },
+        setupPeekRevealed: false,
+        targeting: null,
+        toast: null,
+      });
+      return;
+    }
+
+    // Finalise busts from the round that just ended: move into permanent
+    // kickedIds. This mirrors the server's play_again handler.
+    const nextKicked = [...elim.kickedIds];
+    for (const id of elim.bustedThisRound) {
+      if (!nextKicked.includes(id)) nextKicked.push(id);
+    }
+    const finalisedElim: ElimState = {
+      ...elim,
+      bustedThisRound: [],
+      kickedIds: nextKicked,
+    };
+
+    // Filter out kicked players from the next round's seat list. The Glorious
+    // Victor's seat persists; kicks are permanent for the rest.
+    const kickedSet = new Set(nextKicked);
+    const activePlayers = game.players.filter((p) => !kickedSet.has(p.id));
+
+    if (activePlayers.length <= 1) {
+      // Only one (or zero) active players remain — declare GV immediately
+      // instead of starting a new round.
+      const survivor = activePlayers[0]?.id ?? null;
+      set({
+        elim: {
+          ...finalisedElim,
+          gloriosVictory: survivor,
+          gloriosVictoryReason: "survivor",
+        },
+      });
+      return;
+    }
+
+    const playerInputs = activePlayers.map((p) => ({ id: p.id, name: p.name, isBot: p.isBot }));
     const next = newGame({
       players: playerInputs,
       roundNumber: game.roundNumber + 1,
       scores: game.scores,
       caboBonus: game.caboBonus,
       caboPenalty: game.caboPenalty,
+      snapBonus: game.snapBonus,
     });
-    set({ game: next, setupPeekRevealed: false, targeting: null, toast: null });
+    set({
+      game: next,
+      elim: finalisedElim,
+      setupPeekRevealed: false,
+      targeting: null,
+      toast: null,
+    });
   },
 
   backToMenu() {
@@ -899,6 +1415,7 @@ export const useStore = create<StoreState>((set, get) => ({
     }
     set({
       screen: "menu", mode: "sp", training: false, mp: null,
+      elim: EMPTY_ELIM,
       game: null, pendingGame: null, coinToss: null,
       targeting: null, toast: null,
       chatMessages: [], chatOpen: false, chatUnread: 0,
@@ -913,6 +1430,7 @@ export const useStore = create<StoreState>((set, get) => ({
     import("./mp").then((m) => m.leaveRoom());
     set({
       screen: "lobby", mode: "mp", mp: null,
+      elim: EMPTY_ELIM,
       game: null, targeting: null, toast: null,
       chatMessages: [], chatOpen: false, chatUnread: 0,
     });
@@ -976,6 +1494,6 @@ export const useStore = create<StoreState>((set, get) => ({
   },
 }));
 
-if (typeof window !== "undefined") {
-  (window as any).__store = useStore;
+if (typeof window !== "undefined" && import.meta.env.DEV) {
+  (window as unknown as { __store: typeof useStore }).__store = useStore;
 }

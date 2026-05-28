@@ -1637,36 +1637,45 @@ html, body, #root {
     inset 0 2px 0 oklch(0.85 0.10 30),
     0 6px 12px oklch(0.45 0.18 25 / 0.3);
 }
-/* Ghost-light: "How to play", view-mode toggle. Deep navy fill so
-   they read as a "blue cluster" sitting between the teal primary CTA
-   and the coral secondary CTA above. The top-edge inset highlight
-   gives the same tactile shine treatment as the other buttons —
-   subtle, not chrome-y. Hover brightens the gradient one step. */
+/* Ghost-light + Training Chamber: secondary "blue cluster" that sits
+   below the teal/coral CTAs. Palette is pulled from the menu aurora
+   bg (hue 255-265, low chroma) but lifted in lightness so the buttons
+   still read as solid shapes. Effect treatment matches .btn.big — same
+   4px depth lift, top-edge shine, and soft outer glow — at the
+   smaller secondary size. */
 .menu-refresh .menu-card .btn.ghost-light {
   background: linear-gradient(
     180deg,
-    oklch(0.38 0.13 255) 0%,
-    oklch(0.28 0.13 260) 100%
+    oklch(0.32 0.07 258) 0%,
+    oklch(0.22 0.06 263) 100%
   );
-  border-color: oklch(0.18 0.10 265);
-  color: oklch(0.97 0.04 260);
+  border-color: oklch(0.14 0.05 268);
+  color: oklch(0.96 0.03 258);
   box-shadow:
-    0 3px 0 oklch(0.18 0.10 265),
-    inset 0 1.5px 0 oklch(0.62 0.13 255);
+    0 4px 0 oklch(0.14 0.05 268),
+    inset 0 2px 0 oklch(0.55 0.08 255),
+    0 14px 28px oklch(0.20 0.06 260 / 0.40);
   font-size: 14px;
   padding: 10px 14px;
 }
 .menu-refresh .menu-card .btn.ghost-light:hover:not(:disabled) {
+  transform: translateY(-2px);
   background: linear-gradient(
     180deg,
-    oklch(0.44 0.14 255) 0%,
-    oklch(0.32 0.14 260) 100%
+    oklch(0.38 0.08 258) 0%,
+    oklch(0.26 0.07 263) 100%
   );
-  transform: translateY(-1px);
   box-shadow:
-    0 4px 0 oklch(0.18 0.10 265),
-    inset 0 1.5px 0 oklch(0.68 0.14 255),
-    0 8px 20px oklch(0.30 0.14 260 / 0.45);
+    0 6px 0 oklch(0.14 0.05 268),
+    inset 0 2px 0 oklch(0.60 0.09 255),
+    0 20px 36px oklch(0.20 0.06 260 / 0.55);
+}
+.menu-refresh .menu-card .btn.ghost-light:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow:
+    0 1px 0 oklch(0.14 0.05 268),
+    inset 0 2px 0 oklch(0.50 0.07 255),
+    0 6px 12px oklch(0.20 0.06 260 / 0.35);
 }
 /* "Or" divider style — subtle pill that picks up the warm tone */
 .menu-refresh .menu-card .divider {
@@ -2220,6 +2229,24 @@ html, body, #root {
 }
 
 .hand-slot { position: relative; }
+
+/* Empty hand slot left after a correct self-snap. Holds the space so the
+   other cards' positions stay anchored, with a subtle dashed outline that
+   reads as "this used to be a card, a penalty can land here". */
+.hand-slot.hand-slot-empty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.hand-slot-empty-ghost {
+  /* Width/height inlined in JSX to match the active card size for this
+     seat. The dashed outline reads as "this used to be a card; a penalty
+     can land here". */
+  border: 2px dashed oklch(0.6 0.04 240 / 0.45);
+  border-radius: 12px;
+  background: oklch(0.4 0.03 240 / 0.1);
+}
 
 /* Spy glow — shown on any card actively being peeked at */
 .hand-slot.spy-glow {
@@ -3670,23 +3697,9 @@ body.mobile-mode .round-start-label {
 
 /* ========== Training Chamber ========== */
 
-/* Menu button */
-.btn.training-btn {
-  background: linear-gradient(135deg, #2a1a5e 0%, #1a2a5e 100%);
-  color: #a87bff;
-  border: 2px dashed #a87bff;
-  box-shadow: none;
-  font-size: 14px;
-  font-weight: 700;
-  padding: 10px 16px;
-  border-radius: 12px;
-  transition: background 0.15s, color 0.15s, transform 0.15s;
-}
-.btn.training-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, #3d2a7a 0%, #2a3d7a 100%);
-  color: #c9a9ff;
-  transform: translateY(-2px);
-}
+/* Menu button: previously had its own purple-dashed style. Now reuses
+   .ghost-light so it visually groups with "How to play" and the view-mode
+   toggle. See Menu.tsx where the className was swapped to "btn ghost-light". */
 
 /* Push table content up so the fixed panel doesn't cover the bottom player */
 .table-root.training-active {
@@ -5221,6 +5234,135 @@ body.mobile-mode .glory-splash-sub {
   font-size: clamp(14px, 4vw, 20px);
 }
 
+/* ── SUDDEN DEATH splash (golden/fire theme, distinct from the red Bust theme) ── */
+.sudden-death-overlay {
+  background: radial-gradient(circle at center,
+    rgba(60, 30, 5, 0.78) 0%,
+    rgba(30, 8, 2, 0.92) 70%);
+}
+.sudden-death-splash-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  pointer-events: none;
+}
+.sudden-death-halo {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: clamp(360px, 60vw, 720px);
+  height: clamp(360px, 60vw, 720px);
+  transform: translate(-50%, -50%);
+  background:
+    radial-gradient(circle at center,
+      rgba(255, 186, 61, 0.55) 0%,
+      rgba(255, 120, 32, 0.32) 30%,
+      rgba(180, 50, 10, 0.18) 55%,
+      transparent 75%);
+  border-radius: 50%;
+  z-index: 0;
+  filter: blur(10px);
+}
+.sudden-death-embers {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+.sudden-death-ember {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%,
+    #fff2c2 0%,
+    #ffd86b 40%,
+    #ff8d2c 75%,
+    rgba(180, 60, 10, 0.0) 100%);
+  box-shadow:
+    0 0 12px rgba(255, 180, 60, 0.75),
+    0 0 24px rgba(255, 120, 30, 0.55);
+}
+.sudden-death-title {
+  position: relative;
+  z-index: 1;
+  font-family: 'Fredoka', system-ui, sans-serif;
+  font-size: clamp(64px, 12vw, 160px);
+  font-weight: 900;
+  color: #ffd86b;
+  text-transform: uppercase;
+  letter-spacing: 5px;
+  text-shadow:
+    0 8px 32px rgba(255, 140, 40, 0.6),
+    0 4px 0 rgba(120, 40, 0, 0.7),
+    0 0 28px rgba(255, 200, 80, 0.45);
+  line-height: 1;
+  margin: 0;
+  text-align: center;
+}
+.sudden-death-sub {
+  position: relative;
+  z-index: 1;
+  font-family: 'Fredoka', system-ui, sans-serif;
+  font-size: clamp(18px, 2.8vw, 28px);
+  font-weight: 600;
+  color: #ffe9b8;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.55);
+  text-align: center;
+  padding: 0 16px;
+}
+.sudden-death-hint {
+  position: relative;
+  z-index: 1;
+  font-family: 'Fredoka', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 220, 160, 0.65);
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  margin-top: 8px;
+}
+body.mobile-mode .sudden-death-title {
+  font-size: clamp(48px, 14vw, 88px);
+  letter-spacing: 3px;
+}
+body.mobile-mode .sudden-death-sub {
+  font-size: clamp(13px, 3.6vw, 18px);
+}
+
+/* ── Sudden Death scoreboard cells (gold tint for F-columns) ── */
+.sb-th-final {
+  color: #ffc857 !important;
+  text-shadow: 0 1px 2px rgba(120, 60, 0, 0.6);
+}
+.sb-td-final {
+  background: linear-gradient(180deg,
+    rgba(255, 200, 87, 0.06) 0%,
+    rgba(255, 160, 40, 0.10) 100%);
+  border-left: 1px solid rgba(255, 200, 87, 0.18);
+  border-right: 1px solid rgba(255, 200, 87, 0.18);
+}
+.sb-cell-final {
+  background: linear-gradient(180deg,
+    rgba(255, 200, 87, 0.10) 0%,
+    rgba(255, 160, 40, 0.16) 100%) !important;
+  color: #ffc857 !important;
+  font-weight: 800 !important;
+}
+.end-score-round-h-final {
+  color: #ffc857 !important;
+  font-weight: 800 !important;
+}
+
 /* ========== Bot difficulty picker ========== */
 .bot-picker-screen {
   justify-content: flex-start;
@@ -5524,6 +5666,20 @@ body.mobile-mode .bot-speech-bubble {
   margin-bottom: 3px;
 }
 .snap-rules-self .snap-rules-title { color: oklch(0.88 0.12 170); }
+/* Locked-button tooltip — compact, one-line reason. Used by the cinematic-
+   first SnapControls when a button is disabled (hand too small / budget
+   spent). The tail still points at the button below. */
+.snap-rules-locked {
+  width: auto;
+  min-width: 180px;
+  padding: 8px 12px;
+}
+.snap-rules-locked-text {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: oklch(0.92 0.04 80);
+}
 .snap-rules-prompt {
   font-size: 11px;
   font-weight: 600;
@@ -5689,6 +5845,15 @@ body.mobile-mode .bot-speech-bubble {
     oklch(0.05 0.04 145 / 0.3) 50%,
     oklch(0.05 0.04 145 / 0.55) 100%);
 }
+/* Cinematic-first ARM overlay — leans into the gold "SNAP!" treatment that
+   pairs with the rival/self button colours, but with a slightly lighter
+   wash so it reads as "incoming" rather than "resolved success". */
+.snap-cine-armed {
+  background: radial-gradient(ellipse at center,
+    oklch(0.78 0.18 80 / 0.18) 0%,
+    oklch(0.05 0.04 70 / 0.32) 50%,
+    oklch(0.05 0.04 70 / 0.58) 100%);
+}
 .snap-cine-wrong {
   background: radial-gradient(ellipse at center,
     oklch(0.55 0.22 25 / 0.2) 0%,
@@ -5740,6 +5905,57 @@ body.mobile-mode .bot-speech-bubble {
   color: oklch(0.78 0.22 25);
   text-shadow: 0 4px 0 oklch(0.25 0.16 25),
                0 14px 32px oklch(0.05 0.04 25 / 0.5);
+}
+.snap-cine-correct .snap-cine-word {
+  color: oklch(0.82 0.22 145);
+  text-shadow: 0 4px 0 oklch(0.28 0.15 150),
+               0 14px 32px oklch(0.05 0.04 145 / 0.5);
+}
+.snap-cine-correct .snap-spoke {
+  background: linear-gradient(180deg,
+    oklch(0.82 0.22 145) 0%,
+    oklch(0.82 0.22 145 / 0) 100%);
+}
+
+/* Snap bonus overlay — small pill that pops in the top-right for the
+   player who earned a -5 snap bonus this round. Positioned away from the
+   central SNAP! cinematic so both can read clearly. Only the player who
+   earned the bonus sees it; the engine pushes the snap_bonus event with
+   their playerId. */
+.snap-bonus-overlay {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 360;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 16px 28px 18px;
+  border-radius: 18px;
+  background: linear-gradient(180deg,
+    oklch(0.45 0.18 145) 0%,
+    oklch(0.28 0.12 150) 100%);
+  border: 2px solid oklch(0.82 0.22 145 / 0.75);
+  box-shadow:
+    0 0 0 1px oklch(0.05 0.02 145 / 0.6),
+    0 18px 48px oklch(0.05 0.04 145 / 0.55);
+}
+.snap-bonus-title {
+  font-family: 'Fredoka', system-ui, sans-serif;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: oklch(0.97 0.05 95);
+  text-shadow: 0 2px 0 oklch(0.2 0.1 150);
+}
+.snap-bonus-sub {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: oklch(0.86 0.2 145);
 }
 .snap-cine-sub {
   margin-top: 18px;

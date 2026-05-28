@@ -32,10 +32,16 @@ export interface Room {
   kickedIds: string[];
   gloriosVictory: string | null;
   /** Why this player won — drives the tiebreaker message on the client. */
-  gloriosVictoryReason: "survivor" | "more_wins" | "final_round" | null;
+  gloriosVictoryReason: "survivor" | "more_wins" | "final_round" | "sudden_death" | null;
   /** Number of rounds each player has won (lowest hand at round end). Used for
    *  the simultaneous-bust tiebreaker: most wins → Glorious Victor. */
   roundWins: Record<string, number>;
+  /** Sudden-death tiebreaker state, broadcast to clients via publicView.
+   *  - null when no sudden death has been triggered this game.
+   *  - { active: true, contestants, mainRoundsCount } during SD.
+   *  - contestants stays frozen across repeat SD rounds.
+   *  - mainRoundsCount = scores[id].length captured at SD trigger time. */
+  suddenDeath: { active: boolean; contestants: string[]; mainRoundsCount: number } | null;
   // Ready-up system: first player to click arms a 10s timer; second click starts immediately.
   readyVotes: string[];
   readyStartedAt: number | null;
@@ -90,6 +96,7 @@ export class Rooms {
       gloriosVictory: null,
       gloriosVictoryReason: null,
       roundWins: {},
+      suddenDeath: null,
       readyVotes: [],
       readyStartedAt: null,
       roundReadyVotes: [],

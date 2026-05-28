@@ -73,13 +73,16 @@ interface ScoreRow {
   name: string;
   /** Raw per-round contributions (hand value after Cabo bonus zeroing). */
   rounds: number[];
-  /** Cumulative cabo bonus magnitude (will be subtracted from total). */
+  /** Cumulative bonus magnitude — sum of cabo bonus AND snap bonus (both
+   *  reduce the running total). Surfaced as one "Bonus" column in the
+   *  scoreboard, with the round-cell ✦ marker firing if EITHER kind was
+   *  earned that round. */
   bonusTotal: number;
   /** Cumulative cabo penalty (will be added to total). */
   penaltyTotal: number;
   /** Net running total: sum(rounds) + penaltyTotal - bonusTotal. */
   total: number;
-  /** Per-round bonus values (parallel to rounds). */
+  /** Per-round combined bonus values (cabo + snap), parallel to rounds. */
   perRoundBonus: number[];
   /** Per-round penalty values (parallel to rounds). */
   perRoundPenalty: number[];
@@ -93,15 +96,27 @@ function buildRows(
   scores: Record<string, number[]>,
   caboBonus: Record<string, number[]>,
   caboPenalty: Record<string, number[]>,
+  snapBonus: Record<string, number[]>,
   players: { id: string; name: string }[],
   exclude: Set<string>,
+  /** Optional inclusive lower bound — slice each array to indices >= startIndex.
+   *  Used during sudden death to render F-rounds only. */
+  startIndex = 0,
 ): ScoreRow[] {
   const rows: ScoreRow[] = Object.entries(scores)
     .filter(([id]) => !exclude.has(id))
-    .map(([id, arr]) => {
-      const bonus = caboBonus[id] ?? [];
-      const penalty = caboPenalty[id] ?? [];
-      const bonusTotal = sum(bonus);
+    .map(([id, arrRaw]) => {
+      const arr = startIndex > 0 ? arrRaw.slice(startIndex) : arrRaw;
+      const caboFull = caboBonus[id] ?? [];
+      const penaltyFull = caboPenalty[id] ?? [];
+      const snapFull = snapBonus[id] ?? [];
+      const cabo = startIndex > 0 ? caboFull.slice(startIndex) : caboFull;
+      const penalty = startIndex > 0 ? penaltyFull.slice(startIndex) : penaltyFull;
+      const snap = startIndex > 0 ? snapFull.slice(startIndex) : snapFull;
+      // Per-round bonus is cabo + snap (both apply as negative
+      // adjustments to the running total).
+      const perRoundBonus = arr.map((_, i) => (cabo[i] ?? 0) + (snap[i] ?? 0));
+      const bonusTotal = sum(perRoundBonus);
       const penaltyTotal = sum(penalty);
       const total = sum(arr) + penaltyTotal - bonusTotal;
       return {
@@ -111,7 +126,7 @@ function buildRows(
         bonusTotal,
         penaltyTotal,
         total,
-        perRoundBonus: bonus,
+        perRoundBonus,
         perRoundPenalty: penalty,
       };
     });
@@ -125,15 +140,39 @@ function buildRows(
 
 export function Scoreboard() {
   const game = useStore((s) => s.game!);
-  const mp = useStore((s) => s.mp);
-  const kickedSet = new Set(mp?.kickedIds ?? []);
+  const elim = useStore((s) => s.elim);
+  // Mode-agnostic: elim mirrors MP / is computed for SP.
+  // During sudden death, hide non-contestants and slice score arrays so only
+  // F-rounds (≥ mainRoundsCount) appear.
+  //
+  // BUT: at the SD-TRIGGER round_over (the round that armed SD), the F-slice
+  // is empty (no F-rounds played yet) — we still want the user to see the
+  // R-rounds from the round that just ended. So gate the slice on whether
+  // the SD has actually started (the new game post-playAgain has only the
+  // contestants seated). At trigger time, game.players still has all 4.
+  const sdArmed = !!elim.suddenDeath?.active;
+  const sdContestants = sdArmed ? new Set(elim.suddenDeath!.contestants) : null;
+  const sdStarted =
+    sdArmed && !!sdContestants &&
+    game.players.every((p) => sdContestants.has(p.id)) &&
+    game.players.length === sdContestants.size;
+  const inSuddenDeath = sdStarted;
+  const startIndex = inSuddenDeath ? elim.suddenDeath!.mainRoundsCount : 0;
+  const exclude = new Set(elim.kickedIds);
+  if (inSuddenDeath && sdContestants) {
+    for (const id of Object.keys(game.scores)) {
+      if (!sdContestants.has(id)) exclude.add(id);
+    }
+  }
 
   const rows = buildRows(
     game.scores,
     game.caboBonus ?? {},
     game.caboPenalty ?? {},
+    game.snapBonus ?? {},
     game.players,
-    kickedSet,
+    exclude,
+    startIndex,
   );
 
   const roundCount = Math.max(0, ...rows.map((r) => r.rounds.length));
@@ -153,19 +192,27 @@ export function Scoreboard() {
   // Columns: Player | R1..Rn | Bonus | Penalty | Total
   const gridCols = `minmax(80px, 1.2fr) repeat(${Math.max(1, roundCount)}, minmax(26px, 0.7fr)) minmax(50px, 0.95fr) minmax(54px, 0.95fr) minmax(54px, 1.1fr)`;
 
+  const colPrefix = inSuddenDeath ? "F" : "R";
+
   return (
     <div className="scoreboard">
       <div className="sb-title">
         <span className="sb-title-main">Scoreboard</span>
-        <span className="sb-title-sub">Round {game.roundNumber} · lowest wins</span>
+        <span className="sb-title-sub">
+          {inSuddenDeath
+            ? `Sudden Death · Round F${Math.max(1, roundCount)}`
+            : `Round ${game.roundNumber} · lowest wins`}
+        </span>
       </div>
       <div className="sb-table">
         <div className="sb-thead" style={{ gridTemplateColumns: gridCols }}>
           <div className="sb-th sb-th-name">Player</div>
           {Array.from({ length: Math.max(1, roundCount) }).map((_, i) => (
-            <div key={i} className="sb-th sb-th-round">{roundCount > 0 ? `R${i + 1}` : "—"}</div>
+            <div key={i} className={`sb-th sb-th-round${inSuddenDeath ? " sb-th-final" : ""}`}>
+              {roundCount > 0 ? `${colPrefix}${i + 1}` : "—"}
+            </div>
           ))}
-          <div className="sb-th sb-th-bonus" title="Cabo bonus subtracted">Bonus</div>
+          <div className="sb-th sb-th-bonus" title="Bonuses subtracted (Cabo bonus, Snap bonus)">Bonus</div>
           <div className="sb-th sb-th-penalty" title="Cabo penalty added">Penalty</div>
           <div className="sb-th sb-th-total">Total</div>
         </div>
@@ -194,8 +241,9 @@ export function Scoreboard() {
                     : isLowest
                     ? " sb-td-round-win"
                     : "";
+                  const finalCls = inSuddenDeath ? " sb-td-final" : "";
                   return (
-                    <span key={ri} className={`sb-td sb-td-round${cls}`}>
+                    <span key={ri} className={`sb-td sb-td-round${cls}${finalCls}`}>
                       {v !== undefined ? v : "—"}
                       {hadBonus && <span className="sb-cell-marker bonus" title="Cabo bonus">✦</span>}
                       {hadPenalty && <span className="sb-cell-marker penalty" title="Cabo penalty">!</span>}
@@ -285,10 +333,27 @@ export function RoundEndOverlay() {
   const game = useStore((s) => s.game!);
   const mode = useStore((s) => s.mode);
   const mp = useStore((s) => s.mp);
+  const elim = useStore((s) => s.elim);
   const humanId = useStore((s) => s.humanId);
   const playAgain = useStore((s) => s.playAgain);
   const backToMenu = useStore((s) => s.backToMenu);
-  const kickedSet = new Set(mp?.kickedIds ?? []);
+  // During sudden death, hide non-contestants and slice scores to F-rounds.
+  // Gate on "SD has actually started" (post-playAgain) so the SD-trigger
+  // round_over still shows R-columns rather than an empty F-slice.
+  const sdArmed = !!elim.suddenDeath?.active;
+  const sdContestants = sdArmed ? new Set(elim.suddenDeath!.contestants) : null;
+  const sdStarted =
+    sdArmed && !!sdContestants &&
+    game.players.every((p) => sdContestants.has(p.id)) &&
+    game.players.length === sdContestants.size;
+  const inSuddenDeath = sdStarted;
+  const startIndex = inSuddenDeath ? elim.suddenDeath!.mainRoundsCount : 0;
+  const kickedSet = new Set(elim.kickedIds);
+  if (inSuddenDeath && sdContestants) {
+    for (const id of Object.keys(game.scores)) {
+      if (!sdContestants.has(id)) kickedSet.add(id);
+    }
+  }
   const reduced = useReducedMotion() ?? false;
 
   const [stage, setStage] = useState<CinematicStage>("title");
@@ -304,12 +369,12 @@ export function RoundEndOverlay() {
   const playedFor = useRef<number | null>(null);
   useEffect(() => {
     if (game.phase !== "round_over") return;
-    if (mp?.gloriosVictory) return;
-    if (mode === "mp" && mp?.bustedThisRound.includes(humanId)) return;
+    if (elim.gloriosVictory) return;
+    if (elim.bustedThisRound.includes(humanId)) return;
     if (playedFor.current === game.roundNumber) return;
     playedFor.current = game.roundNumber;
     Audio.playSfx(game.winnerId === humanId ? "win" : "lose");
-  }, [game.phase, game.roundNumber, game.winnerId, humanId, mp?.gloriosVictory]);
+  }, [game.phase, game.roundNumber, game.winnerId, humanId, elim.gloriosVictory, elim.bustedThisRound]);
 
   const confettiFiredFor = useRef<number | null>(null);
   useEffect(() => {
@@ -328,15 +393,18 @@ export function RoundEndOverlay() {
   }, [stage, game.phase, game.roundNumber, reduced]);
 
   if (game.phase !== "round_over") return null;
-  if (mode === "mp" && mp?.gloriosVictory) return null;
-  if (mode === "mp" && mp?.bustedThisRound.includes(humanId)) return null;
+  // Yield to GloriousVictory / BustedOverlay (mode-agnostic via elim).
+  if (elim.gloriosVictory) return null;
+  if (elim.bustedThisRound.includes(humanId)) return null;
 
   const allRows = buildRows(
     game.scores,
     game.caboBonus ?? {},
     game.caboPenalty ?? {},
+    game.snapBonus ?? {},
     game.players,
     kickedSet,
+    startIndex,
   );
 
   // For the cinematic pill row use HAND VALUES (this round), so the "X wins"
@@ -344,7 +412,7 @@ export function RoundEndOverlay() {
   const handSums = game.players
     .filter((p) => !kickedSet.has(p.id))
     .map((p) => {
-      const handSum = p.hand.reduce((s, c) => s + cardScore(c), 0);
+      const handSum = p.hand.reduce((s, c) => s + (c ? cardScore(c) : 0), 0);
       const roundIdx = (game.scores[p.id]?.length ?? 1) - 1;
       const roundBonus = (game.caboBonus[p.id] ?? [])[roundIdx] ?? 0;
       const roundPenalty = (game.caboPenalty[p.id] ?? [])[roundIdx] ?? 0;
@@ -371,6 +439,7 @@ export function RoundEndOverlay() {
     : null;
 
   const roundCount = Math.max(0, ...allRows.map((r) => r.rounds.length));
+  // Columns: name | rounds… | bonus | penalty | total
   const modalGridCols = `minmax(90px, 1.3fr) repeat(${Math.max(1, roundCount)}, minmax(28px, 1fr)) minmax(40px, 0.9fr) minmax(40px, 0.9fr) minmax(48px, 1.1fr)`;
 
   const modalRoundMins: number[] = [];
@@ -422,7 +491,11 @@ export function RoundEndOverlay() {
                 animate={{ scale: 1, y: 0, opacity: 1 }}
                 transition={{ type: "spring", stiffness: 220, damping: 18, delay: 0.15 }}
               >
-                {isRoundTie ? "It's a tie" : "Round Over"}
+                {isRoundTie
+                  ? "It's a tie"
+                  : inSuddenDeath
+                  ? `Sudden Death · F${Math.max(1, roundCount)}`
+                  : "Round Over"}
               </motion.h1>
 
               <div className="cinematic-pills">
@@ -472,7 +545,11 @@ export function RoundEndOverlay() {
             <h2>{winner!.name} wins the round!</h2>
           )}
           <div className="modal-subtitle">
-            {isTie
+            {inSuddenDeath
+              ? (isTie
+                  ? `Sudden Death · F${Math.max(1, roundCount)} · tied — play again`
+                  : `Sudden Death · F${Math.max(1, roundCount)}`)
+              : isTie
               ? `Tied at ${lowestCum} pts · lowest wins`
               : "Leaderboard · lowest total wins"}
           </div>
@@ -480,9 +557,14 @@ export function RoundEndOverlay() {
             <div className="sb-thead" style={{ gridTemplateColumns: modalGridCols }}>
               <div className="sb-th sb-th-name">Player</div>
               {Array.from({ length: Math.max(1, roundCount) }).map((_, i) => (
-                <div key={i} className="sb-th sb-th-round">{roundCount > 0 ? `R${i + 1}` : "—"}</div>
+                <div
+                  key={i}
+                  className={`sb-th sb-th-round${inSuddenDeath ? " sb-th-final" : ""}`}
+                >
+                  {roundCount > 0 ? `${inSuddenDeath ? "F" : "R"}${i + 1}` : "—"}
+                </div>
               ))}
-              <div className="sb-th sb-th-bonus">Bonus</div>
+              <div className="sb-th sb-th-bonus" title="Bonuses subtracted — Cabo bonus and Snap bonus combined.">Bonus</div>
               <div className="sb-th sb-th-penalty">Penalty</div>
               <div className="sb-th sb-th-total">Total</div>
             </div>
@@ -511,8 +593,9 @@ export function RoundEndOverlay() {
                         : isLowest
                         ? " sb-td-round-win"
                         : "";
+                      const finalCls = inSuddenDeath ? " sb-td-final" : "";
                       return (
-                        <span key={ri} className={`sb-td sb-td-round${cls}`}>
+                        <span key={ri} className={`sb-td sb-td-round${cls}${finalCls}`}>
                           {v !== undefined ? v : "—"}
                           {hadBonus && <span className="sb-cell-marker bonus" title="Cabo bonus">✦</span>}
                           {hadPenalty && <span className="sb-cell-marker penalty" title="Cabo penalty">!</span>}

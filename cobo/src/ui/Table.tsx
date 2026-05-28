@@ -9,12 +9,13 @@ import { Scoreboard, RoundEndOverlay } from "./Scoreboard";
 import { BustedOverlay } from "./BustedOverlay";
 import { GameLostOverlay } from "./GameLostOverlay";
 import { GloriousVictory } from "./GloriousVictory";
+import { SuddenDeathSplash } from "./SuddenDeathSplash";
 import { ActionBanner } from "./ActionBanner";
 import { RoundStartCinematic } from "./RoundStartCinematic";
 import { ActionLog } from "./ActionLog";
 import { TrainingPanel } from "./TrainingPanel";
 import { MpNotices } from "./MpNotices";
-import { botMove, executeBotSnap, findBotSnap, ingestReveals, reactToRoundEnd, resetBotKnowledge } from "../ai/bot";
+import { armBotSnap, botMove, executeBotSnap, findBotSnap, ingestReveals, reactToRoundEnd, resetBotKnowledge } from "../ai/bot";
 import { clearReveals as clearRevealsEngine } from "../engine/game";
 import { Audio } from "../audio/sounds";
 import { useTheme } from "../state/theme";
@@ -89,10 +90,17 @@ export function Table() {
       if (!curNow.isBot) return;
       if (latest.phase === "setup_peek" || latest.phase === "round_over") return;
       if (latest.reveals.some((r) => r.reason !== "round_end")) return;
-      useStore.setState({ game: botMove(latest) });
+      // Snap pauses the world. The bot's pending move (and any drawn card it
+      // already holds) freezes until the snap resolves; this effect re-fires
+      // via the snapPhase dep below.
+      if (latest.snapPhase !== "idle") return;
+      // Route through applyBotMove so kicked-seat skipping + bust detection
+      // fire when a bot's action lands the round in round_over (or pushes
+      // someone over 60).
+      useStore.getState().applyBotMove(botMove(latest));
     }, delay);
     return () => clearTimeout(t);
-  }, [game.phase, game.currentPlayer, hasTransientReveal, mode]);
+  }, [game.phase, game.currentPlayer, hasTransientReveal, mode, game.snapPhase]);
 
   // SP-only: bot snap reactions. The trigger is a CHANGE to the discard top
   // (i.e. a fresh card just landed), not every state tick. Watching the full
@@ -100,33 +108,64 @@ export function Table() {
   // games — Bob's 320-700ms reaction window kept getting cancelled before it
   // could fire. We key on the top card's identity instead so the timer
   // survives until it fires (or the discard changes for real).
+  //
+  // Cinematic-first flow: at the chosen reaction time, ARM the bot's snap
+  // (emits snap_armed_*, SnapCinematic shows the SNAP! overlay). Then a
+  // second timer (~1.0s later, after the overlay) resolves the snap. This
+  // mirrors what a human does: press → cinematic → pick.
   const botDifficulty = useStore((s) => s.botDifficulty);
   const discardTopId = game.discard[game.discard.length - 1]?.id;
+  const ARM_OVERLAY_MS = 1000;
+  // resolveTimerRef lives across effect re-runs so the cleanup of the
+  // ARMING effect (which fires once arm changes snapPhase → armed_*) doesn't
+  // cancel the scheduled resolve. Cleaned when component unmounts or when
+  // a fresh discard-top triggers a brand-new plan.
+  const botSnapResolveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (mode === "mp") return;
     if (!botDifficulty) return;
     if (game.phase === "setup_peek" || game.phase === "round_over") return;
     if (hasTransientReveal) return;
-    // Read the latest game when planning so we don't snapshot a stale view
-    // (this effect only re-runs on discard-top change, not on every action).
+    if (game.snapPhase !== "idle") return; // another snap already running
     const live = useStore.getState().game;
     if (!live) return;
     const plan = findBotSnap(live, botDifficulty);
     if (!plan) return;
-    const t = setTimeout(() => {
+    const armTimer = setTimeout(() => {
       const latest = useStore.getState().game;
       if (!latest) return;
       if (latest.phase === "setup_peek" || latest.phase === "round_over") return;
+      if (latest.snapPhase !== "idle") return;
       // Re-validate: discard top might have changed, or the bot already used
       // its snap budget via a parallel path.
       const bot = latest.players.find((p) => p.id === plan.botId);
       if (!bot) return;
       if (plan.kind === "self" && bot.snapsUsed.self) return;
       if (plan.kind === "other" && bot.snapsUsed.other) return;
-      useStore.setState({ game: executeBotSnap(latest, plan) });
+      const armed = armBotSnap(latest, plan);
+      if (armed === latest) return; // engine rejected
+      useStore.getState().applyBotMove(armed);
+      // After the SNAP! overlay, resolve.
+      botSnapResolveTimer.current = setTimeout(() => {
+        botSnapResolveTimer.current = null;
+        const afterArm = useStore.getState().game;
+        if (!afterArm) return;
+        useStore.getState().applyBotMove(executeBotSnap(afterArm, plan));
+      }, ARM_OVERLAY_MS);
     }, plan.delayMs);
-    return () => clearTimeout(t);
-  }, [discardTopId, game.phase, mode, botDifficulty, hasTransientReveal]);
+    return () => {
+      clearTimeout(armTimer);
+    };
+  }, [discardTopId, game.phase, mode, botDifficulty, hasTransientReveal, game.snapPhase]);
+  // Cancel a pending resolve if the round ends or the component unmounts.
+  useEffect(() => {
+    return () => {
+      if (botSnapResolveTimer.current) {
+        clearTimeout(botSnapResolveTimer.current);
+        botSnapResolveTimer.current = null;
+      }
+    };
+  }, []);
 
   // SP-only: fire a bot speech bubble at each round transition (winner gloats /
   // loser complains). Keyed on roundNumber so a new round triggers exactly once.
@@ -466,6 +505,7 @@ export function Table() {
         <BustedOverlay />
         <GameLostOverlay />
         <GloriousVictory />
+        <SuddenDeathSplash />
         <MpNotices />
 
         {caboBurst && (

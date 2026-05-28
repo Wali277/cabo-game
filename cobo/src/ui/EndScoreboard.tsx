@@ -29,9 +29,13 @@ interface Props {
   winnerId: string | null;
   humanId: string;
   variant: "victory" | "lost";
+  /** Boundary index splitting R-rounds (< mainRoundsCount) from F-rounds
+   *  (≥ mainRoundsCount). Null/undefined → all rounds render as R-columns
+   *  (no sudden death occurred). */
+  mainRoundsCount?: number | null;
 }
 
-export function EndScoreboard({ rows, winnerId, humanId, variant }: Props) {
+export function EndScoreboard({ rows, winnerId, humanId, variant, mainRoundsCount }: Props) {
   if (rows.length === 0) return null;
 
   // For each round index, find the lowest value across all players (= round
@@ -50,6 +54,11 @@ export function EndScoreboard({ rows, winnerId, humanId, variant }: Props) {
     roundLowestCounts.push(values.filter((v) => v === min).length);
   }
 
+  // Helper: column label + class for an index. Splits at mainRoundsCount.
+  const splitAt = typeof mainRoundsCount === "number" ? mainRoundsCount : null;
+  const isFinalIndex = (i: number) => splitAt !== null && i >= splitAt;
+  const labelFor = (i: number) => isFinalIndex(i) ? `F${i - (splitAt ?? 0) + 1}` : `R${i + 1}`;
+
   return (
     <div className={`end-scoreboard end-scoreboard-${variant}`}>
       <div className="end-scoreboard-header">Final Scores</div>
@@ -61,7 +70,12 @@ export function EndScoreboard({ rows, winnerId, humanId, variant }: Props) {
               <th>Rounds</th>
             ) : (
               Array.from({ length: numRounds }).map((_, i) => (
-                <th key={i} className="end-score-round-h">R{i + 1}</th>
+                <th
+                  key={i}
+                  className={`end-score-round-h${isFinalIndex(i) ? " end-score-round-h-final" : ""}`}
+                >
+                  {labelFor(i)}
+                </th>
               ))
             )}
             <th>Total</th>
@@ -81,13 +95,14 @@ export function EndScoreboard({ rows, winnerId, humanId, variant }: Props) {
                   const v = row.rounds[i];
                   const isLowest = v !== undefined && v === roundMins[i];
                   const tiedAtLowest = isLowest && roundLowestCounts[i] > 1;
-                  const cls = tiedAtLowest
+                  const baseCls = tiedAtLowest
                     ? "end-score-round end-score-round-tie"
                     : isLowest
                     ? "end-score-round end-score-round-win"
                     : "end-score-round";
+                  const finalCls = isFinalIndex(i) ? " sb-cell-final" : "";
                   return (
-                    <td key={i} className={cls}>
+                    <td key={i} className={`${baseCls}${finalCls}`}>
                       {v !== undefined ? v : "—"}
                     </td>
                   );

@@ -19,15 +19,16 @@ import { FireworksLayer } from "./Particles";
  */
 export function GloriousVictory() {
   const mp = useStore((s) => s.mp);
+  const elim = useStore((s) => s.elim);
   const humanId = useStore((s) => s.humanId);
   const backToMenu = useStore((s) => s.backToMenu);
-  const mode = useStore((s) => s.mode);
   const game = useStore((s) => s.game);
   const reduced = useReducedMotion() ?? false;
 
-  const victorId = mp?.gloriosVictory ?? null;
-  const reason = mp?.gloriosVictoryReason ?? null;
-  const show = mode === "mp" && !!victorId && victorId === humanId;
+  // Mode-agnostic GV — `elim` is mirrored from MP / computed locally in SP.
+  const victorId = elim.gloriosVictory;
+  const reason = elim.gloriosVictoryReason;
+  const show = !!victorId && victorId === humanId;
 
   const [stage, setStage] = useState<"splash" | "modal">("splash");
   useEffect(() => {
@@ -60,6 +61,9 @@ export function GloriousVictory() {
   if (!show) return null;
 
   const scoreRows = buildScoreRows(game, mp?.members ?? null);
+  // mainRoundsCount = boundary between R-rounds and F-rounds. The SD record
+  // is kept (with active: false) after GV via SD, so this stays accessible.
+  const mainRoundsCount = elim.suddenDeath?.mainRoundsCount ?? null;
 
   let tiebreakerMsg: string | null = null;
   if (reason === "more_wins") {
@@ -72,6 +76,8 @@ export function GloriousVictory() {
       : "Won by winning more rounds";
   } else if (reason === "final_round") {
     tiebreakerMsg = "Won by winning the final round";
+  } else if (reason === "sudden_death") {
+    tiebreakerMsg = "Won the sudden-death final";
   }
 
   return (
@@ -141,6 +147,7 @@ export function GloriousVictory() {
                 winnerId={victorId}
                 humanId={humanId}
                 variant="victory"
+                mainRoundsCount={mainRoundsCount}
               />
 
               <button

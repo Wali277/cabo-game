@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useEffect, useLayoutEffect, useState } from "react";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { useStore } from "../state/store";
 import { Audio } from "../audio/sounds";
 import { EndScoreboard, buildScoreRows } from "./EndScoreboard";
@@ -13,24 +13,44 @@ import { EndScoreboard, buildScoreRows } from "./EndScoreboard";
  */
 export function GameLostOverlay() {
   const mp = useStore((s) => s.mp);
+  const elim = useStore((s) => s.elim);
   const humanId = useStore((s) => s.humanId);
   const game = useStore((s) => s.game);
   const backToMenu = useStore((s) => s.backToMenu);
-  const mode = useStore((s) => s.mode);
 
-  const gloriosVictory = mp?.gloriosVictory ?? null;
-  const reason = mp?.gloriosVictoryReason ?? null;
+  // Mode-agnostic: elim is mirrored from MP / computed locally in SP.
+  const gloriosVictory = elim.gloriosVictory;
+  const reason = elim.gloriosVictoryReason;
 
   // Show when: game is over AND I am not the winner AND I was eliminated.
   const iAmEliminated =
-    (mp?.bustedThisRound.includes(humanId) ?? false) ||
-    (mp?.kickedIds.includes(humanId) ?? false);
+    elim.bustedThisRound.includes(humanId) ||
+    elim.kickedIds.includes(humanId);
+
+  // If we're being eliminated by a bust THIS round, the BustedOverlay splash
+  // plays first (1.4s). Delay our render so the splash isn't interrupted.
+  // If we were already kicked from a previous round (no fresh splash to play),
+  // appear immediately.
+  //
+  // useLayoutEffect (not useEffect) so the splashSettled=false update lands
+  // synchronously before the next paint — otherwise GameLostOverlay flashes
+  // for one frame before the bust splash, which the user perceives as the
+  // cinematic being skipped.
+  const reduced = useReducedMotion() ?? false;
+  const justBusted = elim.bustedThisRound.includes(humanId);
+  const [splashSettled, setSplashSettled] = useState(!justBusted);
+  useLayoutEffect(() => {
+    if (!justBusted || reduced) { setSplashSettled(true); return; }
+    setSplashSettled(false);
+    const t = setTimeout(() => setSplashSettled(true), 1400);
+    return () => clearTimeout(t);
+  }, [justBusted, reduced]);
 
   const show =
-    mode === "mp" &&
     !!gloriosVictory &&
     gloriosVictory !== humanId &&
-    iAmEliminated;
+    iAmEliminated &&
+    splashSettled;
 
   // Play lose SFX once when the overlay appears.
   useEffect(() => {
@@ -55,6 +75,9 @@ export function GameLostOverlay() {
     case "final_round":
       howWonMsg = "Won by winning the final round (tied on wins)";
       break;
+    case "sudden_death":
+      howWonMsg = "Won in sudden-death overtime";
+      break;
     case "survivor":
     default:
       howWonMsg = "Won by being the last one standing";
@@ -62,6 +85,9 @@ export function GameLostOverlay() {
   }
 
   const scoreRows = buildScoreRows(game, mp?.members ?? null);
+  // mainRoundsCount = boundary between R-rounds and F-rounds for the end
+  // scoreboard. The SD record is kept (with active:false) after GV via SD.
+  const mainRoundsCount = elim.suddenDeath?.mainRoundsCount ?? null;
 
   return (
     <AnimatePresence>
@@ -87,6 +113,7 @@ export function GameLostOverlay() {
             winnerId={gloriosVictory}
             humanId={humanId}
             variant="lost"
+            mainRoundsCount={mainRoundsCount}
           />
 
           <button
