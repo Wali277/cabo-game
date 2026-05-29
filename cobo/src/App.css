@@ -4445,7 +4445,9 @@ body.mobile-mode .game-body {
    clip the way they used to. Column widths are tuned per player-count below. */
 body.mobile-mode .table-grid {
   display: grid !important;
-  grid-template-columns: minmax(66px, 0.85fr) minmax(0, 2.3fr) minmax(66px, 0.85fr);
+  /* Side columns sized to CONTAIN the 2-column side clusters (~100px) so they
+     don't overlap the deck; centre is just wide enough for the 3 piles. */
+  grid-template-columns: minmax(98px, 1fr) minmax(0, 1.6fr) minmax(98px, 1fr);
   grid-template-rows: auto minmax(0, 1fr) auto auto !important;
   grid-template-areas:
     "top    top     top"
@@ -4476,8 +4478,8 @@ body.mobile-mode .tslot-top    { grid-area: top;    align-self: start; }
 /* Nudge the side rails inward off the screen edge so the rotated CABO text
    isn't clipped at the very left/right (cards were sitting ~10px from the
    edge). The extra room is taken toward the centre, where there's empty felt. */
-body.mobile-mode .tslot-left   { grid-area: left;   align-self: center; padding-left: 8px; box-sizing: border-box; }
-body.mobile-mode .tslot-right  { grid-area: right;  align-self: center; padding-right: 8px; box-sizing: border-box; }
+body.mobile-mode .tslot-left   { grid-area: left;   align-self: center; padding-left: 5px; box-sizing: border-box; }
+body.mobile-mode .tslot-right  { grid-area: right;  align-self: center; padding-right: 5px; box-sizing: border-box; }
 body.mobile-mode .tslot-center {
   grid-area: center;
   display: flex;
@@ -4549,9 +4551,23 @@ body.mobile-mode .tslot-left .player-seat,
 body.mobile-mode .tslot-right .player-seat {
   flex-direction: column;
   gap: 4px;
-  align-items: center;
   width: 100%;
 }
+/* Hug the OUTER edge so the 2-col cluster grows inward (toward centre). */
+body.mobile-mode .tslot-left .player-seat  { align-items: flex-start; }
+body.mobile-mode .tslot-right .player-seat { align-items: flex-end; }
+
+/* Mobile side hand: 2-column upright cluster (sm cards), sized to its content
+   so it overflows the narrow column toward the table centre rather than the
+   screen edge. Vertically compact (2 rows) → no spill into the action menu. */
+body.mobile-mode .side-hands-mobile {
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  gap: 4px;
+  width: max-content;
+}
+body.mobile-mode .tslot-right .side-hands-mobile { direction: rtl; }
+body.mobile-mode .tslot-right .side-hands-mobile > * { direction: ltr; }
 /* xs card = 40×58 (bumped from 32 for legibility). Rotated 90°, the wrapper
    reserves the card HEIGHT (58px) as width. The MAIN wrapper's height is set
    inline per card-count in PlayerSeat (so penalty cards extend the column);
@@ -4614,9 +4630,9 @@ body.mobile-mode .center-area {
   align-items: center;
 }
 body.mobile-mode .deck-area {
-  padding: 5px 10px;
+  padding: 5px 7px;
   border-width: 2px;
-  gap: 8px;
+  gap: 5px;
   border-radius: 20px;
   /* Align the deck / drawn / discard CARDS along their top edge. The piles
      have different heights (deck has a 2-line "Deck · N" label, discard a

@@ -29,12 +29,11 @@ const SUIT_GLYPH: Record<string, string> = { S: "♠", H: "♥", D: "♦", C: "�
 
 const SIZE_PX: Record<"desktop" | "mobile", Record<"xs" | "sm" | "md" | "lg", number>> = {
   desktop: { xs: 44, sm: 56, md: 80, lg: 110 },
-  // Mobile `xs` is consumed ONLY by the left/right side-rail opponent cards.
-  // Bumped 32→40 so the rank/suit faces are legible when spied/peeked — the
-  // previous 32px was barely readable. 40px is the largest that still fits the
-  // narrow side column (rotated width 58 ≤ 62px) and the vertical rail budget
-  // (with the side portrait shrunk to make room). See PlayerSeat side rail.
-  mobile:  { xs: 40, sm: 48, md: 50, lg: 66 },
+  // Mobile `xs` is consumed ONLY by the left/right side-player cards, now laid
+  // out as a 2-column cluster toward centre. 44px (just shy of the top's sm=48)
+  // is the largest that lets BOTH side clusters + the centre deck fit a 375px
+  // phone with no overlap. Faces are legible. See PlayerSeat side cluster.
+  mobile:  { xs: 42, sm: 48, md: 50, lg: 66 },
 };
 
 /** Pixel width of a card at a given size + view mode. Exported so seats can
