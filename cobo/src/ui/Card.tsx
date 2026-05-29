@@ -132,6 +132,11 @@ export function CardView({
         transition={
           reduced
             ? { duration: 0.15 }
+            : viewMode === "mobile"
+            // Mobile: a fixed-duration tween for the 3D rotateY flip. The spring
+            // re-solves the (GPU-costly) 3D transform every frame until it
+            // settles; a short tween is far cheaper and reads the same.
+            ? { duration: flipDuration * 0.8, ease: "easeInOut" as const }
             : { duration: flipDuration, type: "spring", stiffness: 105, damping: 16, mass: 1.1 }
         }
         style={{ width: "100%", height: "100%", transformStyle: "preserve-3d", position: "relative" }}

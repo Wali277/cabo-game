@@ -71,11 +71,16 @@ export function cardLayoutTransition({
   }
 
   if (viewMode === "mobile") {
+    // Mobile: short fixed-duration tweens instead of springs. A spring solves
+    // physics every frame and the previous soft configs (stiffness 75–140) ran
+    // 40–60+ frames before settling — that's the sluggish/janky card movement
+    // on phones. A ~0.3–0.45s ease-out tween settles in far fewer frames
+    // (cheaper) and reads snappier. All durations stay under the 500ms mobile
+    // animation hold (see actionSwapAnimationHoldMs). Desktop keeps its springs.
     return {
-      type: "spring" as const,
-      stiffness: isActionCardSwap ? 75 : isHandSwap ? 130 : 140,
-      damping: 26,
-      mass: 1.1,
+      type: "tween" as const,
+      duration: isActionCardSwap ? 0.45 : isHandSwap ? 0.4 : 0.34,
+      ease: [0.22, 1, 0.36, 1] as const,
     };
   }
 

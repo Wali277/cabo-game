@@ -5,6 +5,7 @@ import { useStore } from "../state/store";
 import { Audio } from "../audio/sounds";
 import { EndScoreboard, buildScoreRows } from "./EndScoreboard";
 import { FireworksLayer } from "./Particles";
+import { useViewMode } from "../state/viewmode";
 
 /**
  * GloriousVictory — two-beat cinematic when the local player wins the game.
@@ -24,6 +25,7 @@ export function GloriousVictory() {
   const backToMenu = useStore((s) => s.backToMenu);
   const game = useStore((s) => s.game);
   const reduced = useReducedMotion() ?? false;
+  const mobile = useViewMode() === "mobile";
 
   // Mode-agnostic GV — `elim` is mirrored from MP / computed locally in SP.
   const victorId = elim.gloriosVictory;
@@ -43,9 +45,11 @@ export function GloriousVictory() {
     if (!show || victorId !== humanId) return;
     Audio.playSfx("win");
     if (reduced) return;
+    // Lighter, fewer confetti volleys on mobile (canvas-confetti is rAF-driven
+    // and 3×130 particles stutters on phones). Desktop keeps the full burst.
     const fire = (delay: number) => setTimeout(() => {
       confetti({
-        particleCount: 130,
+        particleCount: mobile ? 70 : 130,
         spread: 85,
         startVelocity: 38,
         origin: { y: 0.55 },
@@ -54,9 +58,9 @@ export function GloriousVictory() {
     }, delay);
     const t1 = fire(0);
     const t2 = fire(550);
-    const t3 = fire(1100);
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
-  }, [show, victorId, humanId, reduced]);
+    const t3 = mobile ? null : fire(1100);
+    return () => { clearTimeout(t1); clearTimeout(t2); if (t3) clearTimeout(t3); };
+  }, [show, victorId, humanId, reduced, mobile]);
 
   if (!show) return null;
 

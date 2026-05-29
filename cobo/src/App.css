@@ -259,6 +259,41 @@ body.mobile-mode .menu-wallpaper-card {
   /* Lighter single shadow (was a double drop-shadow) — cheaper to paint. */
   filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.5)) !important;
 }
+
+/* ── In-game cinematics ──────────────────────────────────────────────────
+   iOS Safari chokes on full-screen `backdrop-filter` and large `blur()`
+   re-rasterized every frame while content animates behind them — this is a
+   big part of the "cinematics feel buggy" report. Drop the backdrop blurs
+   (the vignette gradients already dim the scene) and shrink the bloom/halo
+   blur radii. Visually near-identical on a phone; desktop keeps the full
+   premium blur. */
+body.mobile-mode .action-cinematic-vignette,
+body.mobile-mode .round-start-vignette,
+body.mobile-mode .toast {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+body.mobile-mode .action-cinematic-bloom,
+body.mobile-mode .round-start-bloom {
+  filter: blur(14px) !important;   /* was blur(34px) */
+}
+body.mobile-mode .glory-splash-halo { filter: blur(4px) !important; }   /* was 8px */
+body.mobile-mode .sudden-death-halo { filter: blur(5px) !important; }   /* was 10px */
+
+/* ── Always-on in-game glow loops ────────────────────────────────────────
+   These animate `box-shadow` on an infinite loop (a per-frame repaint that
+   never lets the renderer idle during play). Freeze them to a static glow on
+   mobile — the affordance still reads, the repaint stops. Desktop unchanged. */
+body.mobile-mode .pile.clickable .card-wrap::after {
+  animation: none !important;
+  box-shadow:
+    0 0 0 3px rgba(255, 216, 107, 0.4),
+    0 0 18px 4px rgba(255, 216, 107, 0.22) !important;
+}
+body.mobile-mode .hand-slot.spy-glow::before,
+body.mobile-mode .hand-slot.spy-glow::after {
+  animation: none !important;
+}
 /* Primary/big button sheen sweep: an infinite repaint on every CTA. */
 body.mobile-mode .btn.primary::before,
 body.mobile-mode .btn.big::before {
@@ -4668,12 +4703,12 @@ body.mobile-mode .tslot-action .left-divider {
   display: none;
 }
 
-/* ── Drawn-card action bar: A/B layouts (chosen via ?ab=, see LeftPanel.tsx) ──
-   These only apply in the turn_drawn phase, so the draw / CABO / Yes-No phases
-   keep the default flex-wrap row above. The "Use Spy" ability button is wrapped
-   in `.left-tip-wrap`; Swap + Discard are bare `.left-btn`s. */
-
-/* Variant A "split": ability fills the first row, Swap + Discard share row two. */
+/* ── Drawn-card action bar layout (turn_drawn phase only) ──
+   The ability button ("Use Spy") fills the first row full-width; Swap +
+   Discard share the row beneath it. Only applies in turn_drawn, so the
+   draw / CABO / Yes-No phases keep the default flex-wrap row above. The
+   ability button is wrapped in `.left-tip-wrap`; Swap + Discard are bare
+   `.left-btn`s (with no ability card, those two just split the one row). */
 body.mobile-mode .tslot-action .left-buttons.ab-split {
   flex-direction: row !important;
   flex-wrap: wrap;
@@ -4690,22 +4725,6 @@ body.mobile-mode .tslot-action .left-buttons.ab-split > .left-tip-wrap > .left-b
 body.mobile-mode .tslot-action .left-buttons.ab-split > .left-btn {
   flex: 1 1 0 !important;
   width: auto !important;
-}
-
-/* Variant B "stack": all three actions full-width, stacked vertically. */
-body.mobile-mode .tslot-action .left-buttons.ab-stack {
-  flex-direction: column !important;
-  flex-wrap: nowrap;
-  align-items: stretch;
-  gap: 8px !important;
-}
-body.mobile-mode .tslot-action .left-buttons.ab-stack > .left-tip-wrap,
-body.mobile-mode .tslot-action .left-buttons.ab-stack > .left-btn {
-  flex: 0 0 auto !important;
-  width: 100% !important;
-}
-body.mobile-mode .tslot-action .left-buttons.ab-stack > .left-tip-wrap > .left-btn {
-  width: 100% !important;
 }
 /* The previous bottom-sheet drawer rules for .left-instruction / .left-buttons /
    .left-btn are no longer applied in mobile (the panel is now inline via

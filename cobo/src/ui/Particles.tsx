@@ -17,6 +17,7 @@
  */
 import { motion, useReducedMotion } from "framer-motion";
 import { useMemo } from "react";
+import { useViewMode } from "../state/viewmode";
 
 /* ─────────────────────────────────────────────────────────────────────────
    CABO letter burst
@@ -108,8 +109,12 @@ interface ShatterGlassProps {
   shards?: number;
 }
 
-export function ShatterGlass({ color = "#ff5b6e", shards = 9 }: ShatterGlassProps) {
+export function ShatterGlass({ color = "#ff5b6e", shards }: ShatterGlassProps) {
   const reduced = useReducedMotion();
+  const mobile = useViewMode() === "mobile";
+  // Fewer SVG shards on mobile (each animates 5 props over 1.6s) — still
+  // reads as a shatter. Desktop keeps the fuller 9-shard burst.
+  const shardCount = shards ?? (mobile ? 5 : 9);
   if (reduced) return null;
 
   return (
@@ -123,8 +128,8 @@ export function ShatterGlass({ color = "#ff5b6e", shards = 9 }: ShatterGlassProp
       }}
       aria-hidden="true"
     >
-      {Array.from({ length: shards }, (_, i) => {
-        const angle = (i / shards) * 360 + (Math.random() * 30 - 15);
+      {Array.from({ length: shardCount }, (_, i) => {
+        const angle = (i / shardCount) * 360 + (Math.random() * 30 - 15);
         const rad = (angle * Math.PI) / 180;
         const distance = 200 + Math.random() * 100;
         const dx = Math.cos(rad) * distance;
@@ -188,12 +193,17 @@ interface FireworksLayerProps {
 
 export function FireworksLayer({ count = 6 }: FireworksLayerProps) {
   const reduced = useReducedMotion();
+  const mobile = useViewMode() === "mobile";
+  // Each burst runs an INFINITE loop of ~14 particles for the whole victory
+  // screen — the longest-lived animation in the game. Halve the bursts on
+  // mobile so the celebration doesn't peg the GPU. Desktop keeps all 6.
+  const effCount = mobile ? Math.min(count, 3) : count;
 
   // Generate fixed random positions / delays per mount so the bursts feel
   // organic but stable (no re-randomising on every render).
   const bursts = useMemo(() => {
     const arr: Array<{ x: number; y: number; delay: number; hue: number; id: number }> = [];
-    for (let i = 0; i < count; i++) {
+    for (let i = 0; i < effCount; i++) {
       arr.push({
         // Bursts spread across the viewport with a bit of margin
         x: 10 + Math.random() * 80,    // % from left
@@ -204,7 +214,7 @@ export function FireworksLayer({ count = 6 }: FireworksLayerProps) {
       });
     }
     return arr;
-  }, [count]);
+  }, [effCount]);
 
   if (reduced) return null;
 
@@ -220,14 +230,14 @@ export function FireworksLayer({ count = 6 }: FireworksLayerProps) {
       aria-hidden="true"
     >
       {bursts.map((b) => (
-        <Firework key={b.id} x={b.x} y={b.y} delay={b.delay} hue={b.hue} />
+        <Firework key={b.id} x={b.x} y={b.y} delay={b.delay} hue={b.hue} mobile={mobile} />
       ))}
     </div>
   );
 }
 
-function Firework({ x, y, delay, hue }: { x: number; y: number; delay: number; hue: number }) {
-  const particles = 14;
+function Firework({ x, y, delay, hue, mobile }: { x: number; y: number; delay: number; hue: number; mobile: boolean }) {
+  const particles = mobile ? 8 : 14;
   const cycle = 3.6 + Math.random() * 1.4;
 
   return (

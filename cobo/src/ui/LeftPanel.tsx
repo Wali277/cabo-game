@@ -15,19 +15,6 @@ const ACTION_META: Record<string, { label: string; emoji: string; desc: string; 
   "K":  { label: "Peek & Swap", emoji: "👑", desc: "Peek an opponent's card, then decide swap.", color: "#ffd86b" },
 };
 
-/** Action-bar layout for the drawn-card decision, chosen via the `?ab=` URL
- *  param so both can be compared live on the same build:
- *    ?ab=split (default) → "Use Spy" full-width on the first row, Swap + Discard
- *                          side-by-side beneath it.
- *    ?ab=stack           → three full-width buttons stacked vertically.
- *  Temporary A/B switch — the chosen winner gets baked in as the only layout
- *  afterwards. Only affects the turn_drawn phase (see className below). */
-const AB_VARIANT: "split" | "stack" =
-  typeof window !== "undefined" &&
-  new URLSearchParams(window.location.search).get("ab") === "stack"
-    ? "stack"
-    : "split";
-
 interface LeftPanelProps {
   /** Extra class names — used by Table.tsx to add `.open` in phone mode so
    *  CSS can slide the panel up as a bottom sheet. */
@@ -309,7 +296,7 @@ export function LeftPanel({ className = "" }: LeftPanelProps = {}) {
 
       {buttons && (
         <motion.div
-          className={`left-buttons${game.phase === "turn_drawn" ? ` ab-${AB_VARIANT}` : ""}`}
+          className={`left-buttons${game.phase === "turn_drawn" ? " ab-split" : ""}`}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.08 }}

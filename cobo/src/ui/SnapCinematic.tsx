@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { useStore } from "../state/store";
 import { Audio } from "../audio/sounds";
+import { useViewMode } from "../state/viewmode";
 
 /**
  * Big "SNAP!" / "MISS!" overlay. Reads from game.animations and consumes
@@ -31,6 +32,9 @@ type SnapMoment = {
 export function SnapCinematic() {
   const game = useStore((s) => s.game);
   const reduced = useReducedMotion() ?? false;
+  // Fewer radial spokes on mobile (each is a Framer keyframe loop) — still
+  // reads as a burst, half the per-frame animation load. Desktop keeps 14.
+  const spokeCount = useViewMode() === "mobile" ? 8 : 14;
   const [moment, setMoment] = useState<SnapMoment | null>(null);
   const handledEventId = useRef<string | null>(null);
 
@@ -115,12 +119,12 @@ export function SnapCinematic() {
           {/* Particle burst — radial spokes that scale + fade outward */}
           {!reduced && (
             <div className="snap-burst" aria-hidden>
-              {Array.from({ length: 14 }).map((_, i) => (
+              {Array.from({ length: spokeCount }).map((_, i) => (
                 <motion.span
                   key={i}
                   className="snap-spoke"
                   style={{
-                    transform: `rotate(${(i * 360) / 14}deg) translateY(0)`,
+                    transform: `rotate(${(i * 360) / spokeCount}deg) translateY(0)`,
                   }}
                   initial={{ opacity: 0, scaleY: 0.4 }}
                   animate={{ opacity: [0, 1, 0], scaleY: [0.4, 1.4, 0.6] }}
