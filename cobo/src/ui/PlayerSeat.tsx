@@ -22,6 +22,9 @@ interface Props {
  *  initial mount). Swap / blind_swap / peek_and_swap let the shared-
  *  element layout animation on the inner CardView handle the glide. */
 const CARD_SPRING = { type: "spring" as const, stiffness: 140, damping: 22, mass: 1.2 };
+/** Mobile: cheap fixed tween for slot entrances (deal / snap-replacement card)
+ *  instead of the spring — springs re-solve per frame and felt jaggy on phones. */
+const CARD_TWEEN_MOBILE = { type: "tween" as const, duration: 0.34, ease: [0.22, 1, 0.36, 1] as const };
 
 export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: Props) {
   const viewMode = useViewMode();
@@ -287,9 +290,12 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
         transition={
           // Round-start deal staggers per card so each of the 4 cards in
           // a hand arrives a beat after the previous — reads as a real
-          // deal, not a four-card splash.
+          // deal, not a four-card splash. Mobile uses a cheap tween base
+          // (keeps the stagger) to avoid the spring's per-frame jank.
           lastAnim?.kind === "deal"
-            ? { ...CARD_SPRING, delay: 0.12 + idx * 0.09 }
+            ? { ...(isMobile ? CARD_TWEEN_MOBILE : CARD_SPRING), delay: 0.12 + idx * 0.09 }
+            : isMobile
+            ? CARD_TWEEN_MOBILE
             : CARD_SPRING
         }
       >

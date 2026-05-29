@@ -20,6 +20,13 @@ const CARD_SPRING = { type: "spring" as const, stiffness: 115, damping: 22, mass
  *  so the discard arrival matches the pace of the swap glide. */
 const SWAP_CARD_SPRING = { type: "spring" as const, stiffness: 87, damping: 20, mass: 1.25 };
 
+/** Mobile: a short fixed-duration tween instead of the springs above for the
+ *  drawn-slot and discard-pile arrivals. Springs re-solve physics every frame
+ *  and ran long on phones — that's the "jaggy" discard/draw feel. A ~0.34s
+ *  ease-out tween over the same arc keyframes is far cheaper and snappier.
+ *  Desktop keeps its premium springs. */
+const MOBILE_CARD_TWEEN = { type: "tween" as const, duration: 0.34, ease: [0.22, 1, 0.36, 1] as const };
+
 /** How many cards of the discard pile are visibly rendered as a stack.
  *  Older cards exist in `game.discard` but stay invisibly buried. */
 const VISIBLE_PILE_DEPTH = 5;
@@ -263,10 +270,12 @@ export function Center() {
         ? swapHandDiscardTransition(reduced)
         : reduced
         ? { duration: 0.15 }
+        : !isDesktop
+        ? MOBILE_CARD_TWEEN
         : isSwapDiscard
         ? SWAP_CARD_SPRING
         : CARD_SPRING,
-    [topDiscard?.id, isHandSwapDiscard, isSwapDiscard, reduced],
+    [topDiscard?.id, isHandSwapDiscard, isSwapDiscard, reduced, isDesktop],
   );
 
   return (
@@ -292,7 +301,7 @@ export function Center() {
                 initial={reduced ? { opacity: 0 } : drawnTraj.initial}
                 animate={reduced ? { opacity: 1 } : drawnAnimate!}
                 exit={{ opacity: 0, scale: 0.85, transition: { duration: 0.18 } }}
-                transition={reduced ? { duration: 0.15 } : CARD_SPRING}
+                transition={reduced ? { duration: 0.15 } : isDesktop ? CARD_SPRING : MOBILE_CARD_TWEEN}
                 style={{ position: "relative", zIndex: 5 }}
               >
                 <CardView
