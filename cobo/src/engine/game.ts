@@ -135,21 +135,14 @@ export function startPlay(state: GameState): GameState {
 }
 
 export function clearAnimations(state: GameState): GameState {
-  // Identity guard: if there's nothing to clear, return the SAME state object so
-  // Zustand's `s => s.game` subscribers don't re-render on a no-op clear (the
-  // consume effect can fire when already empty). Behaviour-preserving.
-  if (state.animations.length === 0) return state;
   return { ...state, animations: [] };
 }
 
 export function clearReveals(state: GameState): GameState {
-  if (state.reveals.length === 0) return state;
   // Keep persistent reveals (setup peek shown via phase, round_end shown forever)
   const keep = state.reveals.filter(
     (r) => r.reason === "round_end",
   );
-  // No change → same ref (avoids a redundant full-board re-render).
-  if (keep.length === state.reveals.length) return state;
   return { ...state, reveals: keep };
 }
 
