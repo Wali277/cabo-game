@@ -294,6 +294,42 @@ body.mobile-mode .hand-slot.spy-glow::before,
 body.mobile-mode .hand-slot.spy-glow::after {
   animation: none !important;
 }
+
+/* ── Opponent cards (top / left / right) on mobile: flatten the 3D perspective.
+   On a 32–56px card the perspective:800px depth is imperceptible, and on the
+   90°-rotated side rails the strong perspective-to-size ratio sheared the tiny
+   cards (the "weird looking / badly designed" left+right cards). Dropping
+   perspective renders them flat AND removes ~12 GPU 3D-contexts in a 4-player
+   game — a big part of why 3/4-player lagged while 1v1 is smooth. The flip
+   still works: backface-visibility keys off preserve-3d (kept on .card-inner),
+   not perspective. The human's own hand (.tslot-bottom) keeps its perspective
+   for the peek-flip depth. Desktop is untouched. */
+body.mobile-mode .tslot-top .card-scene,
+body.mobile-mode .tslot-left .card-scene,
+body.mobile-mode .tslot-right .card-scene {
+  perspective: none !important;
+}
+/* Without perspective the ±1px Z face offsets are visually inert; clear them
+   so the rotated side cards render perfectly flat. */
+body.mobile-mode .tslot-top .card-face,
+body.mobile-mode .tslot-left .card-face,
+body.mobile-mode .tslot-right .card-face {
+  transform: none !important;
+}
+body.mobile-mode .tslot-top .card-back,
+body.mobile-mode .tslot-left .card-back,
+body.mobile-mode .tslot-right .card-back {
+  transform: rotateY(180deg) !important;
+}
+
+/* Lighter card shadow on mobile — one small shadow instead of the 18px-blur +
+   inset stack. With up to ~19 cards on a 4-player board the blurred shadow
+   repaint was a real paint cost; the look barely changes. (Skins with their
+   own !important shadow, e.g. minimalist, keep theirs via higher specificity.) */
+body.mobile-mode .card-face,
+body.mobile-mode .card-back {
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.32) !important;
+}
 /* Primary/big button sheen sweep: an infinite repaint on every CTA. */
 body.mobile-mode .btn.primary::before,
 body.mobile-mode .btn.big::before {
