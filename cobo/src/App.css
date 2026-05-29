@@ -229,6 +229,136 @@ html, body, #root {
   }
 }
 
+/* ============================================================
+ * MOBILE PERFORMANCE PASS
+ * Silence the always-on animations and GPU-compositing effects that
+ * pinned phone framerates. Everything here is scoped to
+ * `body.mobile-mode`, so the desktop/web experience is byte-for-byte
+ * unchanged. (In-game animated wallpapers are gated off in Table.tsx;
+ * MenuWallpaper freezes its cards in MenuWallpaper.tsx. This block
+ * covers the remaining CSS-driven loops + backdrop blurs.)
+ * ============================================================ */
+/* Menu aurora blobs + under-pile glows: stop the infinite drift/breathe. */
+body.mobile-mode .menu-aurora-blob,
+body.mobile-mode .menu-wallpaper-glow {
+  animation: none !important;
+}
+/* Primary/big button sheen sweep: an infinite repaint on every CTA. */
+body.mobile-mode .btn.primary::before,
+body.mobile-mode .btn.big::before {
+  animation: none !important;
+  display: none;
+}
+/* Drop backdrop blur on panels — it forces a re-blur every frame whenever
+   cards animate behind them. The panels' solid-ish rgba background keeps
+   them perfectly legible without the blur. */
+body.mobile-mode .left-panel,
+body.mobile-mode .action-log {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+/* ============================================================
+ * Menu sound toggle (top-right) + Add-to-Home-Screen banner (bottom)
+ * ============================================================ */
+.menu .menu-sound-toggle {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 14px);
+  right: calc(env(safe-area-inset-right, 0px) + 14px);
+  z-index: 50;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  color: #f4ebff;
+  border: 2px solid rgba(168, 123, 255, 0.55);
+  background: rgba(13, 22, 56, 0.9);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.38);
+  transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease;
+}
+.menu-sound-toggle:hover {
+  transform: translateY(-2px) scale(1.05);
+  border-color: rgba(168, 123, 255, 0.95);
+}
+.menu-sound-toggle:active { transform: scale(0.94); }
+.menu-sound-toggle.is-muted {
+  border-color: rgba(255, 120, 120, 0.6);
+  background: rgba(46, 18, 26, 0.9);
+}
+
+.a2hs-banner {
+  position: fixed;
+  left: 14px;
+  right: 14px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
+  max-width: 430px;
+  margin: 0 auto;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  color: #f4ebff;
+  background: linear-gradient(135deg, rgba(255, 216, 107, 0.18), rgba(168, 123, 255, 0.16));
+  border: 1.5px solid rgba(255, 216, 107, 0.5);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.34);
+}
+.a2hs-icon {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 11px;
+  color: #ffd86b;
+  background: rgba(255, 216, 107, 0.16);
+}
+.a2hs-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.25;
+}
+.a2hs-text strong { font-size: 14px; font-weight: 800; color: #fff; }
+.a2hs-text span { font-size: 12px; color: rgba(244, 235, 255, 0.82); }
+.a2hs-dismiss {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  color: rgba(244, 235, 255, 0.8);
+  background: rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.a2hs-dismiss:hover { background: rgba(255, 255, 255, 0.2); color: #fff; }
+
+/* ── Installed PWA (standalone display mode) ──────────────────────────────
+   No browser chrome here, so content runs under the iOS status bar. Pad the
+   top bar / menu by the status-bar safe area so nothing hides behind the
+   clock, and let the game use the reclaimed full-screen height. Scoped to
+   body.standalone → the in-browser web build is completely unaffected. */
+body.standalone .top-bar {
+  padding-top: calc(env(safe-area-inset-top, 0px) + 8px);
+}
+body.standalone .menu-refresh,
+body.standalone .lobby.menu-refresh {
+  padding-top: calc(env(safe-area-inset-top, 0px) + 20px);
+}
+
 /* ────────────────────────────────────────────────────────────────────────────
    IN-GAME TABLE THEME (.table-bg)
 
@@ -4517,6 +4647,46 @@ body.mobile-mode .tslot-action .left-btn {
 }
 body.mobile-mode .tslot-action .left-divider {
   display: none;
+}
+
+/* ── Drawn-card action bar: A/B layouts (chosen via ?ab=, see LeftPanel.tsx) ──
+   These only apply in the turn_drawn phase, so the draw / CABO / Yes-No phases
+   keep the default flex-wrap row above. The "Use Spy" ability button is wrapped
+   in `.left-tip-wrap`; Swap + Discard are bare `.left-btn`s. */
+
+/* Variant A "split": ability fills the first row, Swap + Discard share row two. */
+body.mobile-mode .tslot-action .left-buttons.ab-split {
+  flex-direction: row !important;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 8px !important;
+}
+body.mobile-mode .tslot-action .left-buttons.ab-split > .left-tip-wrap {
+  flex: 0 0 100% !important;
+  width: 100% !important;
+}
+body.mobile-mode .tslot-action .left-buttons.ab-split > .left-tip-wrap > .left-btn {
+  width: 100% !important;
+}
+body.mobile-mode .tslot-action .left-buttons.ab-split > .left-btn {
+  flex: 1 1 0 !important;
+  width: auto !important;
+}
+
+/* Variant B "stack": all three actions full-width, stacked vertically. */
+body.mobile-mode .tslot-action .left-buttons.ab-stack {
+  flex-direction: column !important;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 8px !important;
+}
+body.mobile-mode .tslot-action .left-buttons.ab-stack > .left-tip-wrap,
+body.mobile-mode .tslot-action .left-buttons.ab-stack > .left-btn {
+  flex: 0 0 auto !important;
+  width: 100% !important;
+}
+body.mobile-mode .tslot-action .left-buttons.ab-stack > .left-tip-wrap > .left-btn {
+  width: 100% !important;
 }
 /* The previous bottom-sheet drawer rules for .left-instruction / .left-buttons /
    .left-btn are no longer applied in mobile (the panel is now inline via

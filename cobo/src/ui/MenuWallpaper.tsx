@@ -1,5 +1,6 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { CardView } from "./Card";
+import { useViewMode } from "../state/viewmode";
 import type { Card, Rank, Suit } from "../engine/types";
 
 /**
@@ -87,6 +88,12 @@ function makeCard(rank: Rank, suit: Suit, id: string): Card {
 
 export function MenuWallpaper() {
   const reduceMotion = useReducedMotion();
+  const mobile = useViewMode() === "mobile";
+  // Mobile: render only the large outer cards and FREEZE them (no infinite
+  // Framer loops) so the menu's renderer can go idle — 16 looping cards was a
+  // major source of low FPS on phones. Desktop keeps all cards drifting.
+  const cards = mobile ? CARDS.filter((c) => c.size === "lg") : CARDS;
+  const frozen = reduceMotion || mobile;
 
   return (
     <div className="menu-wallpaper" aria-hidden="true">
@@ -104,7 +111,7 @@ export function MenuWallpaper() {
       <div className="menu-wallpaper-glow menu-wallpaper-glow-left" />
       <div className="menu-wallpaper-glow menu-wallpaper-glow-right" />
 
-      {CARDS.map((c) => {
+      {cards.map((c) => {
         const sideStyle =
           c.side === "left" ? { left: `${c.inset}%` } : { right: `${c.inset}%` };
 
@@ -115,7 +122,7 @@ export function MenuWallpaper() {
         const dx = 4 * c.driftScale;
         const baseR = c.rotate;
 
-        const animateLoop = reduceMotion
+        const animateLoop = frozen
           ? { rotate: baseR }
           : {
               y: [0, -dy, 0, dy * 0.6, 0],
@@ -142,7 +149,7 @@ export function MenuWallpaper() {
             initial={{ rotate: baseR, y: 0, x: 0 }}
             animate={animateLoop}
             transition={
-              reduceMotion
+              frozen
                 ? { duration: 0 }
                 : {
                     duration: c.duration,

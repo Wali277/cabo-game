@@ -41,6 +41,21 @@ function mediaMatches(query: string): boolean {
   }
 }
 
+/** True when launched as an installed PWA — iOS home-screen ("standalone") or a
+ *  display-mode:standalone window. These have no browser chrome, so we lean on
+ *  the full-bleed mobile layout to use the extra space. */
+export function isStandalone(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return (
+      (navigator as { standalone?: boolean }).standalone === true ||
+      window.matchMedia("(display-mode: standalone)").matches
+    );
+  } catch {
+    return false;
+  }
+}
+
 function readSaved(): ViewMode | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -60,6 +75,10 @@ function readSaved(): ViewMode | null {
  */
 function resolveMode(): ViewMode {
   if (mediaMatches(NARROW_QUERY)) return "mobile";
+  // Installed on a touch device (iPhone/iPad/Android home screen): always use
+  // the spacious full-bleed layout, even over a stale "desktop" preference.
+  // Desktop PWA installs (fine pointer) are left alone.
+  if (isStandalone() && mediaMatches("(pointer: coarse)")) return "mobile";
   const saved = readSaved();
   if (saved) return saved;
   if (mediaMatches("(pointer: coarse)")) return "mobile";

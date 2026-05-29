@@ -87,20 +87,31 @@ function hash01(s: string): number {
 /** Per-card settled rotation. The VERY first card on the pile (absolute
  *  index 0 in game.discard) lands STRAIGHT; every subsequent card gets
  *  a ±5° rotation seeded by its id so the pile reads as a real toss. */
-function pileRotation(cardId: string, absoluteIndex: number): number {
+function pileRotation(cardId: string, absoluteIndex: number, viewMode: "desktop" | "mobile"): number {
   if (absoluteIndex === 0) return 0;
-  return hash01(cardId + "rot") * 18 - 9; // ±9°
+  // Tight mobile layout: gentler tilt so the small cards stay aligned and
+  // don't swing sideways into the neighbouring deck / drawn slots.
+  const max = viewMode === "mobile" ? 3.5 : 9;
+  return (hash01(cardId + "rot") - 0.5) * 2 * max; // ±max°
 }
 
 /** x/y jitter per card so the pile builds visibly unevenly — cards
  *  don't stack pixel-aligned like a deck cut for play. The horizontal
  *  spread is big enough that the under-pile cards genuinely peek out
  *  from behind the top card, growing the silhouette as more land. */
-function pileOffset(cardId: string, indexInStack: number): { x: number; y: number } {
-  const x = (hash01(cardId + "x") - 0.5) * 22;         // ±11px
-  // Each higher card sits ~2.5px above the previous one, so the visible
-  // pile literally grows taller as more cards accumulate.
-  const y = (hash01(cardId + "y") - 0.5) * 12 - indexInStack * 2.5;
+function pileOffset(cardId: string, indexInStack: number, viewMode: "desktop" | "mobile"): { x: number; y: number } {
+  const mobile = viewMode === "mobile";
+  // Desktop piles spread widely for a "real toss" look. On mobile the deck /
+  // drawn / discard cards sit only ~8px apart, so the full spread shoved the
+  // top discard card sideways into the drawn card (the overlap + misalignment
+  // the player reported). Shrink the spread so the pile stays neatly aligned.
+  const xSpread = mobile ? 4 : 22;   // ±2px vs ±11px
+  const yJitter = mobile ? 4 : 12;   // ±2px vs ±6px
+  const yStep = mobile ? 1 : 2.5;    // gentler stack growth keeps top card aligned
+  const x = (hash01(cardId + "x") - 0.5) * xSpread;
+  // Each higher card sits slightly above the previous one, so the visible
+  // pile grows taller as more cards accumulate.
+  const y = (hash01(cardId + "y") - 0.5) * yJitter - indexInStack * yStep;
   return { x, y };
 }
 
@@ -219,12 +230,12 @@ export function Center() {
     [topDiscard?.id, isDesktop, swapHandSource],
   );
   const topRotation = useMemo(
-    () => topDiscard ? pileRotation(topDiscard.id, game.discard.length - 1) : 0,
-    [topDiscard?.id, game.discard.length],
+    () => topDiscard ? pileRotation(topDiscard.id, game.discard.length - 1, viewMode) : 0,
+    [topDiscard?.id, game.discard.length, viewMode],
   );
   const topOffset = useMemo(
-    () => topDiscard ? pileOffset(topDiscard.id, visiblePile.length - 1) : { x: 0, y: 0 },
-    [topDiscard?.id, visiblePile.length],
+    () => topDiscard ? pileOffset(topDiscard.id, visiblePile.length - 1, viewMode) : { x: 0, y: 0 },
+    [topDiscard?.id, visiblePile.length, viewMode],
   );
 
   // Pre-compute the stable animate target arrays so framer-motion doesn't
@@ -332,8 +343,8 @@ export function Center() {
                     drop the shared-element link and let CSS position them. */}
                 {visiblePile.slice(0, -1).map((card, i) => {
                   const absoluteIdx = pileBaseAbsoluteIdx + i;
-                  const rot = pileRotation(card.id, absoluteIdx);
-                  const { x, y } = pileOffset(card.id, i);
+                  const rot = pileRotation(card.id, absoluteIdx, viewMode);
+                  const { x, y } = pileOffset(card.id, i, viewMode);
                   return (
                     <div
                       key={card.id}

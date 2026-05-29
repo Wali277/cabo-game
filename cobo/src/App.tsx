@@ -17,7 +17,7 @@ import { SnapCinematic } from "./ui/SnapCinematic";
 import { SnapBonusOverlay } from "./ui/SnapBonusOverlay";
 import { BUSTED_ROOM_KEY } from "./ui/BustedOverlay";
 import { getSocket } from "./state/mp";
-import { useViewMode } from "./state/viewmode";
+import { useViewMode, isStandalone } from "./state/viewmode";
 
 function getRoomFromPath(): string | null {
   const m = window.location.pathname.match(/\/room\/([A-Za-z0-9]{4,8})/);
@@ -39,6 +39,12 @@ function App() {
     document.body.classList.toggle("mobile-mode", viewMode === "mobile");
     return () => { document.body.classList.remove("mobile-mode"); };
   }, [viewMode]);
+
+  // Installed-PWA flag → CSS reclaims the status-bar safe area and uses the
+  // extra space. Standalone never changes within a session, so set it once.
+  useEffect(() => {
+    document.body.classList.toggle("standalone", isStandalone());
+  }, []);
 
   const prevScreenRef = useRef(screen);
   const firstRender = useRef(true);

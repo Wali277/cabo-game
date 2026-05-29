@@ -388,12 +388,23 @@ export function Table() {
           {/* Ocean = pure dark-blue gradient (no overlay).
               Aquarium = full animated underwater scene (fish, kelp, etc).
               Northern Lights = aurora ribbons + stars overlay. */}
-          {tableTheme === "emerald"  && <EmeraldWallpaper />}
-          {tableTheme === "ocean"    && <OceanWallpaper />}
-          {tableTheme === "crimson"  && <CrimsonWallpaper />}
-          {tableTheme === "cosmic"   && <CosmicWallpaper />}
-          {tableTheme === "northern" && <NorthernLightsWallpaper />}
-          {tableTheme === "aquarium" && <AquariumWallpaper />}
+          {/* Animated wallpaper overlays are DESKTOP-ONLY. On phones each ran
+              continuous Framer / requestAnimationFrame loops (dozens of
+              particles, the Aquarium physics sim, big blur/blend layers) that
+              pinned the GPU and never let the renderer idle — the main cause of
+              low mobile FPS. The themed gradient on `.table-bg[data-theme]` is
+              pure CSS and still renders on mobile, so the table stays themed
+              without the per-frame repaint. Desktop is unchanged. */}
+          {!isMobile && (
+            <>
+              {tableTheme === "emerald"  && <EmeraldWallpaper />}
+              {tableTheme === "ocean"    && <OceanWallpaper />}
+              {tableTheme === "crimson"  && <CrimsonWallpaper />}
+              {tableTheme === "cosmic"   && <CosmicWallpaper />}
+              {tableTheme === "northern" && <NorthernLightsWallpaper />}
+              {tableTheme === "aquarium" && <AquariumWallpaper />}
+            </>
+          )}
         </div>
 
         {/* Compact top bar */}
