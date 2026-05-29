@@ -53,14 +53,13 @@ export function Menu() {
     const s = Audio.getSettings();
     return s.musicMuted && s.sfxMuted;
   });
-  useEffect(
-    () =>
-      Audio.subscribe(() => {
-        const s = Audio.getSettings();
-        setMuted(s.musicMuted && s.sfxMuted);
-      }),
-    [],
-  );
+  useEffect(() => {
+    const unsub = Audio.subscribe(() => {
+      const s = Audio.getSettings();
+      setMuted(s.musicMuted && s.sfxMuted);
+    });
+    return () => { unsub(); };
+  }, []);
   const toggleMute = () => {
     Audio.ensure();
     const next = !muted;
