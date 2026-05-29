@@ -4445,9 +4445,9 @@ body.mobile-mode .game-body {
    clip the way they used to. Column widths are tuned per player-count below. */
 body.mobile-mode .table-grid {
   display: grid !important;
-  /* Side columns sized to CONTAIN the 2-column side clusters (~100px) so they
-     don't overlap the deck; centre is just wide enough for the 3 piles. */
-  grid-template-columns: minmax(98px, 1fr) minmax(0, 1.6fr) minmax(98px, 1fr);
+  /* Side columns hold the narrow rotated rail (sm card rotated = 70px wide);
+     centre takes the rest for the deck/discard/drawn piles. */
+  grid-template-columns: minmax(74px, 0.9fr) minmax(0, 2.2fr) minmax(74px, 0.9fr);
   grid-template-rows: auto minmax(0, 1fr) auto auto !important;
   grid-template-areas:
     "top    top     top"
@@ -4478,8 +4478,8 @@ body.mobile-mode .tslot-top    { grid-area: top;    align-self: start; }
 /* Nudge the side rails inward off the screen edge so the rotated CABO text
    isn't clipped at the very left/right (cards were sitting ~10px from the
    edge). The extra room is taken toward the centre, where there's empty felt. */
-body.mobile-mode .tslot-left   { grid-area: left;   align-self: center; padding-left: 5px; box-sizing: border-box; }
-body.mobile-mode .tslot-right  { grid-area: right;  align-self: center; padding-right: 5px; box-sizing: border-box; }
+body.mobile-mode .tslot-left   { grid-area: left;   align-self: center; padding-left: 7px; box-sizing: border-box; }
+body.mobile-mode .tslot-right  { grid-area: right;  align-self: center; padding-right: 7px; box-sizing: border-box; }
 body.mobile-mode .tslot-center {
   grid-area: center;
   display: flex;
@@ -4490,7 +4490,17 @@ body.mobile-mode .tslot-center {
 /* Contextual action bar — between the deck and the human's hand. Renders
    only on the human's turn / setup; collapses to 0 otherwise so a bot turn
    reclaims the space. */
-body.mobile-mode .tslot-action { grid-area: action; align-self: end; }
+body.mobile-mode .tslot-action {
+  grid-area: action;
+  align-self: end;
+  /* The sm side rails are tall enough to spill ~20px into this row. Give the
+     action panel priority so it sits OVER the side cards (it's a solid panel,
+     so the overlap reads cleanly). When the player taps an action (spy / swap /
+     snap → boardPickActive), the panel is display:none'd (.tslot-action-hidden
+     below), so every side card is fully visible + tappable again. */
+  position: relative;
+  z-index: 20;
+}
 /* While the human is picking a card on the board (swap / peek / blind-swap /
    snap target), collapse the action panel so it frees the area and never
    covers the cards being tapped. The grid row is `auto`, so display:none
@@ -4551,31 +4561,17 @@ body.mobile-mode .tslot-left .player-seat,
 body.mobile-mode .tslot-right .player-seat {
   flex-direction: column;
   gap: 4px;
+  align-items: center;
   width: 100%;
 }
-/* Hug the OUTER edge so the 2-col cluster grows inward (toward centre). */
-body.mobile-mode .tslot-left .player-seat  { align-items: flex-start; }
-body.mobile-mode .tslot-right .player-seat { align-items: flex-end; }
-
-/* Mobile side hand: 2-column upright cluster (sm cards), sized to its content
-   so it overflows the narrow column toward the table centre rather than the
-   screen edge. Vertically compact (2 rows) → no spill into the action menu. */
-body.mobile-mode .side-hands-mobile {
-  display: grid;
-  grid-template-columns: repeat(2, auto);
-  gap: 4px;
-  width: max-content;
-}
-body.mobile-mode .tslot-right .side-hands-mobile { direction: rtl; }
-body.mobile-mode .tslot-right .side-hands-mobile > * { direction: ltr; }
-/* xs card = 40×58 (bumped from 32 for legibility). Rotated 90°, the wrapper
-   reserves the card HEIGHT (58px) as width. The MAIN wrapper's height is set
-   inline per card-count in PlayerSeat (so penalty cards extend the column);
-   this fixed height is the fallback / back-row footprint. */
+/* sm card = 48×70 (same size as the top player). Rotated 90°, the wrapper
+   reserves the card HEIGHT (70px) as its width. The MAIN wrapper's height is
+   set inline per card-count in PlayerSeat (so penalty cards extend the column);
+   this fixed height is the fallback / back-row footprint (4 × 48 + gaps). */
 body.mobile-mode .hand-row-side-wrap,
 body.mobile-mode .hand-row-side-wrap-back {
-  width: 58px;
-  height: 184px;
+  width: 70px;
+  height: 216px;
 }
 body.mobile-mode .hand-row-side-wrap {
   position: relative;
@@ -4585,8 +4581,8 @@ body.mobile-mode .hand-row-side {
   gap: 4px;
 }
 body.mobile-mode .hand-slot-placeholder {
-  width: 40px;
-  height: 58px;
+  width: 48px;
+  height: 70px;
 }
 /* The narrow phone rail has no room to throw the overflow column out toward
    the screen edge (it'd clip), so tuck it just behind the main column and

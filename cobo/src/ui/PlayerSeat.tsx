@@ -46,13 +46,10 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
       : "lg"
     : !isMobile
     ? "md"
-    // Mobile: top opponent = sm (48). Side players = xs (44) — just shy of sm
-    // so the two 2-column side clusters + the centre deck all fit a 375px phone
-    // without overlapping. Side players render as a 2-col cluster (below) that
-    // grows toward centre.
-    : tablePos === "top"
-    ? "sm"
-    : "xs";
+    // Mobile: all opponents — top AND left/right — use sm (48), so the side
+    // players match the top player's card size. Side players render in the
+    // rotated vertical rail (below), same placement as the top row reads.
+    : "sm";
   const game = useStore((s) => s.game!);
   const targeting = useStore((s) => s.targeting);
   const humanId = useStore((s) => s.humanId);
@@ -408,39 +405,37 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
         //   LEFT player  → back-row at `right: 100%` (LEFT of main wrapper).
         //   RIGHT player → back-row at `left: 100%`  (RIGHT of main wrapper).
         // CSS picks the side via .pos-left / .pos-right on .side-hands-group.
-        isMobile ? (
-          // MOBILE: a 2-column upright cluster that grows toward the table
-          // centre (into the empty felt) instead of a tall rotated rail. Cards
-          // are `sm` (same as the top player) and readable; the cluster is
-          // vertically compact (2 rows) so it fits the cell without spilling
-          // into the action menu. `pos-left/right` flips which way it hugs.
-          <div className={`side-hands-mobile pos-${tablePos}`}>
-            {cardSlots}
+        // Side player: rotated vertical rail (same placement on mobile and
+        // desktop). On mobile the wrapper height grows with the card count so
+        // snap-penalty cards extend the line. Cards are sm (48) — matching the
+        // top player. 4 sm cards × 48 + 4px gaps + 12 padding.
+        <div className={`side-hands-group pos-${tablePos}${sideHasOverflow ? " has-back" : ""}`}>
+          <div
+            className="hand-row-side-wrap"
+            style={
+              isMobile && isSide
+                ? { height: handLen * cardPx("sm", viewMode) + (handLen - 1) * 4 + 12 }
+                : undefined
+            }
+          >
+            <div
+              className="hand-row hand-row-side"
+              style={{ transform: `translateX(-50%) translateY(-50%) rotate(${sideRotateDeg}deg)` }}
+            >
+              {sideMainSlots.length ? sideMainSlots : cardSlots}
+            </div>
           </div>
-        ) : (
-          // DESKTOP: original rotated rail — main 4-card row + absolute back-row
-          // for snap-penalty overflow tucked toward the screen edge. Unchanged.
-          <div className={`side-hands-group pos-${tablePos}${sideHasOverflow ? " has-back" : ""}`}>
-            <div className="hand-row-side-wrap">
+          {sideHasOverflow && (
+            <div className="hand-row-side-wrap hand-row-side-wrap-back">
               <div
                 className="hand-row hand-row-side"
                 style={{ transform: `translateX(-50%) translateY(-50%) rotate(${sideRotateDeg}deg)` }}
               >
-                {sideMainSlots.length ? sideMainSlots : cardSlots}
+                {sideBackRowSlots}
               </div>
             </div>
-            {sideHasOverflow && (
-              <div className="hand-row-side-wrap hand-row-side-wrap-back">
-                <div
-                  className="hand-row hand-row-side"
-                  style={{ transform: `translateX(-50%) translateY(-50%) rotate(${sideRotateDeg}deg)` }}
-                >
-                  {sideBackRowSlots}
-                </div>
-              </div>
-            )}
-          </div>
-        )
+          )}
+        </div>
       ) : (
         <div className="hand-row">{cardSlots}</div>
       )}
