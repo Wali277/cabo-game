@@ -27,6 +27,7 @@ import { CrimsonWallpaper } from "./CrimsonWallpaper";
 import { CosmicWallpaper } from "./CosmicWallpaper";
 import { CaboLettersBurst } from "./Particles";
 import { actionSwapAnimationHoldMs } from "./cardMotion";
+import { useFitToViewport } from "./fitScale";
 
 export function Table() {
   const game = useStore((s) => s.game!);
@@ -47,6 +48,14 @@ export function Table() {
   // up as a bottom sheet via the 📊 Scores top-bar button.
   const viewMode = useViewMode();
   const isMobile = viewMode === "mobile";
+  // Desktop board auto-fit: uniformly downscale the card board so it always
+  // fits the viewport height at 100% zoom. Short laptops/MacBooks were
+  // clipping the human's hand off the bottom. Disabled on mobile, which keeps
+  // its own dvh/flex layout. See useFitToViewport + getFitScale.
+  const { ref: tableGridRef, scale: fitScale } = useFitToViewport(
+    !isMobile,
+    [game.players.length, viewMode],
+  );
   // Mobile: when the human must pick a card on the BOARD (a swap / peek /
   // blind-swap / peek-and-swap target, or an armed snap they're taking),
   // collapse the inline action panel so it never covers the cards they need
@@ -488,8 +497,20 @@ export function Table() {
         <div className="game-body">
           {!isMobile && <LeftPanel />}
 
-          {/* Table grid — players sit on each side of the deck */}
-          <div className="table-grid">
+          {/* Table grid — players sit on each side of the deck.
+              On desktop it's uniformly down-scaled (useFitToViewport) so the
+              whole board — including the human hand — always fits the viewport
+              height at 100% zoom on short laptop screens. Mobile keeps its own
+              dvh/flex layout (no transform). */}
+          <div
+            className="table-grid"
+            ref={tableGridRef}
+            style={
+              !isMobile && fitScale < 1
+                ? { transform: `scale(${fitScale})`, transformOrigin: "top center" }
+                : undefined
+            }
+          >
             {/* Top opponent */}
             <div className="tslot tslot-top">
               {slotMap.top && (

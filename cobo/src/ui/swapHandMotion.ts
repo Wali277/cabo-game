@@ -1,3 +1,5 @@
+import { getFitScale } from "./fitScale";
+
 type Trajectory = {
   initial: { x: number; y: number; opacity: number; scale: number; rotate: number };
   animate: { x: number[]; y: number[]; opacity: number; scale: number; rotate: number };
@@ -26,9 +28,15 @@ export function recordSwapHandSource(
 
   const source = centerOf(sourceRect);
   const target = centerOf(targetRect);
+  // Both rects are measured in (scaled) screen space. This offset is replayed
+  // as a motion x/y INSIDE the board, which is itself scaled by the desktop
+  // fit transform — so divide by the live fit scale to convert the screen
+  // delta back into the board's local space and avoid a double-scaled glide.
+  // No-op when the board isn't scaled (getFitScale() === 1).
+  const s = getFitScale() || 1;
   swapHandSourceOffsets.set(cardId, {
-    x: source.x - target.x,
-    y: source.y - target.y,
+    x: (source.x - target.x) / s,
+    y: (source.y - target.y) / s,
   });
 }
 

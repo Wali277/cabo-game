@@ -1939,9 +1939,15 @@ body.standalone .lobby.menu-refresh {
   width: 100%;
   /* dvh accounts for the iOS / mobile-edge collapsing URL bar so the
      game never sits ~70px past the visible viewport on phones. The 100vh
-     fallback below handles browsers that still don't ship dvh. */
-  min-height: 100vh;
-  min-height: 100dvh;
+     fallback below handles browsers that still don't ship dvh.
+     FIXED height (not min-height): pins the in-game container to exactly the
+     viewport so the flex chain hands .game-body / .table-grid a definite
+     bounded height. The desktop board then auto-scales (useFitToViewport) to
+     fit that height instead of overflowing it — short laptops/MacBooks were
+     clipping the human's hand off the bottom. Mobile sets its own height in
+     the body.mobile-mode override below, so this doesn't affect phones. */
+  height: 100vh;
+  height: 100dvh;
   /* Game layout should never scroll — every screen of the game fits
      in the viewport by design. Hides any sub-pixel rounding that would
      otherwise produce a flickering scrollbar. */
