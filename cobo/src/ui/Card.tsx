@@ -1,4 +1,5 @@
 import { motion, useReducedMotion } from "framer-motion";
+import { memo } from "react";
 import type React from "react";
 import type { Card as CardT } from "../engine/types";
 import { useViewMode } from "../state/viewmode";
@@ -28,7 +29,12 @@ const SUIT_GLYPH: Record<string, string> = { S: "♠", H: "♥", D: "♦", C: "�
 
 const SIZE_PX: Record<"desktop" | "mobile", Record<"xs" | "sm" | "md" | "lg", number>> = {
   desktop: { xs: 44, sm: 56, md: 80, lg: 110 },
-  mobile:  { xs: 32, sm: 48, md: 50, lg: 66 },
+  // Mobile `xs` is consumed ONLY by the left/right side-rail opponent cards.
+  // Bumped 32→40 so the rank/suit faces are legible when spied/peeked — the
+  // previous 32px was barely readable. 40px is the largest that still fits the
+  // narrow side column (rotated width 58 ≤ 62px) and the vertical rail budget
+  // (with the side portrait shrunk to make room). See PlayerSeat side rail.
+  mobile:  { xs: 40, sm: 48, md: 50, lg: 66 },
 };
 
 /** Pixel width of a card at a given size + view mode. Exported so seats can
@@ -37,7 +43,7 @@ export function cardPx(size: "xs" | "sm" | "md" | "lg", viewMode: "desktop" | "m
   return SIZE_PX[viewMode][size];
 }
 
-export function CardView({
+function CardViewImpl({
   card,
   faceUp,
   highlight,
@@ -148,6 +154,42 @@ export function CardView({
     </motion.div>
   );
 }
+
+/**
+ * Memoised so a card only re-renders when something it actually DRAWS changes.
+ * Without this, every card re-runs its (Framer-heavy: layoutId measurement, 3D
+ * flip, skin) render on every game tick because the parent PlayerSeat re-renders
+ * — and that cost scales with player/card count, which is why 3-4-player lagged.
+ *
+ * The comparator deliberately EXCLUDES `onClick`: the store's click actions
+ * (clickOwnCard/clickOtherCard) read fresh state via get() and re-validate every
+ * gate (snap phase, turn, targeting) at call time, and the closure only captures
+ * the stable `idx`/player.id — so a "stale" onClick is harmless. Including it
+ * would defeat the memo (a new closure every parent render). It also excludes
+ * the internal store subscriptions (lastAnimKind etc.) — those live inside the
+ * component via useStore and still trigger their own re-render when they change,
+ * which is exactly what the flip-timing logic needs.
+ *
+ * Every prop the component renders FROM is compared, so a reveal/swap/flip/skin
+ * change still re-renders correctly. (Card compared by id+rank+suit since clone()
+ * hands us a fresh object reference every tick.)
+ */
+function cardViewPropsEqual(prev: Props, next: Props): boolean {
+  return (
+    prev.faceUp === next.faceUp &&
+    prev.highlight === next.highlight &&
+    prev.size === next.size &&
+    prev.flipDuration === next.flipDuration &&
+    prev.shake === next.shake &&
+    prev.layoutId === next.layoutId &&
+    prev.skinOverride === next.skinOverride &&
+    (prev.card?.id ?? null) === (next.card?.id ?? null) &&
+    (prev.card?.rank ?? null) === (next.card?.rank ?? null) &&
+    (prev.card?.suit ?? null) === (next.card?.suit ?? null)
+  );
+}
+
+export const CardView = memo(CardViewImpl, cardViewPropsEqual);
 
 /** Pick a per-suit text color: skin override wins, else default red/black. */
 function suitTextColor(suit: string, skin: import("./cardSkins").SkinStyle): string {

@@ -4549,12 +4549,14 @@ body.mobile-mode .tslot-right .player-seat {
   align-items: center;
   width: 100%;
 }
-/* xs card = 32×46. Horizontal row of 4 ≈ 4×32 + 3×4 = 140 wide × 46 tall →
-   after the 90° rotation the wrapper reserves ~48 wide × ~152 tall. */
+/* xs card = 40×58 (bumped from 32 for legibility). Rotated 90°, the wrapper
+   reserves the card HEIGHT (58px) as width. The MAIN wrapper's height is set
+   inline per card-count in PlayerSeat (so penalty cards extend the column);
+   this fixed height is the fallback / back-row footprint. */
 body.mobile-mode .hand-row-side-wrap,
 body.mobile-mode .hand-row-side-wrap-back {
-  width: 48px;
-  height: 152px;
+  width: 58px;
+  height: 184px;
 }
 body.mobile-mode .hand-row-side-wrap {
   position: relative;
@@ -4564,8 +4566,8 @@ body.mobile-mode .hand-row-side {
   gap: 4px;
 }
 body.mobile-mode .hand-slot-placeholder {
-  width: 32px;
-  height: 46px;
+  width: 40px;
+  height: 58px;
 }
 /* The narrow phone rail has no room to throw the overflow column out toward
    the screen edge (it'd clip), so tuck it just behind the main column and

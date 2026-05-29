@@ -353,7 +353,7 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
           className={`bot-portrait-wrap bot-portrait-identifier${isCurrent ? " is-current" : ""}`}
           style={{ borderColor: botProfile!.accent }}
         >
-          <BotPortraitComp size={isMobile ? (tablePos === "left" || tablePos === "right" ? 38 : 52) : 72} />
+          <BotPortraitComp size={isMobile ? (tablePos === "left" || tablePos === "right" ? 28 : 52) : 72} />
           {player.calledCabo && <span className="cabo-badge bot-cabo-badge">CABO!</span>}
           <AnimatePresence>
             {hasSpeech && (
