@@ -89,10 +89,12 @@ function makeCard(rank: Rank, suit: Suit, id: string): Card {
 export function MenuWallpaper() {
   const reduceMotion = useReducedMotion();
   const mobile = useViewMode() === "mobile";
-  // Mobile: render only the large outer cards and FREEZE them (no infinite
-  // Framer loops) so the menu's renderer can go idle — 16 looping cards was a
-  // major source of low FPS on phones. Desktop keeps all cards drifting.
-  const cards = mobile ? CARDS.filter((c) => c.size === "lg") : CARDS;
+  // Mobile: render just 4 outer cards (one per corner) and FREEZE them (no
+  // infinite Framer loops) so the menu's renderer can go idle — 16 looping
+  // cards, each a 3D-context CardView, was a major source of low FPS on
+  // phones. Desktop keeps all 16 cards drifting.
+  const MOBILE_CARD_IDS = ["L1", "L2", "R1", "R2"];
+  const cards = mobile ? CARDS.filter((c) => MOBILE_CARD_IDS.includes(c.id)) : CARDS;
   const frozen = reduceMotion || mobile;
 
   return (

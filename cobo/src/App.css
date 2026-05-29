@@ -238,10 +238,26 @@ html, body, #root {
  * MenuWallpaper freezes its cards in MenuWallpaper.tsx. This block
  * covers the remaining CSS-driven loops + backdrop blurs.)
  * ============================================================ */
-/* Menu aurora blobs + under-pile glows: stop the infinite drift/breathe. */
+/* Menu aurora: the two 60vw blur(80px) (→90vw blur(60px) on mobile) blobs +
+   grain are the single heaviest thing on the phone menu — large permanently-
+   composited (will-change) blurred layers that iOS Safari struggles to paint.
+   Hide them on mobile; the navy gradient body + floating cards + soft glows
+   keep the menu rich. Desktop keeps the full aurora. */
 body.mobile-mode .menu-aurora-blob,
+body.mobile-mode .menu-aurora-grain {
+  display: none !important;
+}
+/* Stop the infinite glow breathe AND release the permanent GPU layers
+   (will-change) the decorative menu elements each held — 12 composited
+   layers on a phone was a big chunk of the jank. */
 body.mobile-mode .menu-wallpaper-glow {
   animation: none !important;
+  will-change: auto !important;
+}
+body.mobile-mode .menu-wallpaper-card {
+  will-change: auto !important;
+  /* Lighter single shadow (was a double drop-shadow) — cheaper to paint. */
+  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.5)) !important;
 }
 /* Primary/big button sheen sweep: an infinite repaint on every CTA. */
 body.mobile-mode .btn.primary::before,
@@ -291,7 +307,10 @@ body.mobile-mode .action-log {
   background: rgba(46, 18, 26, 0.9);
 }
 
-.a2hs-banner {
+/* `.menu` scope bumps specificity over `.menu > *:not(.menu-wallpaper)`
+   (line 68) which otherwise forces position:relative — that dropped the
+   banner into normal flow, where it overlapped the card and overflowed. */
+.menu .a2hs-banner {
   position: fixed;
   left: 14px;
   right: 14px;
