@@ -295,32 +295,14 @@ body.mobile-mode .hand-slot.spy-glow::after {
   animation: none !important;
 }
 
-/* ── Opponent cards (top / left / right) on mobile: flatten the 3D perspective.
-   On a 32–56px card the perspective:800px depth is imperceptible, and on the
-   90°-rotated side rails the strong perspective-to-size ratio sheared the tiny
-   cards (the "weird looking / badly designed" left+right cards). Dropping
-   perspective renders them flat AND removes ~12 GPU 3D-contexts in a 4-player
-   game — a big part of why 3/4-player lagged while 1v1 is smooth. The flip
-   still works: backface-visibility keys off preserve-3d (kept on .card-inner),
-   not perspective. The human's own hand (.tslot-bottom) keeps its perspective
-   for the peek-flip depth. Desktop is untouched. */
-body.mobile-mode .tslot-top .card-scene,
-body.mobile-mode .tslot-left .card-scene,
-body.mobile-mode .tslot-right .card-scene {
-  perspective: none !important;
-}
-/* Without perspective the ±1px Z face offsets are visually inert; clear them
-   so the rotated side cards render perfectly flat. */
-body.mobile-mode .tslot-top .card-face,
-body.mobile-mode .tslot-left .card-face,
-body.mobile-mode .tslot-right .card-face {
-  transform: none !important;
-}
-body.mobile-mode .tslot-top .card-back,
-body.mobile-mode .tslot-left .card-back,
-body.mobile-mode .tslot-right .card-back {
-  transform: rotateY(180deg) !important;
-}
+/* NOTE: A v5.9 attempt to flatten opponent-card perspective (perspective:none
+   + cleared translateZ offsets) was REVERTED in v5.10 — clearing the translateZ
+   removed the depth separation that stops the front/back z-fighting, which
+   reintroduced the backface bleed-through on mobile GPUs (front showing through
+   the CABO back). All cards now keep the proven perspective:800px + translateZ
+   backface config from the global `.card-scene` / Card.tsx rules. This bleed is
+   a mobile-GPU artifact that does NOT reproduce in a desktop preview, so the
+   backface config must not be altered without on-device verification. */
 
 /* Lighter card shadow on mobile — one small shadow instead of the 18px-blur +
    inset stack. With up to ~19 cards on a 4-player board the blurred shadow
