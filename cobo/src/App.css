@@ -402,11 +402,15 @@ body.mobile-mode .action-log {
 
 /* ── Installed PWA (standalone display mode) ──────────────────────────────
    No browser chrome here, so content runs under the iOS status bar. Pad the
-   top bar / menu by the status-bar safe area so nothing hides behind the
-   clock, and let the game use the reclaimed full-screen height. Scoped to
-   body.standalone → the in-browser web build is completely unaffected. */
-body.standalone .top-bar {
-  padding-top: calc(env(safe-area-inset-top, 0px) + 8px);
+   menu by the status-bar safe area so nothing hides behind the clock, and lock
+   out the rubber-band overscroll that makes the app feel like it scrolls.
+   Scoped to body.standalone → the in-browser web build is completely
+   unaffected. (The in-game top bar gets its safe-area padding from the
+   `body.mobile-mode .top-bar` rule, which applies in standalone too.) */
+body.standalone {
+  /* Kill iOS rubber-band / overscroll bounce so the installed app sits fixed
+     to the viewport instead of dragging. */
+  overscroll-behavior: none;
 }
 body.standalone .menu-refresh,
 body.standalone .lobby.menu-refresh {
@@ -4361,6 +4365,12 @@ body.mobile-mode .top-bar {
   flex-wrap: wrap;
   gap: 8px;
   padding: 8px 10px;
+  /* Reserve the iOS status-bar safe area so the buttons clear the clock/notch
+     in the installed PWA (black-translucent status bar). This MUST come after
+     the `padding` shorthand above, or the shorthand resets padding-top and the
+     top bar renders under the status bar — untappable. In a normal browser the
+     inset is 0, so this is just the 8px. */
+  padding-top: calc(env(safe-area-inset-top, 0px) + 8px);
 }
 body.mobile-mode .top-bar .menu-back {
   font-size: 14px;
@@ -4581,7 +4591,7 @@ body.mobile-mode .center-area {
   align-items: center;
 }
 body.mobile-mode .deck-area {
-  padding: 7px 10px;
+  padding: 5px 10px;
   border-width: 2px;
   gap: 8px;
   border-radius: 20px;
@@ -4653,13 +4663,16 @@ body.mobile-mode .tslot-action .left-panel {
   max-width: 480px !important;
   max-height: none !important;
   margin: 0 8px !important;
-  padding: 10px 14px !important;
+  /* Tightened vertical padding/gap to bank a few px of headroom for the
+     largest status-bar insets (Dynamic Island ~59px) so the layout fits with
+     no scroll on every phone. */
+  padding: 7px 12px !important;
   border-radius: 16px !important;
   background: rgba(13, 22, 56, 0.92) !important;
   border: 2px solid rgba(168, 123, 255, 0.55) !important;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4) !important;
   flex-direction: column !important;
-  gap: 8px !important;
+  gap: 6px !important;
   overflow: hidden;
 }
 /* Compact instruction header — emoji + text inline to save vertical room */
