@@ -82,7 +82,12 @@ function CardViewImpl({
 
   return (
     <motion.div
-      layoutId={layoutId}
+      // PERF (mobile): drop the Framer shared-layout (layoutId) participation on
+      // phones. The LayoutGroup re-measures every participating card on activity
+      // (getBoundingClientRect FLIP passes) — that's the dominant main-thread
+      // cost on mobile (50ms+ tasks). Without layoutId the card still renders &
+      // swaps; it just doesn't do the measured glide. Desktop keeps the glide.
+      layoutId={viewMode === "mobile" ? undefined : layoutId}
       className={`card-wrap card-skin-${skinId}${suppressCssTransformTransition ? " layout-glide" : ""} ${isHl ? "hl" : ""} ${highlight ?? ""}`}
       style={{
         width: w,
