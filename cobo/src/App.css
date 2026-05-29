@@ -2887,9 +2887,21 @@ body.mobile-mode .round-start-label {
 /* ========== Toast ========== */
 .toast {
   position: fixed;
-  top: 24px;
-  left: 50%;
-  transform: translateX(-50%);
+  /* Clear the iOS status bar (was top:24px → under the notch/clock). */
+  top: calc(env(safe-area-inset-top, 0px) + 16px);
+  /* Centre via auto margins, NOT transform. The toast is a Framer motion.div
+     whose animate={{ y, scale }} writes an inline `transform` that overrode the
+     old `translateX(-50%)`, so the toast lost its centering and ran off the
+     right edge. left:0/right:0 + margin:auto centres it transform-free, and the
+     max-width caps it inside the viewport so it can never clip. */
+  left: 0;
+  right: 0;
+  margin-left: auto;
+  margin-right: auto;
+  width: fit-content;
+  max-width: calc(100vw - 24px);
+  box-sizing: border-box;
+  text-align: center;
   background: #0d1638;
   color: #a87bff;
   font-weight: 700;
