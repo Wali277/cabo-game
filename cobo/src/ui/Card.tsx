@@ -358,11 +358,18 @@ function CardFace({
   const glyph = SUIT_GLYPH[card.suit];
   const font = skin.font ?? "'Fredoka', system-ui, sans-serif";
 
-  // Glyph sizes — enlarged on mobile (see budget note at top of CardFace).
-  // 2*(rankFs + cornerSuitFs) + pipFs must stay under the inner height.
-  const rankFs = w * (mobile ? 0.30 : 0.22);
-  const cornerSuitFs = w * (mobile ? 0.19 : 0.17);
-  const pipFs = w * (mobile ? 0.32 : 0.48);
+  // Glyph sizes. Rank corner: sized for at-a-glance reading of the drawn card.
+  // Centre pip: a lone glyph stranded in the empty middle reads much smaller
+  // than the signs packed into the corners (whitespace illusion), so — like a
+  // real playing card — the centre pip is sized well ABOVE the corner rank so
+  // it actually looks like the dominant central symbol. Pushed as large as the
+  // budget allows; mobile trims the corner suit glyph for the extra room.
+  // Invariant preserved: 2*(rankFs + cornerSuitFs) + pipFs must stay under the
+  // inner height (~1.33w) so the two corners and the centre pip never overlap.
+  //   desktop: 2*(0.27+0.17)+0.44 = 1.32w   mobile: 2*(0.34+0.13)+0.36 = 1.30w
+  const rankFs = w * (mobile ? 0.34 : 0.27);
+  const cornerSuitFs = w * (mobile ? 0.13 : 0.17);
+  const pipFs = w * (mobile ? 0.36 : 0.44);
 
   return (
     <div
