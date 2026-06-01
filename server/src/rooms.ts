@@ -1,4 +1,4 @@
-import type { GameState } from "./engine/types.js";
+import type { GameState, GameVariant } from "./engine/types.js";
 
 export interface Member {
   socketId: string;
@@ -12,6 +12,9 @@ export interface Room {
   hostId: string | null;
   members: Member[];
   game: GameState | null;
+  /** Rule variant for this room, chosen by the host in the lobby. Joiners see
+   *  it read-only. Locked once the game starts. Passed into every newGame(). */
+  variant: GameVariant;
   createdAt: number;
   lastStarterIdx: number;
   coinToss: {
@@ -85,6 +88,7 @@ export class Rooms {
       hostId: null,
       members: [],
       game: null,
+      variant: "classic",
       createdAt: Date.now(),
       lastStarterIdx: 0,
       coinToss: null,
