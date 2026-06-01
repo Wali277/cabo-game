@@ -30,6 +30,11 @@ import { CaboLettersBurst } from "./Particles";
 import { actionSwapAnimationHoldMs } from "./cardMotion";
 import { useFitToViewport } from "./fitScale";
 
+// How long a transient peek / spy reveal stays face-up before it auto-flips
+// back. There is no tap-to-skip — it dismisses smoothly on its own. Snappy but
+// long enough to read and memorise the card. (Tunable: lower = faster.)
+const REVEAL_HOLD_MS = 1800;
+
 export function Table() {
   const game = useStore((s) => s.game!);
   const humanId = useStore((s) => s.humanId);
@@ -81,12 +86,6 @@ export function Table() {
   // CABO letter-burst particle anchor — set when a "cabo_called" animation
   // event lands. Cleared 1.2s later so the burst auto-unmounts.
   const [caboBurst, setCaboBurst] = useState<{ x: number; y: number; key: number } | null>(null);
-
-  // Reveals that the human can tap-anywhere to dismiss early
-  // (peek_own / peek_other only — peek_and_swap stays until user decides)
-  const hasDismissableReveal =
-    game.reveals.some((r) => r.reason === "peek_own" || r.reason === "peek_other") &&
-    game.phase !== "action_peek_and_swap_decide";
 
   const lastRound = useRef(game.roundNumber);
   useEffect(() => {
@@ -224,15 +223,22 @@ export function Table() {
     return () => clearTimeout(t);
   }, [botSpeech]);
 
-  // Auto-clear transient reveals after a short window so cards flip back.
-  // Setup peek reveals are intentionally NOT auto-cleared — they stay face-up
-  // until startPlay() so players can take their time memorising their cards.
+  // Auto-flip transient reveals (peek / spy / snap reveals) back face-down after
+  // a short window. No tap-to-skip — it dismisses smoothly on its own. Setup
+  // peek reveals are intentionally NOT auto-cleared — they stay face-up until
+  // startPlay() so players can memorise their dealt cards.
+  //
+  // The timer is keyed on a STABLE content signature of the transient reveals,
+  // NOT on `game.reveals` directly: that array's identity changes every tick
+  // (bot moves, MP broadcasts), which kept restarting the timer and left the
+  // peeked card stuck face-up — the "sometimes it stays" bug.
+  const transientRevealKey = game.reveals
+    .filter((r) => r.reason !== "round_end" && r.reason !== "setup")
+    .map((r) => `${r.reason}:${r.playerId}:${r.index}:${r.card.id}`)
+    .join("|");
   useEffect(() => {
     if (game.phase === "setup_peek") return;
-    const transients = game.reveals.filter(
-      (r) => r.reason !== "round_end" && r.reason !== "setup",
-    );
-    if (transients.length === 0) return;
+    if (!transientRevealKey) return;
     const t = setTimeout(() => {
       const latest = useStore.getState().game;
       if (!latest) return;
@@ -240,9 +246,9 @@ export function Table() {
       if (useStore.getState().mode === "mp") {
         import("../state/mp").then((m) => m.sendAction({ type: "clear_reveals" }));
       }
-    }, 2400);
+    }, REVEAL_HOLD_MS);
     return () => clearTimeout(t);
-  }, [game.reveals, game.phase]);
+  }, [transientRevealKey, game.phase]);
 
   // Spawn the CABO letter-burst particle when a "cabo_called" animation
   // event arrives. Anchor to the centre of the caller's seat by querying
@@ -642,22 +648,6 @@ export function Table() {
           />
         )}
 
-        {/* Tap-anywhere overlay to dismiss peek/spy reveals early */}
-        {hasDismissableReveal && (
-          <div
-            className="reveal-dismiss-overlay"
-            onClick={() => {
-              const latest = useStore.getState().game;
-              if (!latest) return;
-              useStore.setState({ game: clearRevealsEngine(latest) });
-              if (mode === "mp") {
-                import("../state/mp").then((m) =>
-                  m.sendAction({ type: "clear_reveals" }),
-                );
-              }
-            }}
-          />
-        )}
       </div>
 
       {/* Training Chamber dev panel — fixed bar at the bottom of the screen */}
