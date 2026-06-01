@@ -1,5 +1,6 @@
 import { io, type Socket } from "socket.io-client";
 import { useStore } from "./store";
+import { logDebug } from "./debugLog";
 
 // In a production web build the Node server serves both the static client and
 // the Socket.IO endpoint, so we connect to the same origin (works behind any
@@ -61,6 +62,16 @@ export function getSocket(): Socket {
           },
         );
       }
+    });
+    // ── Connection diagnostics ────────────────────────────────────────────
+    // Log non-sensitive socket lifecycle events to the debug buffer so the
+    // owner can see dropped connections / handshake failures. We only record
+    // event names and error messages here — never room or card data.
+    socket.on("connect_error", (err) => {
+      logDebug("warn", "socket", "connect_error", err?.message);
+    });
+    socket.on("disconnect", (reason) => {
+      logDebug("warn", "socket", "disconnected", String(reason));
     });
     listenersBound = true;
   }
@@ -181,6 +192,11 @@ export function sendAction(
   onFail?: () => void,
 ) {
   getSocket().emit("action", payload, (resp: { ok: boolean; error?: string }) => {
+    if (resp?.ok === false) {
+      // Log only the action TYPE + server error string — never the payload,
+      // which can carry card indices / hidden-info choices.
+      logDebug("warn", "action", `action ${payload.type} rejected`, resp?.error);
+    }
     if (!resp?.ok && onFail) onFail();
   });
 }
@@ -211,6 +227,12 @@ export function sendStrawPick(index: number) {
 
 export function sendReady() {
   return new Promise<any>((resolve) => getSocket().emit("room:ready", {}, resolve));
+}
+
+/** Withdraw a ready vote (the room "cancel"). Holds a pending start until the
+ *  player re-readies; every active player must be ready for the game to begin. */
+export function sendUnready() {
+  return new Promise<any>((resolve) => getSocket().emit("room:unready", {}, resolve));
 }
 
 export function sendStrawReady() {

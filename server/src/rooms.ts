@@ -45,10 +45,10 @@ export interface Room {
    *  - contestants stays frozen across repeat SD rounds.
    *  - mainRoundsCount = scores[id].length captured at SD trigger time. */
   suddenDeath: { active: boolean; contestants: string[]; mainRoundsCount: number } | null;
-  // Ready-up system: first player to click arms a 10s timer; second click starts immediately.
+  // Lobby ready-up: EVERY active player must click Ready before the game starts
+  // (no timer — players can withdraw via room:unready, so nobody feels rushed).
   readyVotes: string[];
-  readyStartedAt: number | null;
-  // Same system for the "Start round" button inside the game (setup_peek phase).
+  // Same "first click arms a 10s timer" system for the in-game "Start round" button (setup_peek).
   roundReadyVotes: string[];
   roundReadyStartedAt: number | null;
   // Straw-draw continue: all players must click Continue (or timer runs out).
@@ -102,7 +102,6 @@ export class Rooms {
       roundWins: {},
       suddenDeath: null,
       readyVotes: [],
-      readyStartedAt: null,
       roundReadyVotes: [],
       roundReadyStartedAt: null,
       strawReadyVotes: [],

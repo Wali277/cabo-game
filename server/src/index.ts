@@ -27,6 +27,7 @@ import {
   dragonChooseRank,
   drawFromDeck,
   drawFromDiscard,
+  endRound,
   handScore,
   newGame,
   setupPeekCard,
@@ -45,9 +46,6 @@ const io = new Server(server, { cors: { origin: "*" } });
 
 const rooms = new Rooms();
 
-// Per-room timers for the ready-up countdown. Stored outside the Room so they
-// aren't serialised and can be properly cancelled on early start or room cleanup.
-const readyTimers = new Map<string, ReturnType<typeof setTimeout>>();
 // Per-room timers for the coin-toss server-side fallback (auto-resolve after
 // 5s if only one player has picked — happens when the other player has
 // disconnected and their client-side auto-pick never fires).
@@ -62,9 +60,6 @@ const strawReadyTimers = new Map<string, ReturnType<typeof setTimeout>>();
 function startRoomGame(roomCode: string) {
   const room = rooms.get(roomCode);
   if (!room || room.game || room.members.length < 2) return;
-  const timerId = readyTimers.get(roomCode);
-  if (timerId) clearTimeout(timerId);
-  readyTimers.delete(roomCode);
   const players = room.members.map((m) => ({ id: m.playerId, name: m.name, isBot: false }));
   room.game = newGame({ players, variant: room.variant });
   const startIdx = Math.floor(Math.random() * players.length);
@@ -88,8 +83,31 @@ function startRoomGame(roomCode: string) {
     };
   }
   room.readyVotes = [];
-  room.readyStartedAt = null;
   broadcastRoom(roomCode);
+}
+
+// Start the room's game the instant every CONNECTED, still-active player has
+// clicked Ready (minimum 2). Disconnected players are deliberately excluded:
+// they can't click, so requiring them would stall the room forever — and if a
+// game does start without one, the in-game forfeit flow handles them. Returns
+// true if it started (in which case it has already broadcast). This is the
+// single source of truth for "everyone's ready", called from room:ready and
+// whenever lobby membership changes (a leaver may be the last one awaited).
+function maybeStartRoom(roomCode: string): boolean {
+  const room = rooms.get(roomCode);
+  if (!room || room.game) return false;
+  const required = room.members
+    .filter(
+      (m) =>
+        m.connected &&
+        !room.disconnects[m.playerId]?.forfeited &&
+        !room.kickedIds.includes(m.playerId),
+    )
+    .map((m) => m.playerId);
+  if (required.length < 2) return false;
+  if (!required.every((pid) => room.readyVotes.includes(pid))) return false;
+  startRoomGame(roomCode); // resets readyVotes + broadcasts internally
+  return true;
 }
 
 // Finalise a straw draw: assign any unclaimed straws to players who didn't
@@ -177,16 +195,30 @@ function skipKickedTurn(game: GameState, kickedIds: string[]): GameState {
     return game;
   }
   let attempts = game.players.length;
+  let wrappedToCaboCaller = false;
   while (
     attempts > 0 &&
     kickedIds.includes(game.players[game.currentPlayer]?.id ?? "")
   ) {
     game.currentPlayer = (game.currentPlayer + 1) % game.players.length;
     attempts -= 1;
-    // Stop and resolve as round_over if we wrap into the cabo caller's seat.
+    // If we wrap into the cabo caller's seat, the final lap is over.
     if (game.caboCallerId && game.players[game.currentPlayer]?.id === game.caboCallerId) {
+      wrappedToCaboCaller = true;
       break;
     }
+  }
+  // Wrapping to the cabo caller means the round is over — mirror advanceTurn()
+  // and end it, instead of handing the caller an extra turn (or, if the caller
+  // was themselves kicked/forfeited, parking the turn on a dead seat → the
+  // silent multiplayer freeze).
+  if (wrappedToCaboCaller) {
+    return endRound(game);
+  }
+  // If we exhausted every seat and the current one is STILL kicked, no live
+  // player can act — end the round rather than freeze on a forfeited seat.
+  if (kickedIds.includes(game.players[game.currentPlayer]?.id ?? "")) {
+    return endRound(game);
   }
   // We advanced past at least one kicked seat — reset per-turn transient
   // state so the new current player starts a clean turn.
@@ -218,6 +250,135 @@ function matchTotal(game: GameState, id: string): number {
     sum(game.caboBonus[id]) -
     sum(game.snapBonus[id])
   );
+}
+
+/** End-of-round bookkeeping: credit the round win, detect busts on the full
+ *  match total, and resolve Glorious Victory / Sudden Death. MUST be called
+ *  exactly once per transition INTO round_over — both call sites gate on the
+ *  phase having just become round_over (the action handler via `phaseBefore`,
+ *  the forfeit timer by checking the post-skip phase). Extracted so a forfeit
+ *  that ends the round runs the SAME elimination logic as a normal round end. */
+function processRoundOver(room: ReturnType<Rooms["get"]> & {}) {
+  const game = room.game;
+  if (!game) return;
+  // The engine's declared round winner is passed through unchanged, even if
+  // they happen to be on kickedIds (winner reassignment was removed per spec).
+  const winnerId = game.winnerId;
+
+  // Sudden-death resolution: lowest-unique hand among the locked contestants.
+  if (room.suddenDeath?.active) {
+    if (winnerId) {
+      room.roundWins[winnerId] = (room.roundWins[winnerId] ?? 0) + 1;
+    }
+    const contestantHands = room.suddenDeath.contestants.map((id) => {
+      const player = game.players.find((p) => p.id === id);
+      return { id, handTotal: player ? handScore(player.hand) : Infinity };
+    });
+    const minHand = Math.min(...contestantHands.map((c) => c.handTotal));
+    const atMin = contestantHands.filter((c) => c.handTotal === minHand);
+    if (atMin.length === 1) {
+      const victorId = atMin[0].id;
+      const losers = room.suddenDeath.contestants.filter((id) => id !== victorId);
+      for (const id of losers) {
+        if (!room.kickedIds.includes(id)) room.kickedIds.push(id);
+      }
+      room.gloriosVictory = victorId;
+      room.gloriosVictoryReason = "sudden_death";
+      // Keep the SD record (inactive) so the end-game scoreboard can split R/F.
+      room.suddenDeath = {
+        active: false,
+        contestants: room.suddenDeath.contestants,
+        mainRoundsCount: room.suddenDeath.mainRoundsCount,
+      };
+    }
+    // else: multiple tied at min — another SD round; play_again starts it.
+    return;
+  }
+
+  // Normal path. Track the round win, then bust on the FULL match total (round
+  // scores + cabo penalties minus cabo/snap bonuses), identical to the scoreboard.
+  if (winnerId) {
+    room.roundWins[winnerId] = (room.roundWins[winnerId] ?? 0) + 1;
+  }
+  room.bustedThisRound = game.players
+    .filter((p) => matchTotal(game, p.id) > 60)
+    .map((p) => p.id);
+
+  if (room.bustedThisRound.length > 0) {
+    const allEliminated = new Set([...room.kickedIds, ...room.bustedThisRound]);
+    const survivors = room.members
+      .map((m) => m.playerId)
+      .filter((pid) => !allEliminated.has(pid) && !room.disconnects[pid]?.forfeited);
+
+    if (survivors.length === 1) {
+      // One clear survivor after busts -> regular Glorious Victory.
+      for (const id of room.bustedThisRound) {
+        if (!room.kickedIds.includes(id)) room.kickedIds.push(id);
+      }
+      room.gloriosVictory = survivors[0];
+      room.gloriosVictoryReason = "survivor";
+    } else if (survivors.length === 0) {
+      // Everyone busted simultaneously -> tiebreaker among this round's busters.
+      const contestants = room.bustedThisRound.filter(
+        (pid) => !room.kickedIds.includes(pid),
+      );
+      if (contestants.length === 1) {
+        const gloriousWinnerId = contestants[0];
+        room.bustedThisRound = room.bustedThisRound.filter((id) => id !== gloriousWinnerId);
+        for (const id of room.bustedThisRound) {
+          if (!room.kickedIds.includes(id)) room.kickedIds.push(id);
+        }
+        room.gloriosVictory = gloriousWinnerId;
+        room.gloriosVictoryReason = "survivor";
+      } else if (contestants.length > 1) {
+        // Tiebreaker 1: most round wins accumulated across previous rounds.
+        const maxWins = Math.max(...contestants.map((pid) => room.roundWins[pid] ?? 0));
+        const topByWins = contestants.filter((pid) => (room.roundWins[pid] ?? 0) === maxWins);
+        if (topByWins.length === 1) {
+          const gloriousWinnerId = topByWins[0];
+          room.bustedThisRound = room.bustedThisRound.filter((id) => id !== gloriousWinnerId);
+          for (const id of room.bustedThisRound) {
+            if (!room.kickedIds.includes(id)) room.kickedIds.push(id);
+          }
+          room.gloriosVictory = gloriousWinnerId;
+          room.gloriosVictoryReason = "more_wins";
+        } else if (winnerId && topByWins.includes(winnerId)) {
+          // Tiebreaker 2: last-round winner is in the tied set -> they take it.
+          const gloriousWinnerId = winnerId;
+          room.bustedThisRound = room.bustedThisRound.filter((id) => id !== gloriousWinnerId);
+          for (const id of room.bustedThisRound) {
+            if (!room.kickedIds.includes(id)) room.kickedIds.push(id);
+          }
+          room.gloriosVictory = gloriousWinnerId;
+          room.gloriosVictoryReason = "final_round";
+        } else {
+          // Sudden Death: the tied-on-wins set plays another round. Kick those
+          // who busted but lost the wins tiebreaker outright.
+          const losers = room.bustedThisRound.filter(
+            (id) => !topByWins.includes(id) && !room.kickedIds.includes(id),
+          );
+          for (const id of losers) {
+            if (!room.kickedIds.includes(id)) room.kickedIds.push(id);
+          }
+          // SD contestants are NOT eliminated (they play the tiebreaker).
+          room.bustedThisRound = room.bustedThisRound.filter(
+            (id) => !topByWins.includes(id),
+          );
+          const anyPlayerId = game.players[0]?.id;
+          const mainRoundsCount = anyPlayerId
+            ? (game.scores[anyPlayerId]?.length ?? 0)
+            : 0;
+          room.suddenDeath = {
+            active: true,
+            contestants: topByWins,
+            mainRoundsCount,
+          };
+        }
+      }
+      // contestants.length === 0 (all already kicked): nothing to do.
+    }
+    // survivors.length > 1: multiple still active -> normal play-again flow.
+  }
 }
 
 function broadcastRoom(roomCode: string) {
@@ -268,7 +429,6 @@ function publicView(room: ReturnType<Rooms["get"]> & {}, viewerId: string) {
     playAgainVotes: room.playAgainVotes,
     disconnects,
     readyVotes: room.readyVotes,
-    readyStartedAt: room.readyStartedAt,
     roundReadyVotes: room.roundReadyVotes,
     roundReadyStartedAt: room.roundReadyStartedAt,
     strawReadyVotes: room.strawReadyVotes,
@@ -473,30 +633,26 @@ io.on("connection", (socket) => {
     if (!room.readyVotes.includes(bound.playerId)) {
       room.readyVotes.push(bound.playerId);
     }
-
-    const activeIds = activePlayerIds(room);
-    const allVoted = activeIds.every((pid) => room.readyVotes.includes(pid));
-
-    if (!room.readyStartedAt) {
-      // First player to click — arm the 10s countdown.
-      room.readyStartedAt = Date.now();
-      const localCode = bound.roomCode;
-      const timerId = setTimeout(() => { startRoomGame(localCode); }, 10_000);
-      readyTimers.set(bound.roomCode, timerId);
-    }
-
-    if (allVoted) {
-      // Everyone clicked — cancel the timer and start now.
-      const timerId = readyTimers.get(bound.roomCode);
-      if (timerId) clearTimeout(timerId);
-      readyTimers.delete(bound.roomCode);
-      startRoomGame(bound.roomCode); // broadcasts internally
-      cb?.({ ok: true });
-      return;
-    }
-
     cb?.({ ok: true });
-    broadcastRoom(bound.roomCode);
+
+    // The game proceeds to the coin toss / straw draw ONLY once every connected
+    // player has clicked Ready. No single player can start a countdown, so
+    // nobody is rushed; players can withdraw via room:unready. If not all are
+    // ready yet, just sync the updated vote tally to everyone.
+    if (!maybeStartRoom(bound.roomCode)) broadcastRoom(bound.roomCode);
+  });
+
+  // Withdraw a ready vote — the room's "cancel". Lets a player call off a
+  // pending start (or undo a misclick) without leaving the room. Once anyone
+  // is un-ready the all-ready condition no longer holds, so the start is held.
+  socket.on("room:unready", (_payload, cb) => {
+    if (!bound) return cb?.({ ok: false });
+    const room = rooms.get(bound.roomCode);
+    if (!room || room.game) return cb?.({ ok: false, error: "Already started" });
+    const before = room.readyVotes.length;
+    room.readyVotes = room.readyVotes.filter((id) => id !== bound!.playerId);
+    cb?.({ ok: true });
+    if (room.readyVotes.length !== before) broadcastRoom(bound.roomCode);
   });
 
   socket.on("room:coin_toss_pick", ({ side }: { side: "heads" | "tails" }, cb) => {
@@ -748,7 +904,6 @@ io.on("connection", (socket) => {
     room.strawDraw = null; // No straw draw from round 2 onward — alternation handles order.
     room.playAgainVotes = [];
     room.readyVotes = [];
-    room.readyStartedAt = null;
     room.roundReadyVotes = [];
     room.roundReadyStartedAt = null;
     room.strawReadyVotes = [];
@@ -773,6 +928,11 @@ io.on("connection", (socket) => {
     if (!bound) return cb?.({ ok: false, error: "Not in a room" });
     const room = rooms.get(bound.roomCode);
     if (!room || !room.game) return cb?.({ ok: false, error: "No game" });
+    // Phase BEFORE this action ran — used to gate the round-over block below so
+    // it fires only on the TRANSITION into round_over, not again on every
+    // clear_animations / clear_reveals the client sends during the reveal
+    // (which would double-count roundWins and corrupt the sudden-death tiebreaker).
+    const phaseBefore = room.game.phase;
 
     // Intercept start_play during setup_peek: collective ready-up with 10s timer.
     // First player to click arms the timer; second click (or timer expiry) starts.
@@ -831,147 +991,12 @@ io.on("connection", (socket) => {
     // so the game doesn't stall waiting for someone who can't play.
     room.game = skipKickedTurn(room.game, room.kickedIds);
 
-    // After a round ends: track wins, detect busts, and determine if the game ends.
-    if (room.game.phase === "round_over") {
-      // The engine's declared round winner is passed through unchanged, even
-      // if they happen to be on kickedIds. (Winner reassignment was removed
-      // per the updated spec — the win stays with whoever the engine declared.)
-      const winnerId = room.game.winnerId;
-
-      // ── Sudden-death resolution branch ─────────────────────────────────────
-      // If we're in an active sudden-death round, resolve it by lowest-unique
-      // hand among the locked contestants. Tied hands → another SD round.
-      if (room.suddenDeath?.active) {
-        if (winnerId) {
-          room.roundWins[winnerId] = (room.roundWins[winnerId] ?? 0) + 1;
-        }
-
-        const contestantHands = room.suddenDeath.contestants.map((id) => {
-          const player = room.game!.players.find((p) => p.id === id);
-          return { id, handTotal: player ? handScore(player.hand) : Infinity };
-        });
-        const minHand = Math.min(...contestantHands.map((c) => c.handTotal));
-        const atMin = contestantHands.filter((c) => c.handTotal === minHand);
-
-        if (atMin.length === 1) {
-          // Unique winner — declare GV, kick the other contestants.
-          const victorId = atMin[0].id;
-          const losers = room.suddenDeath.contestants.filter((id) => id !== victorId);
-          for (const id of losers) {
-            if (!room.kickedIds.includes(id)) room.kickedIds.push(id);
-          }
-          room.gloriosVictory = victorId;
-          room.gloriosVictoryReason = "sudden_death";
-          // Keep the SD record (inactive) so the end-game scoreboard can
-          // still split R/F columns. No further SD logic will fire because
-          // active=false.
-          room.suddenDeath = {
-            active: false,
-            contestants: room.suddenDeath.contestants,
-            mainRoundsCount: room.suddenDeath.mainRoundsCount,
-          };
-        }
-        // else: multiple tied at min — another SD round needed; contestants
-        // remain frozen, gloriosVictory unset, play_again will start the next.
-      } else {
-        // ── Normal path ────────────────────────────────────────────────────────
-        // Track round wins (engine's declared winner, even if kicked — per spec).
-        if (winnerId) {
-          room.roundWins[winnerId] = (room.roundWins[winnerId] ?? 0) + 1;
-        }
-
-        // Compute newly busted players on the FULL match total (round scores +
-        // cabo penalties − cabo/snap bonuses), identical to the scoreboard
-        // total — penalties count toward busting, bonuses count against it.
-        room.bustedThisRound = room.game.players
-          .filter((p) => matchTotal(room.game!, p.id) > 60)
-          .map((p) => p.id);
-
-        if (room.bustedThisRound.length > 0) {
-          const allEliminated = new Set([...room.kickedIds, ...room.bustedThisRound]);
-          const survivors = room.members
-            .map((m) => m.playerId)
-            .filter((pid) => !allEliminated.has(pid) && !room.disconnects[pid]?.forfeited);
-
-          if (survivors.length === 1) {
-            // ── One clear survivor after busts → regular Glorious Victory ────────
-            for (const id of room.bustedThisRound) {
-              if (!room.kickedIds.includes(id)) room.kickedIds.push(id);
-            }
-            room.gloriosVictory = survivors[0];
-            room.gloriosVictoryReason = "survivor";
-
-          } else if (survivors.length === 0) {
-            // ── Everyone busted simultaneously → tiebreaker ──────────────────────
-            // Only consider players who were active in this round (not previously kicked).
-            const contestants = room.bustedThisRound.filter(
-              (pid) => !room.kickedIds.includes(pid),
-            );
-
-            if (contestants.length === 1) {
-              // Only one active buster — they win by default.
-              const gloriousWinnerId = contestants[0];
-              room.bustedThisRound = room.bustedThisRound.filter((id) => id !== gloriousWinnerId);
-              for (const id of room.bustedThisRound) {
-                if (!room.kickedIds.includes(id)) room.kickedIds.push(id);
-              }
-              room.gloriosVictory = gloriousWinnerId;
-              room.gloriosVictoryReason = "survivor";
-            } else if (contestants.length > 1) {
-              // Tiebreaker 1: most round wins accumulated across all previous rounds.
-              const maxWins = Math.max(...contestants.map((pid) => room.roundWins[pid] ?? 0));
-              const topByWins = contestants.filter((pid) => (room.roundWins[pid] ?? 0) === maxWins);
-
-              if (topByWins.length === 1) {
-                const gloriousWinnerId = topByWins[0];
-                room.bustedThisRound = room.bustedThisRound.filter((id) => id !== gloriousWinnerId);
-                for (const id of room.bustedThisRound) {
-                  if (!room.kickedIds.includes(id)) room.kickedIds.push(id);
-                }
-                room.gloriosVictory = gloriousWinnerId;
-                room.gloriosVictoryReason = "more_wins";
-              } else if (winnerId && topByWins.includes(winnerId)) {
-                // Tiebreaker 2: last-round winner is in the tied set → they take it.
-                const gloriousWinnerId = winnerId;
-                room.bustedThisRound = room.bustedThisRound.filter((id) => id !== gloriousWinnerId);
-                for (const id of room.bustedThisRound) {
-                  if (!room.kickedIds.includes(id)) room.kickedIds.push(id);
-                }
-                room.gloriosVictory = gloriousWinnerId;
-                room.gloriosVictoryReason = "final_round";
-              } else {
-                // NEW: Sudden Death trigger. The tied-on-wins set plays
-                // another round. Kick those who busted but lost the wins
-                // tiebreaker outright.
-                const losers = room.bustedThisRound.filter(
-                  (id) => !topByWins.includes(id) && !room.kickedIds.includes(id),
-                );
-                for (const id of losers) {
-                  if (!room.kickedIds.includes(id)) room.kickedIds.push(id);
-                }
-                // Remove SD contestants from bustedThisRound — they're
-                // playing the tiebreaker, not eliminated. Leaving them in
-                // would make the client's BustedOverlay incorrectly show
-                // them the "Busted" splash + "Return to menu" modal.
-                room.bustedThisRound = room.bustedThisRound.filter(
-                  (id) => !topByWins.includes(id),
-                );
-                const anyPlayerId = room.game.players[0]?.id;
-                const mainRoundsCount = anyPlayerId
-                  ? (room.game.scores[anyPlayerId]?.length ?? 0)
-                  : 0;
-                room.suddenDeath = {
-                  active: true,
-                  contestants: topByWins,
-                  mainRoundsCount,
-                };
-              }
-            }
-            // If contestants.length === 0 (edge case: all already kicked), do nothing.
-          }
-          // survivors.length > 1: multiple still active → normal play-again flow.
-        }
-      }
+    // After a round ends: credit the win, detect busts, resolve GV / Sudden
+    // Death. Gated on the TRANSITION into round_over (phaseBefore) so it never
+    // re-runs on the clear_animations / clear_reveals the client sends during
+    // the reveal. Shared with the forfeit timer via processRoundOver().
+    if (room.game.phase === "round_over" && phaseBefore !== "round_over") {
+      processRoundOver(room);
     }
 
     cb?.({ ok: true });
@@ -1013,6 +1038,19 @@ io.on("connection", (socket) => {
     if (member) {
       member.connected = false;
       member.socketId = "";
+    }
+    // A player who armed a Snap but disconnects/leaves before picking would
+    // leave snapPhase stuck "armed_*" forever — and the client gates ALL input
+    // on snapPhase !== "idle", so every remaining player freezes silently.
+    // Abandon the unresolved snap immediately (their snap budget isn't consumed
+    // — it only flips on resolution) so the table unpauses on the next
+    // broadcast rather than waiting out the 20s forfeit timer.
+    if (
+      room.game &&
+      room.game.snapPhase !== "idle" &&
+      room.game.snappingPlayerId === bound.playerId
+    ) {
+      room.game = { ...room.game, snapPhase: "idle", snappingPlayerId: null };
     }
     // If a game is in progress, start a forfeit countdown for this player.
     // Don't track disconnects in the lobby (no game yet). Idempotent — if we
@@ -1080,9 +1118,15 @@ io.on("connection", (socket) => {
           }
 
           // If they were on the clock, advance the turn past them. The
-          // skip helper handles consecutive kicked seats too.
+          // skip helper handles consecutive kicked seats too — and if that skip
+          // wraps to the cabo caller / exhausts all seats it ENDS the round, so
+          // run the same bust + round-win bookkeeping the action handler would.
           if (wasTheirTurn) {
+            // The outer guard already ensured phase !== round_over on entry, so
+            // any round_over after the skip is a fresh transition from
+            // skipKickedTurn's endRound (cabo-caller wrap / all-seats-kicked).
             r.game = skipKickedTurn(r.game, r.kickedIds);
+            if (r.game.phase === "round_over") processRoundOver(r);
           }
         }
 
@@ -1098,6 +1142,10 @@ io.on("connection", (socket) => {
         broadcastRoom(localBound.roomCode);
       }, 20_000);
     }
+    // Lobby-only: a player leaving may have been the last one the others were
+    // waiting on to be ready. Re-check so remaining ready players aren't
+    // stranded (no-op once a game exists). It broadcasts if it starts.
+    if (!room.game) maybeStartRoom(bound.roomCode);
     broadcastRoom(bound.roomCode);
     // Garbage-collect empty rooms after a minute
     setTimeout(() => {

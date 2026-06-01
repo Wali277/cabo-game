@@ -1473,6 +1473,15 @@ body.standalone .lobby.menu-refresh {
   text-align: center;
   padding: 6px 0;
 }
+.lobby.menu-refresh .ready-count {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: oklch(0.45 0.04 280);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
 .lobby.menu-refresh .ready-pulse {
   animation: readyPulse 1.4s ease-in-out infinite;
 }
@@ -6916,4 +6925,298 @@ body.mobile-mode .help-fab {
   font-size: 22px;
   bottom: 14px;
   right: 66px;
+}
+
+/* ========== Debug / Error Log overlay ==========
+   Owner-facing diagnostics. The toggle lives bottom-LEFT — every other FAB
+   (audio, help, chat, theme) sits bottom-RIGHT, so this corner is free and the
+   bug button never overlaps them. Works in production (not DEV-gated). */
+.debug-toggle {
+  position: fixed;
+  left: 18px;
+  bottom: 18px;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 3px solid rgba(168, 123, 255, 0.5);
+  background: linear-gradient(135deg, #3a2c66 0%, #221a40 100%);
+  color: #f4ebff;
+  font-size: 20px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    0 8px 20px rgba(0, 0, 0, 0.4),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.25),
+    inset 0 2px 0 rgba(255, 255, 255, 0.12);
+  /* Sits above the board during normal play but BELOW the full-screen overlay
+     base (.overlay z200) and cinematics (snap 320 / dragon 360), so the bug
+     button never covers a BUSTED / victory splash or a cinematic. It reappears
+     once the overlay clears; the panel itself lifts above everything. */
+  z-index: 180;
+  opacity: 0.55;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  line-height: 1;
+}
+.debug-toggle:hover { opacity: 1; transform: scale(1.08); }
+.debug-toggle.open { opacity: 1; transform: scale(0.92); }
+.debug-toggle .debug-toggle-icon { line-height: 1; }
+.debug-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  background: #ff5b6e;
+  color: #fff;
+  border: 2px solid #1c1d2b;
+  border-radius: 11px;
+  font-size: 11px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.debug-panel {
+  position: fixed;
+  left: 18px;
+  bottom: 76px; /* sits above the 46px toggle + a small gap */
+  width: 420px;
+  max-width: calc(100vw - 36px);
+  height: 460px;
+  max-height: calc(100vh - 110px);
+  background: rgba(13, 22, 56, 0.97);
+  color: #f4ebff;
+  border: 2px solid #a87bff;
+  border-radius: 16px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  /* Above all overlays and cinematics so an open log stays readable even if a
+     round-over / cinematic fires while it's open; still below the crash
+     fallback (9999). */
+  z-index: 9990;
+}
+.debug-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(168, 123, 255, 0.3);
+}
+.debug-title {
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  font-size: 13px;
+}
+.debug-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.debug-btn {
+  background: rgba(168, 123, 255, 0.16);
+  border: 1px solid rgba(168, 123, 255, 0.45);
+  color: #f4ebff;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.debug-btn:hover:not(:disabled) { background: rgba(168, 123, 255, 0.3); }
+.debug-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.debug-close {
+  background: transparent;
+  border: none;
+  color: #c9bce8;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 8px;
+}
+.debug-close:hover { background: rgba(255, 91, 110, 0.18); color: #fff; }
+
+.debug-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.debug-empty {
+  margin: auto;
+  color: #9b8fc0;
+  font-size: 13px;
+  padding: 24px 12px;
+  text-align: center;
+}
+.debug-entry {
+  border: 1px solid rgba(168, 123, 255, 0.18);
+  border-left-width: 4px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  overflow: hidden;
+}
+.debug-entry.lvl-error { border-left-color: #ff5b6e; }
+.debug-entry.lvl-warn { border-left-color: #ffd86b; }
+.debug-entry.lvl-info { border-left-color: #67c7e0; }
+.debug-entry-head {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 7px 9px;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.debug-entry-head:hover { background: rgba(168, 123, 255, 0.08); }
+.debug-time {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: #9b8fc0;
+  flex: 0 0 auto;
+}
+.debug-chip {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 1px 7px;
+  border-radius: 999px;
+}
+.debug-chip.chip-error { background: rgba(255, 91, 110, 0.22); color: #ff9aa8; }
+.debug-chip.chip-warn { background: rgba(255, 216, 107, 0.2); color: #ffe39a; }
+.debug-chip.chip-info { background: rgba(103, 199, 224, 0.2); color: #9fe0f0; }
+.debug-source {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 700;
+  color: #c9bce8;
+}
+.debug-message {
+  flex: 1 1 auto;
+  font-size: 12.5px;
+  line-height: 1.35;
+  word-break: break-word;
+  min-width: 0;
+}
+.debug-caret {
+  flex: 0 0 auto;
+  color: #9b8fc0;
+  font-size: 11px;
+}
+.debug-detail {
+  margin: 0;
+  padding: 8px 10px;
+  border-top: 1px dashed rgba(168, 123, 255, 0.25);
+  background: rgba(0, 0, 0, 0.28);
+  color: #d9cff2;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 200px;
+  overflow: auto;
+}
+
+/* Phones: the bug toggle stays bottom-left (it's an owner tool that must be
+   reachable even in production on a phone), and the panel goes near-full-width. */
+body.mobile-mode .debug-toggle {
+  width: 42px;
+  height: 42px;
+  font-size: 18px;
+  left: 12px;
+  bottom: 12px;
+}
+body.mobile-mode .debug-panel {
+  left: 10px;
+  right: 10px;
+  bottom: 64px;
+  width: auto;
+  max-width: none;
+  height: 60vh;
+  max-height: 70vh;
+}
+
+/* ========== Top-level crash fallback (ErrorBoundary) ==========
+   Replaces the blank white screen when React throws during render. Sits above
+   everything (including the debug panel) so it is never obscured. */
+.error-boundary-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(6, 4, 18, 0.92);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+.error-boundary-card {
+  width: min(560px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+  background: rgba(13, 22, 56, 0.98);
+  border: 2px solid #a87bff;
+  border-radius: 18px;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.6);
+  padding: 26px 28px;
+  color: #f4ebff;
+  text-align: center;
+}
+.error-boundary-title {
+  margin: 0 0 8px;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 0.3px;
+}
+.error-boundary-sub {
+  margin: 0 0 16px;
+  color: #c9bce8;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.error-boundary-message {
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  text-align: left;
+  background: rgba(0, 0, 0, 0.32);
+  border: 1px solid rgba(255, 91, 110, 0.4);
+  border-radius: 10px;
+  color: #ff9aa8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 200px;
+  overflow: auto;
+}
+.error-boundary-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+body.mobile-mode .error-boundary-card {
+  width: calc(100vw - 24px);
+  padding: 20px 18px;
 }

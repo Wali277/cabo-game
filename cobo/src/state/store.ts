@@ -21,6 +21,7 @@ import {
   dragonChooseRank as engineDragonChooseRank,
   drawFromDeck,
   drawFromDiscard,
+  endRound,
   handScore,
   newGame,
   setupPeekCard,
@@ -76,7 +77,6 @@ export interface MpRoom {
   playAgainVotes: string[];
   disconnects: Record<string, { startedAt: number; forfeited: boolean }>;
   readyVotes: string[];
-  readyStartedAt: number | null;
   roundReadyVotes: string[];
   roundReadyStartedAt: number | null;
   strawDraw: {
@@ -295,6 +295,7 @@ function skipKickedTurn(game: GameState, kickedIds: string[]): GameState {
   const next: GameState = { ...game };
   let attempts = next.players.length;
   let cur = next.currentPlayer;
+  let wrappedToCaboCaller = false;
   while (
     attempts > 0 &&
     kickedIds.includes(next.players[cur]?.id ?? "")
@@ -302,10 +303,17 @@ function skipKickedTurn(game: GameState, kickedIds: string[]): GameState {
     cur = (cur + 1) % next.players.length;
     attempts -= 1;
     if (next.caboCallerId && next.players[cur]?.id === next.caboCallerId) {
+      wrappedToCaboCaller = true;
       break;
     }
   }
   next.currentPlayer = cur;
+  // Mirror the server (server/src/index.ts skipKickedTurn): wrapping to the cabo
+  // caller, or exhausting every seat with the current one still kicked, means
+  // the round is over — end it instead of parking the turn on a dead seat.
+  if (wrappedToCaboCaller || kickedIds.includes(next.players[cur]?.id ?? "")) {
+    return endRound(next);
+  }
   next.phase = "turn_start";
   next.drawnCard = null;
   next.drawnFrom = null;

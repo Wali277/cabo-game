@@ -1,11 +1,12 @@
 import { motion } from "framer-motion";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useStore } from "../state/store";
 import { MenuWallpaper } from "./MenuWallpaper";
 import {
   createRoom as createRoomMp,
   joinRoom as joinRoomMp,
   sendReady,
+  sendUnready,
   setVariantMp,
 } from "../state/mp";
 import { CaboEvolvedInfo } from "./CaboEvolvedInfo";
@@ -27,16 +28,8 @@ export function Lobby({ initialCode }: Props) {
   const [urlCopied, setUrlCopied] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const [variantBusy, setVariantBusy] = useState(false);
-  const [now, setNow] = useState(Date.now());
   const backToMenu = useStore((s) => s.backToMenu);
   const leaveRoomToLobby = useStore((s) => s.leaveRoomToLobby);
-
-  // Tick every 500ms while a ready countdown is running so the timer updates.
-  useEffect(() => {
-    if (!mp?.readyStartedAt) return;
-    const id = setInterval(() => setNow(Date.now()), 500);
-    return () => clearInterval(id);
-  }, [mp?.readyStartedAt]);
 
   async function doCreate() {
     if (!name.trim()) {
@@ -82,15 +75,13 @@ export function Lobby({ initialCode }: Props) {
   if (mp) {
     const url = `${window.location.origin}/room/${mp.code}`;
     const iReady = mp.readyVotes.includes(mp.viewerId);
-    const opponentReadyId = mp.readyVotes.find((id) => id !== mp.viewerId);
-    const opponentReadyName = opponentReadyId
-      ? mp.members.find((m) => m.id === opponentReadyId)?.name ?? "Opponent"
-      : null;
-    const enoughPlayers = mp.members.length >= 2;
+    // The server waits on every CONNECTED player (a dropped player can't click,
+    // so they don't block the start). Mirror that here: count connected members
+    // only, so "X/N ready" matches when the game actually begins.
+    const connectedMembers = mp.members.filter((m) => m.connected);
+    const readyCount = connectedMembers.filter((m) => mp.readyVotes.includes(m.id)).length;
+    const enoughPlayers = connectedMembers.length >= 2;
     const isHost = mp.hostId === mp.viewerId;
-    const readySecondsLeft = mp.readyStartedAt
-      ? Math.max(0, Math.ceil((10_000 - (now - mp.readyStartedAt)) / 1000))
-      : null;
 
     function copyCode() {
       navigator.clipboard?.writeText(mp!.code);
@@ -105,6 +96,11 @@ export function Lobby({ initialCode }: Props) {
     async function handleReady() {
       setBusy(true);
       await sendReady();
+      setBusy(false);
+    }
+    async function handleUnready() {
+      setBusy(true);
+      await sendUnready();
       setBusy(false);
     }
     async function chooseVariant(v: "classic" | "evolved") {
@@ -208,33 +204,35 @@ export function Lobby({ initialCode }: Props) {
               {!isHost && <div className="hint">Mode is set by the host</div>}
             </div>
 
-            {/* Ready-up section */}
+            {/* Ready-up: every player must click Ready before the coin toss /
+                straw draw begins. Anyone can Cancel to withdraw — no timer, so
+                nobody is rushed. The game starts the moment everyone is ready. */}
             {enoughPlayers && (
               <div className="ready-section">
+                <div className="ready-count">
+                  {readyCount}/{connectedMembers.length} players ready
+                </div>
                 {!iReady ? (
+                  <button
+                    className="btn primary big"
+                    disabled={busy}
+                    onClick={handleReady}
+                  >
+                    Ready to start
+                  </button>
+                ) : (
                   <>
-                    {opponentReadyName && readySecondsLeft !== null && (
-                      <div className="ready-notice">
-                        {opponentReadyName} is ready!
-                        <span className="ready-timer"> Starting in {readySecondsLeft}s…</span>
-                      </div>
-                    )}
+                    <div className="ready-waiting">
+                      You're ready — waiting for everyone else…
+                    </div>
                     <button
-                      className={`btn primary big${opponentReadyName ? " ready-pulse" : ""}`}
+                      className="btn ghost"
                       disabled={busy}
-                      onClick={handleReady}
+                      onClick={handleUnready}
                     >
-                      {opponentReadyName ? "Start game now!" : "Ready to start"}
+                      Cancel — I'm not ready
                     </button>
                   </>
-                ) : (
-                  <div className="ready-waiting">
-                    {opponentReadyName
-                      ? "Starting…"
-                      : readySecondsLeft !== null
-                      ? `Game starts in ${readySecondsLeft}s — waiting for other player`
-                      : "Waiting for other player…"}
-                  </div>
                 )}
               </div>
             )}
