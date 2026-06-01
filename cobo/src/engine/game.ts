@@ -1011,4 +1011,4 @@ export function trainingInjectCard(state: GameState, card: import("./types").Car
   return s;
 }
 
-export { cardScore, handScore, isBlackKing, actionOf, endRound };
+export { cardScore, handScore, isBlackKing, actionOf };
