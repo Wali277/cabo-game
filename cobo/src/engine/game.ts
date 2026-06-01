@@ -9,9 +9,12 @@ import {
 } from "./deck";
 import type {
   AnimationEvent,
+  Card,
   GameState,
+  GameVariant,
   NewGameOptions,
   PlayerState,
+  Rank,
 } from "./types";
 
 let _animId = 0;
@@ -29,26 +32,33 @@ function pushLog(state: GameState, msg: string) {
 }
 
 export function newGame(opts: NewGameOptions): GameState {
+  const variant: GameVariant = opts.variant ?? "classic";
+  // Cabo Evolved deals 5 cards per hand; classic deals 4.
+  const handSize = variant === "evolved" ? 5 : 4;
   const seed = opts.seed ?? Math.floor(Math.random() * 1e9);
   const rng = mulberry32(seed);
-  const deck = shuffle(makeDeck(), rng);
+  const deck = shuffle(makeDeck(variant), rng);
 
   const players: PlayerState[] = opts.players.map((p) => ({
     id: p.id,
     name: p.name,
     isBot: p.isBot,
     hand: [],
-    knownToSelf: [false, false, false, false],
+    knownToSelf: [],
     calledCabo: false,
     snapsUsed: { other: false, self: false },
     snapsCorrect: { other: false, self: false },
   }));
 
-  // Deal 4 cards to each player
-  for (let i = 0; i < 4; i++) {
+  // Deal `handSize` cards to each player
+  for (let i = 0; i < handSize; i++) {
     for (const p of players) {
       p.hand.push(deck.shift()!);
     }
+  }
+  // Size each player's positional-knowledge array to the dealt hand.
+  for (const p of players) {
+    p.knownToSelf = p.hand.map(() => false);
   }
 
   // Per Cabo rules, one card is placed face-up in the discard pile at the
@@ -57,6 +67,7 @@ export function newGame(opts: NewGameOptions): GameState {
   const initialDiscard = deck.shift()!;
 
   const state: GameState = {
+    variant,
     players,
     currentPlayer: 0,
     phase: "setup_peek",
@@ -66,6 +77,7 @@ export function newGame(opts: NewGameOptions): GameState {
     drawnFrom: null,
     pendingActionSource: null,
     peekAndSwapPick: null,
+    pendingPeek: null,
     caboCallerId: null,
     finalRoundTurnsLeft: null,
     reveals: [],
@@ -75,10 +87,12 @@ export function newGame(opts: NewGameOptions): GameState {
     caboBonus: opts.caboBonus ?? Object.fromEntries(players.map((p) => [p.id, []])),
     caboPenalty: opts.caboPenalty ?? Object.fromEntries(players.map((p) => [p.id, []])),
     snapBonus: opts.snapBonus ?? Object.fromEntries(players.map((p) => [p.id, []])),
+    kamikaze: opts.kamikaze ?? Object.fromEntries(players.map((p) => [p.id, []])),
     winnerId: null,
     log: [],
     snapPhase: "idle",
     snappingPlayerId: null,
+    roundOutcome: null,
   };
 
   pushAnim(state, "deal", { playerIds: players.map((p) => p.id) });
@@ -88,7 +102,7 @@ export function newGame(opts: NewGameOptions): GameState {
   for (const p of players) {
     if (p.isBot) {
       // Random two distinct indices so bots' opening info varies between games
-      const indices = shuffle([0, 1, 2, 3], rng).slice(0, 2);
+      const indices = shuffle(p.hand.map((_, i) => i), rng).slice(0, 2);
       for (const i of indices) {
         p.knownToSelf[i] = true;
         state.reveals.push({
@@ -181,6 +195,10 @@ export function drawFromDiscard(state: GameState): GameState {
 
 export function swapDrawnWithHand(state: GameState, handIndex: number): GameState {
   if (state.phase !== "turn_drawn" || !state.drawnCard) return state;
+  // A freshly drawn Dragon must be ACTIVATED, not kept. (A dead Dragon taken
+  // from the discard can be swapped into hand — the only legal move with it —
+  // so only block the deck-drawn case here.)
+  if (state.drawnCard.rank === "Dragon" && state.drawnFrom === "deck") return state;
   const s = clone(state);
   const player = s.players[s.currentPlayer];
   const oldCard = player.hand[handIndex];
@@ -205,13 +223,15 @@ export function discardDrawn(state: GameState): GameState {
   if (state.phase !== "turn_drawn" || !state.drawnCard) return state;
   // Cannot discard a card drawn from discard (must swap with hand)
   if (state.drawnFrom === "discard") return state;
+  // A freshly drawn Dragon cannot be discarded — it must be activated.
+  if (state.drawnCard.rank === "Dragon") return state;
   const s = clone(state);
   const drawn = s.drawnCard!;
   s.discard.push(drawn);
   pushAnim(s, "discard_drawn", { playerId: s.players[s.currentPlayer].id, card: drawn });
   s.drawnCard = null;
   s.drawnFrom = null;
-  const action = actionOf(drawn);
+  const action = actionOf(drawn, s.variant);
   if (!action) {
     pushLog(s, `${s.players[s.currentPlayer].name} discarded a ${drawn.rank}.`);
     return advanceTurn(s);
@@ -228,7 +248,7 @@ export function triggerPendingAction(state: GameState): GameState {
   if (state.phase !== "pending_action" || !state.pendingActionSource) return state;
   const s = clone(state);
   const src = s.pendingActionSource!;
-  const action = actionOf(src);
+  const action = actionOf(src, s.variant);
   if (!action) {
     s.pendingActionSource = null;
     return advanceTurn(s);
@@ -239,6 +259,13 @@ export function triggerPendingAction(state: GameState): GameState {
     case "peek_other": s.phase = "action_peek_other"; break;
     case "blind_swap": s.phase = "action_blind_swap"; break;
     case "peek_and_swap": s.phase = "action_peek_and_swap_pick"; break;
+    // Cabo Evolved:
+    case "peek_choose": s.phase = "action_peek_choose"; break;
+    case "peek_both":
+      // Peek own first; pendingPeek routes the spy step after it resolves.
+      s.phase = "action_peek_own";
+      s.pendingPeek = "peek_other";
+      break;
   }
   return s;
 }
@@ -266,6 +293,65 @@ export function discardDrawnSkipAction(state: GameState): GameState {
   return s;
 }
 
+// ── Cabo Evolved: the Dragon ─────────────────────────────────────────────
+// A drawn Dragon cannot be kept or discarded — only ACTIVATED. Activation
+// transforms it into a brand-new "extra card" of any rank the player picks
+// (the deck is NOT depleted by the transform). If that card is an action
+// card, the player then plays it from `turn_drawn` exactly as if they'd
+// drawn it. A Dragon still held face-down at round end is worth 20 (see
+// cardScore) and that +20 overrides Carré (see detectCarre).
+
+let _extraCardId = 0;
+function nextExtraCardId(): string {
+  _extraCardId += 1;
+  return `dx${_extraCardId}_${Date.now()}`;
+}
+
+/** Press "Activate" on a freshly drawn Dragon → enter the rank-pick phase and
+ *  fire the activation cinematic. Only legal for a Dragon drawn from the deck
+ *  (a Dragon taken from the discard pile is a dead card and cannot activate). */
+export function activateDragon(state: GameState): GameState {
+  if (state.phase !== "turn_drawn" || !state.drawnCard) return state;
+  if (state.drawnCard.rank !== "Dragon" || state.drawnFrom !== "deck") return state;
+  const s = clone(state);
+  s.phase = "dragon_choose";
+  pushAnim(s, "dragon_activate", {
+    playerId: s.players[s.currentPlayer].id,
+    card: s.drawnCard,
+  });
+  pushLog(s, `${s.players[s.currentPlayer].name} unleashed the Dragon!`);
+  return s;
+}
+
+/** Pick the rank the Dragon transforms into. Conjures a NEW card of that rank
+ *  (an "extra card" — not pulled from the deck) into the drawn slot, then
+ *  returns to `turn_drawn` so the player keeps it or plays its action normally.
+ *  The Dragon can become any rank EXCEPT another Dragon. */
+const ALLOWED_DRAGON_RANKS: Rank[] = [
+  "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "Joker",
+];
+
+export function dragonChooseRank(state: GameState, rank: Rank): GameState {
+  if (state.phase !== "dragon_choose" || !state.drawnCard) return state;
+  // The Dragon can become any normal rank — never another Dragon, and never a
+  // forged/unknown value (the client supplies the rank; this guards scoring
+  // integrity, e.g. a bogus rank scoring NaN).
+  if (!ALLOWED_DRAGON_RANKS.includes(rank)) return state;
+  const s = clone(state);
+  // Suit is cosmetic in Cabo; carry the Dragon's suit onto the new card.
+  const newCard: Card = { id: nextExtraCardId(), rank, suit: s.drawnCard!.suit };
+  s.drawnCard = newCard;   // the Dragon is consumed; the extra card replaces it
+  s.drawnFrom = "deck";    // now playable as a normal drawn card (keep or action)
+  s.phase = "turn_drawn";
+  pushAnim(s, "dragon_transform", {
+    playerId: s.players[s.currentPlayer].id,
+    rank,
+    card: newCard,
+  });
+  pushLog(s, `${s.players[s.currentPlayer].name}'s Dragon became a ${rank}.`);
+  return s;
+}
+
 export function actionPeekOwn(state: GameState, index: number): GameState {
   if (state.phase !== "action_peek_own") return state;
   const card = state.players[state.currentPlayer].hand[index];
@@ -276,8 +362,25 @@ export function actionPeekOwn(state: GameState, index: number): GameState {
   s.reveals.push({ playerId: p.id, index, card, toPlayerIds: [p.id], reason: "peek_own" });
   pushAnim(s, "reveal", { playerId: p.id, index, card, toPlayerIds: [p.id] });
   pushLog(s, `${p.name} peeked at one of their cards.`);
+  // Cabo Evolved 9/10 "peek both": route into the spy step after the own-peek
+  // instead of ending the turn. Keep pendingActionSource so the UI can show a
+  // "(2 of 2)" hint. Classic / single-peek path ends the turn as before.
+  if (s.pendingPeek === "peek_other") {
+    s.pendingPeek = null;
+    s.phase = "action_peek_other";
+    return s;
+  }
   s.pendingActionSource = null;
   return advanceTurn(s);
+}
+
+/** Cabo Evolved 7/8 picker: choose to peek one of your own cards OR spy a
+ *  rival's. Transitions into the matching single-peek phase. */
+export function actionChoosePeek(state: GameState, choice: "own" | "other"): GameState {
+  if (state.phase !== "action_peek_choose") return state;
+  const s = clone(state);
+  s.phase = choice === "own" ? "action_peek_own" : "action_peek_other";
+  return s;
 }
 
 export function actionPeekOther(state: GameState, targetPlayerId: string, index: number): GameState {
@@ -722,6 +825,34 @@ function advanceTurn(state: GameState): GameState {
   return state;
 }
 
+/** Cabo Evolved: detect four-of-a-kind among non-zero-value cards in a hand.
+ *  Returns the matched rank and the points those four cards represent (which
+ *  become 0 under Carré). Null in classic or with no four-of-a-kind. */
+function detectCarre(
+  hand: (Card | null)[],
+  variant: GameVariant,
+): { rank: Rank; protect: number } | null {
+  if (variant !== "evolved") return null;
+  const byRank = new Map<Rank, Card[]>();
+  for (const c of hand) {
+    if (!c) continue;
+    if (cardScore(c, variant) === 0) continue; // exclude 0-value (Joker, K)
+    if (c.rank === "Dragon") continue; // Dragon's +20 always stands — never Carré-protected
+    const arr = byRank.get(c.rank) ?? [];
+    arr.push(c);
+    byRank.set(c.rank, arr);
+  }
+  for (const [rank, cards] of byRank) {
+    if (cards.length >= 4) {
+      const protect = cards
+        .slice(0, 4)
+        .reduce((acc, c) => acc + cardScore(c, variant), 0);
+      return { rank, protect };
+    }
+  }
+  return null;
+}
+
 function endRound(state: GameState): GameState {
   const s = state;
   s.phase = "round_over";
@@ -738,7 +869,7 @@ function endRound(state: GameState): GameState {
   }
 
   // Hand totals
-  const totals = s.players.map((p) => ({ id: p.id, name: p.name, total: handScore(p.hand) }));
+  const totals = s.players.map((p) => ({ id: p.id, name: p.name, total: handScore(p.hand, s.variant) }));
   const lowest = Math.min(...totals.map((t) => t.total));
 
   // Winner of the round: lowest total. Cabo caller wins ties.
@@ -748,16 +879,40 @@ function endRound(state: GameState): GameState {
     const caboLowest = lowestPlayers.find((t) => t.id === s.caboCallerId);
     if (caboLowest) winner = caboLowest;
   }
-  s.winnerId = winner.id;
+  // Cabo Evolved Kamikaze TIE: if EVERY active player finished on exactly 0,
+  // nobody can be levied +20 and there is no winner — the round is a draw.
+  const allZeroEvolvedTie =
+    s.variant === "evolved" && totals.length >= 2 && totals.every((t) => t.total === 0);
+  s.winnerId = allZeroEvolvedTie ? null : winner.id;
+
+  // Cabo Evolved special outcomes (no-ops in classic). Kamikaze: if ANY hand
+  // totals exactly 0, every other player takes +20. Carré: a four-of-a-kind
+  // (non-zero rank) makes those four cards count 0 — points protection.
+  const kamikazeOccurred =
+    s.variant === "evolved" && totals.some((t) => t.total === 0);
+  const carreById = new Map<string, { rank: Rank; protect: number }>();
+  if (s.variant === "evolved") {
+    for (const p of s.players) {
+      const c = detectCarre(p.hand, s.variant);
+      if (c) carreById.set(p.id, c);
+    }
+  }
 
   // Per-round scoring with Cabo bonus / penalty accounted for separately so
-  // the scoreboard can display each component on its own line.
+  // the scoreboard can display each component on its own line. Evolved folds
+  // Carré protection + the Kamikaze +20 INTO the round contribution so every
+  // existing total / bust / scoreboard computation picks them up unchanged.
   for (const t of totals) {
     const player = s.players.find((pp) => pp.id === t.id)!;
     const earnedSnapBonus =
       player.snapsCorrect.self && player.snapsCorrect.other;
     const isCaboCaller = t.id === s.caboCallerId;
     const wonRound = t.id === winner.id;
+    const carre = carreById.get(t.id);
+    // Carré: the four matched cards count 0 → contribution is the remainder.
+    const handContribution = carre ? t.total - carre.protect : t.total;
+    // Kamikaze: every non-zero hand takes +20 when someone finished at 0.
+    const kamikazeLevy = kamikazeOccurred && t.total !== 0 ? 20 : 0;
     if (isCaboCaller && wonRound && t.total <= 7) {
       // Successful low Cabo: round contribution is 0, AND the player's
       // hand value is subtracted from their running total via caboBonus.
@@ -765,13 +920,13 @@ function endRound(state: GameState): GameState {
       s.caboBonus[t.id].push(t.total);
       s.caboPenalty[t.id].push(0);
     } else if (isCaboCaller && !wonRound) {
-      // Failed Cabo: take the hand total PLUS a flat +5 penalty.
-      s.scores[t.id].push(t.total);
+      // Failed Cabo: (Carré-protected) hand + Kamikaze levy, PLUS a flat +5.
+      s.scores[t.id].push(handContribution + kamikazeLevy);
       s.caboBonus[t.id].push(0);
       s.caboPenalty[t.id].push(5);
     } else {
       // Normal round (non-caller, or caller who won with a high hand).
-      s.scores[t.id].push(t.total);
+      s.scores[t.id].push(handContribution + kamikazeLevy);
       s.caboBonus[t.id].push(0);
       s.caboPenalty[t.id].push(0);
     }
@@ -780,10 +935,34 @@ function endRound(state: GameState): GameState {
     // self-snap this round. Stored as a positive magnitude; the scoreboard
     // renders it as a negative adjustment.
     s.snapBonus[t.id].push(earnedSnapBonus ? 5 : 0);
+    // Mirror the Kamikaze levy (already folded into `scores` above) so the
+    // scoreboard can show it in the Penalty column. 0 in classic / non-Kamikaze.
+    s.kamikaze[t.id].push(kamikazeLevy);
   }
 
-  pushAnim(s, "round_end", { winnerId: winner.id, totals });
-  pushLog(s, `Round over. ${winner.name} wins with ${winner.total} pts.`);
+  // Record the round's special outcomes for the dedicated cinematics
+  // (Evolved only; null when neither Kamikaze nor Carré occurred).
+  if (s.variant === "evolved" && !allZeroEvolvedTie) {
+    const kamikaze = kamikazeOccurred
+      ? totals.filter((t) => t.total === 0).map((t) => t.id)
+      : [];
+    const carre = [...carreById.entries()].map(([playerId, c]) => ({
+      playerId,
+      rank: c.rank,
+    }));
+    s.roundOutcome = kamikaze.length || carre.length ? { kamikaze, carre } : null;
+  } else {
+    // Classic, or an all-zero Kamikaze tie → no special-outcome cinematic.
+    s.roundOutcome = null;
+  }
+
+  pushAnim(s, "round_end", { winnerId: s.winnerId, totals });
+  pushLog(
+    s,
+    allZeroEvolvedTie
+      ? `Round over — everyone hit zero. It's a tie; no points.`
+      : `Round over. ${winner.name} wins with ${winner.total} pts.`,
+  );
   return s;
 }
 
@@ -806,6 +985,7 @@ function clone(state: GameState): GameState {
     caboBonus: Object.fromEntries(Object.entries(state.caboBonus).map(([k, v]) => [k, v.slice()])),
     caboPenalty: Object.fromEntries(Object.entries(state.caboPenalty).map(([k, v]) => [k, v.slice()])),
     snapBonus: Object.fromEntries(Object.entries(state.snapBonus).map(([k, v]) => [k, v.slice()])),
+    kamikaze: Object.fromEntries(Object.entries(state.kamikaze).map(([k, v]) => [k, v.slice()])),
   };
 }
 

@@ -10,6 +10,7 @@ import { BustedOverlay } from "./BustedOverlay";
 import { GameLostOverlay } from "./GameLostOverlay";
 import { GloriousVictory } from "./GloriousVictory";
 import { SuddenDeathSplash } from "./SuddenDeathSplash";
+import { EvolvedOutcomeCinematic } from "./EvolvedOutcomeCinematic";
 import { ActionBanner } from "./ActionBanner";
 import { RoundStartCinematic } from "./RoundStartCinematic";
 import { ActionLog } from "./ActionLog";
@@ -630,6 +631,7 @@ export function Table() {
         <GameLostOverlay />
         <GloriousVictory />
         <SuddenDeathSplash />
+        <EvolvedOutcomeCinematic />
         <MpNotices />
 
         {caboBurst && (

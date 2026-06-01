@@ -1,8 +1,10 @@
 import { create } from "zustand";
-import type { GameState } from "../engine/types";
-import type { Card } from "../engine/types";
+import type { GameState, GameVariant } from "../engine/types";
+import type { Card, Rank } from "../engine/types";
 import {
+  activateDragon as engineActivateDragon,
   actionBlindSwap,
+  actionChoosePeek,
   actionPeekAndSwapDecide,
   actionPeekAndSwapPick,
   actionPeekOther,
@@ -16,6 +18,7 @@ import {
   clearReveals,
   discardDrawnSkipAction,
   discardDrawnWithAction,
+  dragonChooseRank as engineDragonChooseRank,
   drawFromDeck,
   drawFromDiscard,
   handScore,
@@ -61,6 +64,8 @@ export interface MpRoom {
   hostId: string | null;
   viewerId: string;
   started: boolean;
+  /** Rule variant chosen by the host in the lobby (read-only for joiners). */
+  variant: GameVariant;
   members: MpMember[];
   game: GameState | null;
   coinToss: {
@@ -174,6 +179,9 @@ interface StoreState {
    *  the difficulty picker. Default 1; updated when they tap a count tile. */
   pendingNumBots: number;
   setPendingNumBots: (n: number) => void;
+  /** Selected rule variant for the next single-player game (chosen on the bot picker). */
+  pendingVariant: GameVariant;
+  setPendingVariant: (v: GameVariant) => void;
   setScreen: (s: Screen) => void;
   /** The bot difficulty profile in use for the current SP game. Drives bot
    *  decision making in [ai/bot.ts](src/ai/bot.ts) and chat lines via
@@ -184,8 +192,8 @@ interface StoreState {
    *  the BotSpeechBubble component. */
   botSpeech: { playerId: string; text: string; at: number } | null;
   setBotSpeech: (v: StoreState["botSpeech"]) => void;
-  init: (numBots: number, difficulty?: BotDifficulty) => void;
-  trainInit: () => void;
+  init: (numBots: number, difficulty?: BotDifficulty, variant?: GameVariant) => void;
+  trainInit: (variant?: GameVariant) => void;
   trainingInjectCard: (card: Card) => void;
   triggerAction: () => void;
   skipAction: () => void;
@@ -203,6 +211,10 @@ interface StoreState {
   clickOtherCard: (playerId: string, index: number) => void;
   discardNoAction: () => void;
   discardAndTrigger: () => void;
+  /** Cabo Evolved Dragon: activate a freshly drawn Dragon (→ rank picker). */
+  activateDragon: () => void;
+  /** Cabo Evolved Dragon: choose the rank the Dragon transforms into. */
+  dragonChooseRank: (rank: Rank) => void;
   callCaboAction: () => void;
   /** Begin snap targeting on opponents (UI mode only — sends the actual snap
    *  on card click). Press again to cancel. */
@@ -214,6 +226,8 @@ interface StoreState {
   doSnapOther: (targetId: string, targetIndex: number) => void;
   doSnapSelf: (ownIndex: number) => void;
   peekSwapDecide: (doSwap: boolean, ownIndex?: number) => void;
+  /** Cabo Evolved 7/8 picker: choose to peek own OR spy other. */
+  choosePeek: (choice: "own" | "other") => void;
   consumeAnimations: () => void;
   consumeReveals: () => void;
   setToast: (s: string | null) => void;
@@ -359,7 +373,7 @@ function computeSpBust(game: GameState, prev: ElimState): ElimState {
 
     const contestantHands = prev.suddenDeath.contestants.map((id) => {
       const player = game.players.find((p) => p.id === id);
-      return { id, handTotal: player ? handScore(player.hand) : Infinity };
+      return { id, handTotal: player ? handScore(player.hand, game.variant) : Infinity };
     });
     const minHand = Math.min(...contestantHands.map((c) => c.handTotal));
     const atMin = contestantHands.filter((c) => c.handTotal === minHand);
@@ -552,14 +566,16 @@ export const useStore = create<StoreState>((set, get) => ({
   eliminatedFromRoom: false,
   pendingNumBots: 1,
   setPendingNumBots(n) { set({ pendingNumBots: n }); },
+  pendingVariant: "classic",
+  setPendingVariant(v) { set({ pendingVariant: v }); },
   setScreen(s) { set({ screen: s }); },
   botDifficulty: null,
   botSpeech: null,
   setBotSpeech(v) { set({ botSpeech: v }); },
 
-  init(numBots, difficulty) {
+  init(numBots, difficulty, variant = "classic") {
     const diff = difficulty ?? null;
-    const game = newGame({ players: makePlayers(numBots, diff) });
+    const game = newGame({ players: makePlayers(numBots, diff), variant });
     // Start with the coin toss screen — the actual game state is held in
     // pendingGame until the toss completes and decides the starting player.
     set({
@@ -583,10 +599,12 @@ export const useStore = create<StoreState>((set, get) => ({
     });
   },
 
-  trainInit() {
+  trainInit(variant = "classic") {
     // Training Chamber: 1 bot so swap/spy actions have a target to work with.
     // Skip the coin toss in training mode — human always starts for predictable testing.
-    const game = newGame({ players: makePlayers(1, null) });
+    // `variant` lets the chamber drill Classic or Cabo Evolved (Dragon, K=0, 7/8
+    // peek-or-spy, 9/10 peek+spy, Kamikaze, Carré) — chosen on the menu.
+    const game = newGame({ players: makePlayers(1, null), variant });
     set({
       mode: "sp", training: true, mp: null,
       elim: EMPTY_ELIM,
@@ -855,6 +873,12 @@ export const useStore = create<StoreState>((set, get) => ({
             targeting = "peek_own"; pendingBlindSwapOwnIndex = null; break;
           case "action_peek_other":
             targeting = "peek_other"; pendingBlindSwapOwnIndex = null; break;
+          case "action_peek_choose":
+            // Evolved 7/8 picker — choice is via buttons, no board target yet.
+            targeting = null; pendingBlindSwapOwnIndex = null; break;
+          case "dragon_choose":
+            // Evolved Dragon rank picker — choice is via buttons, no board target.
+            targeting = null; pendingBlindSwapOwnIndex = null; break;
           case "action_blind_swap":
             // If we already picked our own card, stay on the target step
             if (pendingBlindSwapOwnIndex === null) targeting = "blind_swap_self";
@@ -1004,10 +1028,13 @@ export const useStore = create<StoreState>((set, get) => ({
     if (game.phase === "action_peek_own" && targeting === "peek_own") {
       if (mode === "mp") {
         dispatch("action_peek_own", { index }, () => set({ targeting: "peek_own" }));
+        set({ targeting: null });
       } else {
-        set(applySpResult(actionPeekOwn(game, index), elim));
+        // SP: a 9/10 "peek both" routes into the spy step after the own-peek;
+        // carry targeting to peek_other in that case, else clear it.
+        const res = applySpResult(actionPeekOwn(game, index), elim);
+        set({ ...res, targeting: res.game.phase === "action_peek_other" ? "peek_other" : null });
       }
-      set({ targeting: null });
       return;
     }
     if (game.phase === "action_blind_swap" && targeting === "blind_swap_self") {
@@ -1153,6 +1180,44 @@ export const useStore = create<StoreState>((set, get) => ({
     }
     if (!game) return;
     set({ ...applySpResult(skipPendingAction(game), elim), targeting: null });
+  },
+
+  choosePeek(choice) {
+    const { mode, game, elim } = get();
+    if (game && game.snapPhase !== "idle") return;
+    if (mode === "mp") {
+      import("./mp").then((m) => m.sendAction({ type: "action_choose_peek", choice } as any));
+      return;
+    }
+    if (!game) return;
+    const next = actionChoosePeek(game, choice);
+    const targeting: ActionTargetingMode =
+      next.phase === "action_peek_own" ? "peek_own"
+      : next.phase === "action_peek_other" ? "peek_other"
+      : null;
+    set({ ...applySpResult(next, elim), targeting });
+  },
+
+  activateDragon() {
+    const { mode, game, elim } = get();
+    if (game && game.snapPhase !== "idle") return;
+    if (mode === "mp") {
+      import("./mp").then((m) => m.sendAction({ type: "activate_dragon" } as any));
+      return;
+    }
+    if (!game) return;
+    set({ ...applySpResult(engineActivateDragon(game), elim), targeting: null });
+  },
+
+  dragonChooseRank(rank) {
+    const { mode, game, elim } = get();
+    if (game && game.snapPhase !== "idle") return;
+    if (mode === "mp") {
+      import("./mp").then((m) => m.sendAction({ type: "dragon_choose_rank", rank } as any));
+      return;
+    }
+    if (!game) return;
+    set({ ...applySpResult(engineDragonChooseRank(game, rank), elim), targeting: null });
   },
 
   callCaboAction() {
@@ -1355,11 +1420,13 @@ export const useStore = create<StoreState>((set, get) => ({
       }
       const next = newGame({
         players: playerInputs,
+        variant: game.variant,
         roundNumber: game.roundNumber + 1,
         scores: game.scores,
         caboBonus: game.caboBonus,
         caboPenalty: game.caboPenalty,
         snapBonus: game.snapBonus,
+        kamikaze: game.kamikaze,
       });
       set({
         game: next,
@@ -1410,11 +1477,13 @@ export const useStore = create<StoreState>((set, get) => ({
     const playerInputs = activePlayers.map((p) => ({ id: p.id, name: p.name, isBot: p.isBot }));
     const next = newGame({
       players: playerInputs,
+      variant: game.variant,
       roundNumber: game.roundNumber + 1,
       scores: game.scores,
       caboBonus: game.caboBonus,
       caboPenalty: game.caboPenalty,
       snapBonus: game.snapBonus,
+      kamikaze: game.kamikaze,
     });
     set({
       game: next,

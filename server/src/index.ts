@@ -7,7 +7,9 @@ import cors from "cors";
 import { Server } from "socket.io";
 import { Rooms } from "./rooms.js";
 import {
+  activateDragon,
   actionBlindSwap,
+  actionChoosePeek,
   actionPeekAndSwapDecide,
   actionPeekAndSwapPick,
   actionPeekOther,
@@ -22,6 +24,7 @@ import {
   discardDrawn,
   discardDrawnSkipAction,
   discardDrawnWithAction,
+  dragonChooseRank,
   drawFromDeck,
   drawFromDiscard,
   handScore,
@@ -32,7 +35,7 @@ import {
   swapDrawnWithHand,
   triggerPendingAction,
 } from "./engine/game.js";
-import type { GameState } from "./engine/types.js";
+import type { GameState, Rank } from "./engine/types.js";
 
 const app = express();
 app.use(cors());
@@ -63,7 +66,7 @@ function startRoomGame(roomCode: string) {
   if (timerId) clearTimeout(timerId);
   readyTimers.delete(roomCode);
   const players = room.members.map((m) => ({ id: m.playerId, name: m.name, isBot: false }));
-  room.game = newGame({ players });
+  room.game = newGame({ players, variant: room.variant });
   const startIdx = Math.floor(Math.random() * players.length);
   room.game.currentPlayer = startIdx;
   room.lastStarterIdx = startIdx;
@@ -251,6 +254,7 @@ function publicView(room: ReturnType<Rooms["get"]> & {}, viewerId: string) {
     code: room.code,
     hostId: room.hostId,
     started: !!room.game,
+    variant: room.variant,
     viewerId,
     members: room.members.map((m) => ({
       id: m.playerId,
@@ -288,6 +292,7 @@ type ActionMsg =
   | { type: "skip_action" }
   | { type: "action_peek_own"; index: number }
   | { type: "action_peek_other"; targetPlayerId: string; index: number }
+  | { type: "action_choose_peek"; choice: "own" | "other" }
   | { type: "action_blind_swap"; ownIndex: number; targetPlayerId: string; targetIndex: number }
   | { type: "action_peek_and_swap_pick"; targetPlayerId: string; index: number }
   | { type: "action_peek_and_swap_decide"; doSwap: boolean; ownIndex?: number }
@@ -298,6 +303,8 @@ type ActionMsg =
   | { type: "action_start_snap_self" }
   | { type: "start_play" }
   | { type: "setup_peek_card"; index: number }
+  | { type: "activate_dragon" }
+  | { type: "dragon_choose_rank"; rank: Rank }
   | { type: "clear_animations" }
   | { type: "clear_reveals" };
 
@@ -341,6 +348,9 @@ function applyAction(game: GameState, playerId: string, action: ActionMsg): Game
     case "action_peek_other":
       if (!requireCurrent()) return null;
       return actionPeekOther(game, action.targetPlayerId, action.index);
+    case "action_choose_peek":
+      if (!requireCurrent()) return null;
+      return actionChoosePeek(game, action.choice);
     case "action_blind_swap":
       if (!requireCurrent()) return null;
       return actionBlindSwap(game, action.ownIndex, action.targetPlayerId, action.targetIndex);
@@ -369,6 +379,12 @@ function applyAction(game: GameState, playerId: string, action: ActionMsg): Game
       return actionSnapOther(game, playerId, action.targetPlayerId, action.targetIndex);
     case "action_snap_self":
       return actionSnapSelf(game, playerId, action.ownIndex);
+    case "activate_dragon":
+      if (!requireCurrent()) return null;
+      return activateDragon(game);
+    case "dragon_choose_rank":
+      if (!requireCurrent()) return null;
+      return dragonChooseRank(game, action.rank);
     case "clear_animations":
       return clearAnimations(game);
     case "clear_reveals":
@@ -429,6 +445,23 @@ io.on("connection", (socket) => {
     if (room.game) return cb({ ok: false, error: "Already started" });
     startRoomGame(bound.roomCode);
     cb({ ok: true });
+  });
+
+  socket.on("room:set_variant", ({ variant }: { variant: "classic" | "evolved" }, cb) => {
+    if (!bound) return cb?.({ ok: false, error: "Not in a room" });
+    const room = rooms.get(bound.roomCode);
+    if (!room) return cb?.({ ok: false, error: "Room not found" });
+    // Only the host may change the mode, and only before the game starts.
+    if (room.hostId !== bound.playerId) {
+      return cb?.({ ok: false, error: "Only the host can change the game mode" });
+    }
+    if (room.game) return cb?.({ ok: false, error: "Game already started" });
+    if (variant !== "classic" && variant !== "evolved") {
+      return cb?.({ ok: false, error: "Invalid mode" });
+    }
+    room.variant = variant;
+    cb?.({ ok: true });
+    broadcastRoom(bound.roomCode);
   });
 
   socket.on("room:ready", (_payload, cb) => {
@@ -702,6 +735,7 @@ io.on("connection", (socket) => {
     const nextStarterIdx = (room.lastStarterIdx + 1) % players.length;
     room.game = newGame({
       players,
+      variant: room.variant,
       roundNumber: room.game.roundNumber + 1,
       scores: room.game.scores,
       caboBonus: room.game.caboBonus,

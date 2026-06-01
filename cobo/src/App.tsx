@@ -15,6 +15,8 @@ import { EliminatedOverlay } from "./ui/EliminatedOverlay";
 import { SnapControls } from "./ui/SnapControls";
 import { SnapCinematic } from "./ui/SnapCinematic";
 import { SnapBonusOverlay } from "./ui/SnapBonusOverlay";
+import { DragonRankPicker } from "./ui/DragonRankPicker";
+import { DragonActivateCinematic } from "./ui/DragonActivateCinematic";
 import { BUSTED_ROOM_KEY } from "./ui/BustedOverlay";
 import { getSocket } from "./state/mp";
 import { useViewMode, isStandalone } from "./state/viewmode";
@@ -135,6 +137,8 @@ function App() {
       {screen === "game" && <SnapControls />}
       {screen === "game" && <SnapCinematic />}
       {screen === "game" && <SnapBonusOverlay />}
+      {screen === "game" && <DragonRankPicker />}
+      {screen === "game" && <DragonActivateCinematic />}
       <HelpButton />
       <AudioControls />
       <ChatPanel />

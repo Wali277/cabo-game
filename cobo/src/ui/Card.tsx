@@ -3,9 +3,9 @@ import { memo } from "react";
 import type React from "react";
 import type { Card as CardT } from "../engine/types";
 import { useViewMode } from "../state/viewmode";
-import { useCardSkin } from "../state/cardskin";
+import { useCardSkin, type CardSkin } from "../state/cardskin";
 import { useStore } from "../state/store";
-import { SKIN_STYLES, HelmetIcon, HandDrawnBack, RoyalBack, NeonBack, MinimalistBack } from "./cardSkins";
+import { SKIN_STYLES, HelmetIcon, HandDrawnBack, RoyalBack, NeonBack, MinimalistBack, EvolvedBack, DragonFace } from "./cardSkins";
 import {
   cardLayoutTransition,
   isActionSwapKind,
@@ -57,7 +57,11 @@ function CardViewImpl({
   const w = SIZE_PX[viewMode][size];
   const h = Math.round(w * 1.45);
   const currentSkin = useCardSkin();
-  const skinId = skinOverride ?? currentSkin;
+  // Cabo Evolved locks every card to its dedicated purple/orange skin. A
+  // skinOverride (the picker's preview tiles) still wins, so previews render
+  // their own style regardless of the active game's variant.
+  const evolvedLock = useStore((s) => s.game?.variant === "evolved");
+  const skinId: CardSkin = skinOverride ?? (evolvedLock ? "evolved" : currentSkin);
   const skin = SKIN_STYLES[skinId];
   const reduced = useReducedMotion() ?? false;
 
@@ -311,6 +315,45 @@ function CardFace({
     );
   }
 
+  // Cabo Evolved Dragon (rank "D") — the approved filled dragon art with "D"
+  // corners on the skin's black field. Special-cased like the Joker so it never
+  // falls through to the generic rank-text + suit-glyph face.
+  if (card.rank === "Dragon") {
+    const dColor = suitTextColor(card.suit, skin);
+    const letterFs = w * (mobile ? 0.2 : 0.17);
+    const dInset = mobile ? Math.max(3, Math.round(w * 0.05)) : 6;
+    const dragonW = w * (mobile ? 0.5 : 0.54);
+    const cornerStyle: React.CSSProperties = {
+      position: "absolute",
+      fontSize: letterFs,
+      fontWeight: 900,
+      lineHeight: 1,
+      color: dColor,
+      userSelect: "none",
+      fontFamily: skin.font ?? "'Fredoka', system-ui, sans-serif",
+    };
+    return (
+      <div
+        className="card-face"
+        style={{
+          width: w, height: h, position: "absolute", inset: 0,
+          backfaceVisibility: "hidden",
+          background: skin.faceBg,
+          borderRadius: 12,
+          border: `${skin.faceBorderWidth ?? 3}px solid ${skin.faceBorder}`,
+          boxShadow: "0 6px 18px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.5)",
+          overflow: "hidden",
+        }}
+      >
+        <div style={{ top: dInset, left: dInset, ...cornerStyle }}>D</div>
+        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <DragonFace size={dragonW} color={dColor} />
+        </div>
+        <div style={{ bottom: dInset, right: dInset, transform: "rotate(180deg)", ...cornerStyle }}>D</div>
+      </div>
+    );
+  }
+
   const color = suitTextColor(card.suit, skin);
   const glyph = SUIT_GLYPH[card.suit];
   const font = skin.font ?? "'Fredoka', system-ui, sans-serif";
@@ -447,6 +490,8 @@ function CardBack({
     center = <NeonBack w={w} />;
   } else if (skin.backCenter === "minimalist") {
     center = <MinimalistBack w={w} />;
+  } else if (skin.backCenter === "evolved") {
+    center = <EvolvedBack w={w} />;
   } else {
     // Default "CABO" pill
     center = (

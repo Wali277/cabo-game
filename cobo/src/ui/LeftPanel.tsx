@@ -15,6 +15,17 @@ const ACTION_META: Record<string, { label: string; emoji: string; desc: string; 
   "K":  { label: "Peek & Swap", emoji: "👑", desc: "Peek an opponent's card, then decide swap.", color: "#ffd86b" },
 };
 
+/** Cabo Evolved action labels (7/8 = choose peek-or-spy, 9/10 = both, K = no action). */
+const ACTION_META_EVOLVED: Record<string, { label: string; emoji: string; desc: string; color: string }> = {
+  "7":  { label: "Peek or Spy", emoji: "🔮", desc: "Peek one of YOUR cards, OR spy one of a rival's.", color: "#c08bff" },
+  "8":  { label: "Peek or Spy", emoji: "🔮", desc: "Peek one of YOUR cards, OR spy one of a rival's.", color: "#c08bff" },
+  "9":  { label: "Peek + Spy",  emoji: "🔮", desc: "Peek one of YOUR cards AND spy one of a rival's.", color: "#ffd54d" },
+  "10": { label: "Peek + Spy",  emoji: "🔮", desc: "Peek one of YOUR cards AND spy one of a rival's.", color: "#ffd54d" },
+  "J":  { label: "Blind Swap",  emoji: "🔀", desc: "Swap your card with an opponent's blindly.", color: "#ff8ec0" },
+  "Q":  { label: "Blind Swap",  emoji: "🔀", desc: "Swap your card with an opponent's blindly.", color: "#ff8ec0" },
+  // K has NO action in Evolved (value 0) — intentionally omitted.
+};
+
 interface LeftPanelProps {
   /** Extra class names — used by Table.tsx to add `.open` in phone mode so
    *  CSS can slide the panel up as a bottom sheet. */
@@ -43,6 +54,8 @@ export function LeftPanel({ className = "" }: LeftPanelProps = {}) {
   const setTargeting = useStore((s) => s.setTargeting);
   const callCaboAction = useStore((s) => s.callCaboAction);
   const peekSwapDecide = useStore((s) => s.peekSwapDecide);
+  const choosePeek = useStore((s) => s.choosePeek);
+  const activateDragon = useStore((s) => s.activateDragon);
   const start = useStore((s) => s.start);
 
   const isHumanTurn = game.players[game.currentPlayer].id === humanId;
@@ -54,8 +67,10 @@ export function LeftPanel({ className = "" }: LeftPanelProps = {}) {
 
   // For turn_drawn, detect if the drawn card carries an action ability
   const drawnCard = game.drawnCard;
-  const drawnAction = drawnCard ? actionOf(drawnCard) : null;
-  const actionMeta = drawnCard ? ACTION_META[drawnCard.rank] : null;
+  const drawnAction = drawnCard ? actionOf(drawnCard, game.variant) : null;
+  const actionMeta = drawnCard
+    ? (game.variant === "evolved" ? ACTION_META_EVOLVED[drawnCard.rank] : ACTION_META[drawnCard.rank]) ?? null
+    : null;
 
   let emoji = "";
   let instruction = "";
@@ -153,6 +168,37 @@ export function LeftPanel({ className = "" }: LeftPanelProps = {}) {
         break;
 
       case "turn_drawn":
+        // Cabo Evolved Dragon: a deck-drawn Dragon can ONLY be activated (the
+        // engine rejects swap/discard). A dead Dragon taken from the discard
+        // can ONLY be swapped into hand. Either way, show a single valid button
+        // so the player is never soft-locked.
+        if (drawnCard?.rank === "Dragon") {
+          if (game.drawnFrom === "deck") {
+            emoji = "🐉";
+            instruction = "A Dragon! Activate it to transform into any card.";
+            buttons = (
+              <button
+                className="btn left-btn action-trigger-btn primary"
+                style={{ borderColor: "#ffe14d", color: "#ffe14d" }}
+                onClick={() => { Audio.playSfx("action_trigger"); activateDragon(); }}
+              >
+                🐉 Activate Dragon
+              </button>
+            );
+          } else {
+            emoji = "🔄";
+            instruction = "This Dragon is spent — take it into your hand.";
+            buttons = (
+              <button
+                className={`btn left-btn ${targeting === "swap_hand" ? "primary" : ""}`}
+                onClick={() => setTargeting("swap_hand")}
+              >
+                🔄 {targeting === "swap_hand" ? "Pick a card to swap…" : "Swap into Hand"}
+              </button>
+            );
+          }
+          break;
+        }
         emoji = targeting === "swap_hand" ? "🔄" : (actionMeta?.emoji ?? "✋");
         instruction =
           targeting === "swap_hand"
@@ -234,12 +280,40 @@ export function LeftPanel({ className = "" }: LeftPanelProps = {}) {
 
       case "action_peek_own":
         emoji = "👁";
-        instruction = "Tap one of YOUR own cards to peek at it.";
+        instruction = game.pendingPeek === "peek_other"
+          ? "Peek + Spy (1 of 2) — tap one of YOUR cards to peek."
+          : "Tap one of YOUR own cards to peek at it.";
         break;
 
-      case "action_peek_other":
+      case "action_peek_other": {
+        const isBothStep2 =
+          game.variant === "evolved" &&
+          (game.pendingActionSource?.rank === "9" || game.pendingActionSource?.rank === "10");
         emoji = "🔍";
-        instruction = "Tap one of an OPPONENT's cards to spy on it.";
+        instruction = isBothStep2
+          ? "Peek + Spy (2 of 2) — tap an OPPONENT's card to spy."
+          : "Tap one of an OPPONENT's cards to spy on it.";
+        break;
+      }
+
+      case "action_peek_choose":
+        emoji = "🔮";
+        instruction = "Evolved 7/8 — peek one of YOUR cards, or spy a rival's?";
+        buttons = (
+          <>
+            <button className="btn primary left-btn" onClick={() => choosePeek("own")}>
+              👁 Peek my own
+            </button>
+            <button className="btn left-btn" onClick={() => choosePeek("other")}>
+              🔍 Spy a rival
+            </button>
+          </>
+        );
+        break;
+
+      case "dragon_choose":
+        emoji = "🐉";
+        instruction = "Choose the card your Dragon becomes →";
         break;
 
       case "action_blind_swap":

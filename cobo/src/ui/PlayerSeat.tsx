@@ -332,22 +332,18 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
   const sideMainSlots = isSide ? (isMobile ? cardSlots : cardSlots.slice(0, 4)) : cardSlots;
   const sideOverflowSlots = isSide && !isMobile ? cardSlots.slice(4) : [];
   const sideHasOverflow = isSide && !isMobile && sideOverflowSlots.length > 0;
-  // Build the back-row's 4-slot array. Slots 0 and 3 are always empty
-  // placeholders; slots 1 and 2 hold the overflow cards if present.
-  // After the side player's 90° rotation, the row's un-rotated x axis
-  // becomes the rotated y axis — so slot 1 lands at the y of main card 2
-  // and slot 2 at the y of main card 3.
+  // Build the back-row's 4-slot array. The overflow (5th+) cards fill the row
+  // FROM THE START so the second row reads left-to-right in the SAME direction
+  // as the main row: the first overflow card (the 5th card) lands at slot 0 —
+  // aligned with main card 1 — and each further penalty card extends along the
+  // row from there. Trailing empty slots keep the back row the same width as
+  // the main row so the rotation + centering line the two columns up.
   const sideBackRowSlots = sideHasOverflow
-    ? [
-        <div className="hand-slot hand-slot-placeholder" key="back-ph-0" aria-hidden />,
-        sideOverflowSlots[0] ?? (
-          <div className="hand-slot hand-slot-placeholder" key="back-ph-1" aria-hidden />
+    ? [0, 1, 2, 3].map((i) =>
+        sideOverflowSlots[i] ?? (
+          <div className="hand-slot hand-slot-placeholder" key={`back-ph-${i}`} aria-hidden />
         ),
-        sideOverflowSlots[1] ?? (
-          <div className="hand-slot hand-slot-placeholder" key="back-ph-2" aria-hidden />
-        ),
-        <div className="hand-slot hand-slot-placeholder" key="back-ph-3" aria-hidden />,
-      ]
+      )
     : [];
 
   return (

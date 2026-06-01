@@ -1,4 +1,4 @@
-import type { Card, Rank, Suit } from "./types";
+import type { ActionKind, Card, GameVariant, Rank, Suit } from "./types";
 
 const SUITS: Suit[] = ["S", "H", "D", "C"];
 const RANKS: Rank[] = [
@@ -6,7 +6,7 @@ const RANKS: Rank[] = [
   "8", "9", "10", "J", "Q", "K",
 ];
 
-export function makeDeck(): Card[] {
+export function makeDeck(variant: GameVariant = "classic"): Card[] {
   const deck: Card[] = [];
   for (const suit of SUITS) {
     for (const rank of RANKS) {
@@ -18,6 +18,12 @@ export function makeDeck(): Card[] {
   deck.push({ id: "JokerR2", rank: "Joker", suit: "H" });
   deck.push({ id: "JokerB1", rank: "Joker", suit: "S" });
   deck.push({ id: "JokerB2", rank: "Joker", suit: "S" });
+  // Cabo Evolved adds two Dragons (rank "Dragon", worth 20 if still held at
+  // round end). Suit is cosmetic — the Dragon card art ignores it.
+  if (variant === "evolved") {
+    deck.push({ id: "Dragon1", rank: "Dragon", suit: "S" });
+    deck.push({ id: "Dragon2", rank: "Dragon", suit: "H" });
+  }
   return deck;
 }
 
@@ -42,13 +48,16 @@ export function shuffle<T>(arr: T[], rng: () => number): T[] {
   return a;
 }
 
-export function cardScore(card: Card): number {
+export function cardScore(card: Card, variant: GameVariant = "classic"): number {
   switch (card.rank) {
     case "A": return 1;
     case "J": return 11;
     case "Q": return 12;
-    case "K": return 13;
+    // Cabo Evolved: the King becomes a second zero-value card (no action).
+    case "K": return variant === "evolved" ? 0 : 13;
     case "Joker": return 0;
+    // Cabo Evolved Dragon: a 20-point liability if still held at round end.
+    case "Dragon": return 20;
     default: return parseInt(card.rank, 10);
   }
 }
@@ -61,7 +70,14 @@ export function isBlackKing(card: Card): boolean {
   return card.rank === "K" && (card.suit === "S" || card.suit === "C");
 }
 
-export function actionOf(card: Card): "peek_own" | "peek_other" | "blind_swap" | "peek_and_swap" | null {
+export function actionOf(card: Card, variant: GameVariant = "classic"): ActionKind | null {
+  if (variant === "evolved") {
+    // 7/8 = choose (peek own OR spy); 9/10 = both; J/Q = blind swap; K = no action.
+    if (card.rank === "7" || card.rank === "8") return "peek_choose";
+    if (card.rank === "9" || card.rank === "10") return "peek_both";
+    if (card.rank === "J" || card.rank === "Q") return "blind_swap";
+    return null;
+  }
   if (card.rank === "7" || card.rank === "8") return "peek_own";
   if (card.rank === "9" || card.rank === "10") return "peek_other";
   if (card.rank === "J" || card.rank === "Q") return "blind_swap";
@@ -69,6 +85,6 @@ export function actionOf(card: Card): "peek_own" | "peek_other" | "blind_swap" |
   return null;
 }
 
-export function handScore(hand: (Card | null)[]): number {
-  return hand.reduce((s, c) => s + (c ? cardScore(c) : 0), 0);
+export function handScore(hand: (Card | null)[], variant: GameVariant = "classic"): number {
+  return hand.reduce((s, c) => s + (c ? cardScore(c, variant) : 0), 0);
 }

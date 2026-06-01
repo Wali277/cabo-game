@@ -138,6 +138,13 @@ export async function startGame() {
   return new Promise<any>((resolve) => getSocket().emit("room:start", {}, resolve));
 }
 
+/** Host-only: set the rule variant for the room before the game starts. */
+export async function setVariantMp(variant: "classic" | "evolved") {
+  return new Promise<{ ok: boolean; error?: string }>((resolve) =>
+    getSocket().emit("room:set_variant", { variant }, resolve),
+  );
+}
+
 export async function playAgainMp() {
   return new Promise<any>((resolve) => getSocket().emit("room:play_again", {}, resolve));
 }
@@ -153,6 +160,7 @@ export type MpActionType =
   | "skip_action"
   | "action_peek_own"
   | "action_peek_other"
+  | "action_choose_peek"
   | "action_blind_swap"
   | "action_peek_and_swap_pick"
   | "action_peek_and_swap_decide"
@@ -163,6 +171,8 @@ export type MpActionType =
   | "call_cabo"
   | "start_play"
   | "setup_peek_card"
+  | "activate_dragon"
+  | "dragon_choose_rank"
   | "clear_animations"
   | "clear_reveals";
 

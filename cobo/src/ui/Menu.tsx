@@ -45,6 +45,8 @@ export function Menu() {
   const viewMode = useViewMode();
   const [bots, setBots] = useState(1);
   const [showTutorial, setShowTutorial] = useState(false);
+  // Training Chamber: clicking the button reveals a Classic / Cabo Evolved choice.
+  const [trainOpen, setTrainOpen] = useState(false);
 
   // Master sound toggle (mutes/unmutes both music + SFX together). Kept in sync
   // with the in-game audio controls via Audio.subscribe so the icon is correct
@@ -163,12 +165,29 @@ export function Menu() {
             : "📱 Switch to phone layout"}
         </button>
         <div className="divider"><span>dev</span></div>
-        <button
-          className="btn ghost-light"
-          onClick={() => trainInit()}
-        >
-          🧪 Training Chamber
-        </button>
+        {!trainOpen ? (
+          <button
+            className="btn ghost-light"
+            onClick={() => { Audio.playSfx("click"); setTrainOpen(true); }}
+          >
+            🧪 Training Chamber
+          </button>
+        ) : (
+          <div className="train-choice">
+            <span className="train-choice-label">Train which mode?</span>
+            <div className="train-choice-row">
+              <button className="btn ghost-light" onClick={() => trainInit("classic")}>
+                ♣ Classic
+              </button>
+              <button className="btn ghost-light" onClick={() => trainInit("evolved")}>
+                🐉 Cabo Evolved
+              </button>
+            </div>
+            <button className="train-choice-cancel" onClick={() => setTrainOpen(false)}>
+              ← cancel
+            </button>
+          </div>
+        )}
         <div className="hint">
           Multiplayer creates a room with a shareable URL. Up to 4 players.
         </div>

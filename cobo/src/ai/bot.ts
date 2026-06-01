@@ -1,6 +1,8 @@
 import { actionOf, cardScore } from "../engine/deck";
 import {
+  activateDragon as engineActivateDragon,
   actionBlindSwap,
+  actionChoosePeek,
   actionPeekAndSwapDecide,
   actionPeekAndSwapPick,
   actionPeekOther,
@@ -12,12 +14,13 @@ import {
   callCabo,
   discardDrawnSkipAction,
   discardDrawnWithAction,
+  dragonChooseRank as engineDragonChooseRank,
   drawFromDeck,
   drawFromDiscard,
   swapDrawnWithHand,
   triggerPendingAction,
 } from "../engine/game";
-import type { GameState, PlayerState } from "../engine/types";
+import type { GameState, PlayerState, Rank } from "../engine/types";
 import { useStore } from "../state/store";
 import { type BotDifficulty, type ChatMoment, pickChatLine } from "./bots";
 
@@ -75,7 +78,7 @@ export function ingestReveals(state: GameState) {
       }
       const cur = arr[i];
       if (!cur || cur.rank !== card.rank || cur.suit !== card.suit) {
-        arr[i] = { rank: card.rank, suit: card.suit, score: cardScore(card) };
+        arr[i] = { rank: card.rank, suit: card.suit, score: cardScore(card, state.variant) };
       }
     });
     for (const r of state.reveals) {
@@ -85,7 +88,7 @@ export function ingestReveals(state: GameState) {
       oppArr[r.index] = {
         rank: r.card.rank,
         suit: r.card.suit,
-        score: cardScore(r.card),
+        score: cardScore(r.card, state.variant),
       };
     }
   }
@@ -110,6 +113,39 @@ function unknownOwnIndex(bot: PlayerState, k: BotKnowledge): number | null {
   const arr = k.beliefs.get(bot.id)!;
   for (let i = 0; i < arr.length; i++) if (!arr[i]) return i;
   return null;
+}
+
+/** Cabo Evolved: a rank the bot KNOWS it holds exactly three non-zero copies
+ *  of — i.e. a Carré (four of a kind) is one matching card away. */
+function nearCarreRank(bot: PlayerState, k: BotKnowledge): string | null {
+  const arr = k.beliefs.get(bot.id)!;
+  const counts = new Map<string, number>();
+  arr.forEach((b) => {
+    if (b && b.score > 0) counts.set(b.rank, (counts.get(b.rank) ?? 0) + 1);
+  });
+  for (const [rank, n] of counts) if (n === 3) return rank;
+  return null;
+}
+
+/** The own slot to displace when completing a Carré of `rank`: the highest
+ *  KNOWN non-matching card (so the surviving 5th card is as low as possible),
+ *  else any unknown slot. Never displaces a matching slot. */
+function carreDisplaceSlot(bot: PlayerState, k: BotKnowledge, rank: string): number | null {
+  const arr = k.beliefs.get(bot.id)!;
+  let bestKnownIdx: number | null = null;
+  let bestKnownScore = -Infinity;
+  let unknownIdx: number | null = null;
+  arr.forEach((b, i) => {
+    if (b) {
+      if (b.rank !== rank && b.score > bestKnownScore) {
+        bestKnownScore = b.score;
+        bestKnownIdx = i;
+      }
+    } else if (unknownIdx === null) {
+      unknownIdx = i;
+    }
+  });
+  return bestKnownIdx !== null ? bestKnownIdx : unknownIdx;
 }
 
 /** Standard 54-card deck (A-K + 2 Jokers, Jokers=0, J/Q/K=10) averages ~6.3
@@ -211,7 +247,10 @@ function shouldCallCabo(state: GameState, bot: PlayerState, k: BotKnowledge, dif
   const handLen = bot.hand.length;
   const { count, sum } = knownCountAndSum(bot, k);
   const unknowns = handLen - count;
-  const estimate = sum + unknowns * UNKNOWN_ESTIMATE;
+  // Evolved's deck averages lower (~5.5) than classic (~6.5) because K = 0,
+  // so an unknown slot is worth a touch less when judging a Cabo call.
+  const unkEst = state.variant === "evolved" ? 5.5 : UNKNOWN_ESTIMATE;
+  const estimate = sum + unknowns * unkEst;
   const worstCase = sum + unknowns * 10; // assume every unknown is a face card
   const human = state.players.find((p) => !p.isBot);
   const humanReveals = human ? state.reveals.filter((r) => r.playerId === human.id).length : 0;
@@ -270,8 +309,11 @@ function pickDeckSwapTarget(
   // Unknowns: swap if drawn is below the avg unknown estimate. Bob is more
   // aggressive (will swap up to UNKNOWN_ESTIMATE), and both bots loosen
   // further in endgame.
-  const marcyCap = inEndgame ? 6 : 5;
-  const bobCap = inEndgame ? 7 : 6;
+  // Evolved unknowns average ~1 lower than classic (K = 0), so tighten the
+  // "swap a drawn card into an unknown" threshold by one in Evolved.
+  const evo = state.variant === "evolved" ? 1 : 0;
+  const marcyCap = (inEndgame ? 6 : 5) - evo;
+  const bobCap = (inEndgame ? 7 : 6) - evo;
   const cap = difficulty === "bob" ? bobCap : marcyCap;
   if (unknown !== null && drawnScore <= cap) return unknown;
   return null;
@@ -347,6 +389,13 @@ function choosePeekAndSwapPick(state: GameState, bot: PlayerState, k: BotKnowled
   return { playerId: other.id, idx: 0 };
 }
 
+/** Cabo Evolved Dragon: pick the rank a bot's Dragon becomes. v1 policy:
+ *  Joker (0 points) — the follow-up turn lets the bot dump its highest card
+ *  for a free zero. Non-exploitable; a future version could choose actions. */
+function botChooseDragonRank(): Rank {
+  return "Joker";
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // Entry point — the only function Table.tsx calls
 // ────────────────────────────────────────────────────────────────────────────
@@ -374,7 +423,7 @@ export function botMove(state: GameState): GameState {
     const top = state.discard[state.discard.length - 1];
     const inEndgame = !!state.caboCallerId && state.caboCallerId !== bot.id;
     if (top) {
-      const topScore = cardScore(top);
+      const topScore = cardScore(top, state.variant);
       if (difficulty === "billy") {
         // Billy: draws from discard for bad reasons too.
         if (Math.random() < 0.3 && topScore <= 9) return drawFromDiscard(state);
@@ -404,12 +453,19 @@ export function botMove(state: GameState): GameState {
   // ── turn_drawn: swap, discard with action, or discard ───────────────────
   if (state.phase === "turn_drawn" && state.drawnCard) {
     const drawn = state.drawnCard;
-    const drawnScore = cardScore(drawn);
-    const drawnAction = actionOf(drawn);
+    const drawnScore = cardScore(drawn, state.variant);
+    const drawnAction = actionOf(drawn, state.variant);
 
     // Juicy-card chat (face / action). 30% chance, gated by cooldown.
     if (juicyCard(drawn.rank) && Math.random() < 0.3) {
       emitBotSpeech(bot.id, "juicyDraw");
+    }
+
+    // Cabo Evolved Dragon: a deck-drawn Dragon must be ACTIVATED (it can't be
+    // kept or discarded). A Dragon taken from the discard is dead — fall
+    // through to the normal forced-swap path below.
+    if (drawn.rank === "Dragon" && state.drawnFrom === "deck") {
+      return engineActivateDragon(state);
     }
 
     if (state.drawnFrom === "discard") {
@@ -419,6 +475,17 @@ export function botMove(state: GameState): GameState {
       const unknown = unknownOwnIndex(bot, k);
       const target = highest ?? (unknown !== null ? { idx: unknown, score: 0 } : { idx: 0, score: 0 });
       return swapDrawnWithHand(state, target.idx);
+    }
+
+    // Cabo Evolved: if this deck-drawn card completes a four-of-a-kind we
+    // already hold three of, swap it in (displacing our highest non-matching
+    // card) so the four count 0 — strong Carré points protection.
+    if (state.variant === "evolved" && difficulty !== "billy") {
+      const carreRank = nearCarreRank(bot, k);
+      if (carreRank && drawn.rank === carreRank) {
+        const slot = carreDisplaceSlot(bot, k, carreRank);
+        if (slot !== null) return swapDrawnWithHand(state, slot);
+      }
     }
 
     // Drawn from deck.
@@ -468,6 +535,19 @@ export function botMove(state: GameState): GameState {
     return triggerPendingAction(state);
   }
 
+  // Cabo Evolved Dragon: the bot activated a Dragon and must pick the rank it
+  // becomes. v1 policy → Joker (0), so the follow-up turn_drawn logic dumps the
+  // bot's highest card for a free zero.
+  if (state.phase === "dragon_choose") {
+    return engineDragonChooseRank(state, botChooseDragonRank());
+  }
+
+  if (state.phase === "action_peek_choose") {
+    // Evolved 7/8 picker: prefer learning an unknown own card; else spy a rival.
+    const ownUnknown = unknownOwnIndex(bot, k);
+    return actionChoosePeek(state, ownUnknown !== null ? "own" : "other");
+  }
+
   if (state.phase === "action_peek_own") {
     const target = unknownOwnIndex(bot, k) ?? 0;
     return actionPeekOwn(state, target);
@@ -506,7 +586,7 @@ export function botMove(state: GameState): GameState {
   }
 
   if (state.phase === "action_peek_and_swap_decide" && state.peekAndSwapPick) {
-    const pickedScore = cardScore(state.peekAndSwapPick.card);
+    const pickedScore = cardScore(state.peekAndSwapPick.card, state.variant);
     const ownHi = highestKnownOwnIndex(bot, k);
     if (difficulty === "billy") {
       // Billy: swaps regardless of whether it's a good idea, 50% of the time.

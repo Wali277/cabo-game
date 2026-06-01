@@ -1989,6 +1989,12 @@ body.standalone .lobby.menu-refresh {
   grid-template-columns: minmax(220px, 270px) 1fr minmax(260px, 330px);
   gap: 14px;
   flex: 1;
+  /* Let this flex item shrink to the viewport instead of growing to its
+     tallest child's NATURAL height. .table-grid is only downscaled by a CSS
+     transform (visual-only — its layout box stays full-size), so without this
+     the grid's natural height inflates .game-body past 100dvh and the side
+     columns (LeftPanel / Scoreboard) stretch off the bottom of the screen. */
+  min-height: 0;
   align-items: stretch; /* all columns fill full height */
 }
 
@@ -2046,6 +2052,65 @@ body.standalone .lobby.menu-refresh {
   border-radius: 14px !important;
   white-space: nowrap;
 }
+
+/* ========== Dragon rank picker (Cabo Evolved — Dragon activation) ========== */
+.dragon-pick-overlay { display: flex; align-items: center; justify-content: center; }
+.dragon-pick-modal {
+  width: min(440px, 92vw);
+  background: linear-gradient(158deg, #20202a 0%, #0e0e13 60%, #070709 100%);
+  border: 2px solid #ffe14d;
+  border-radius: 20px;
+  padding: 22px 22px 24px;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,225,77,0.12);
+  text-align: center;
+  color: #f6f4ea;
+}
+.dragon-pick-kicker { font-size: 12px; letter-spacing: 3px; text-transform: uppercase; color: #ffe14d; font-weight: 700; }
+.dragon-pick-title { margin: 4px 0; font-size: 24px; font-weight: 800; color: #ffe14d; }
+.dragon-pick-sub { margin: 0 auto 16px; font-size: 13px; line-height: 1.45; color: #b9b6c8; max-width: 360px; }
+.dragon-pick-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.dragon-pick-btn {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  padding: 10px 4px; min-height: 52px;
+  background: rgba(255,225,77,0.06);
+  border: 1.5px solid rgba(255,225,77,0.4);
+  border-radius: 12px; color: #ffe14d; cursor: pointer; font-family: inherit;
+  transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+}
+.dragon-pick-btn:hover { background: rgba(255,225,77,0.16); border-color: #ffe14d; transform: translateY(-2px); }
+.dragon-pick-rank { font-size: 20px; font-weight: 800; line-height: 1; }
+.dragon-pick-hint { font-size: 9px; letter-spacing: 0.3px; color: #9a96aa; text-transform: uppercase; }
+@media (max-width: 480px) {
+  .dragon-pick-grid { grid-template-columns: repeat(4, 1fr); }
+}
+
+/* ========== Dragon activation cinematic ========== */
+.dragon-cine-overlay {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+  background: radial-gradient(circle at 50% 45%, rgba(40, 30, 5, 0.78) 0%, rgba(5, 5, 8, 0.93) 70%);
+  -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+}
+.dragon-cine-ring {
+  position: absolute; width: 300px; height: 300px; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, rgba(255,225,77,0.5) 0%, rgba(255,176,32,0.18) 42%, transparent 70%);
+}
+.dragon-cine-art { filter: drop-shadow(0 0 30px rgba(255,225,77,0.55)); }
+.dragon-cine-word {
+  font-family: 'Fredoka', system-ui, sans-serif; font-weight: 800; font-size: 34px;
+  letter-spacing: 10px; padding-left: 10px; color: #ffe14d;
+  text-shadow: 0 2px 16px rgba(255,176,32,0.6);
+}
+
+/* ========== Menu: Training Chamber Classic / Evolved choice ========== */
+.train-choice { display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
+.train-choice-label { text-align: center; font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.65); }
+.train-choice-row { display: flex; gap: 8px; }
+.train-choice-row .btn { flex: 1; }
+.train-choice-cancel {
+  align-self: center; background: none; border: none; color: rgba(255,255,255,0.45);
+  font-size: 12px; cursor: pointer; padding: 2px 8px; font-family: inherit;
+}
+.train-choice-cancel:hover { color: rgba(255,255,255,0.78); }
 
 /* Action-trigger button in the left panel — glowing border in the action colour */
 .action-trigger-btn {
@@ -5791,6 +5856,312 @@ body.mobile-mode .sudden-death-title {
 body.mobile-mode .sudden-death-sub {
   font-size: clamp(13px, 3.6vw, 18px);
 }
+
+/* ── Cabo Evolved outcome cinematics (Kamikaze / Carré) ──────────────────
+   Dedicated one-shot round-end splashes. Crimson/orange for Kamikaze (a 0
+   hand levies +20 on everyone else), regal purple/gold for Carré (four of a
+   kind protects points). Evolved-only — never shown in classic. */
+.evolved-outcome-overlay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.evolved-outcome-overlay.is-kamikaze {
+  background: radial-gradient(circle at 50% 45%, rgba(120,12,8,0.5) 0%, rgba(10,2,2,0.88) 70%);
+}
+.evolved-outcome-overlay.is-carre {
+  background: radial-gradient(circle at 50% 45%, rgba(58,22,108,0.5) 0%, rgba(8,4,20,0.88) 70%);
+}
+.evolved-outcome-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 0 24px;
+}
+.evolved-outcome-halo {
+  position: absolute;
+  width: 460px;
+  height: 460px;
+  border-radius: 50%;
+  filter: blur(10px);
+  z-index: 0;
+  pointer-events: none;
+}
+.is-kamikaze .evolved-outcome-halo {
+  background: radial-gradient(circle, rgba(255,120,40,0.55) 0%, rgba(255,60,30,0.25) 42%, transparent 70%);
+}
+.is-carre .evolved-outcome-halo {
+  background: radial-gradient(circle, rgba(200,140,255,0.5) 0%, rgba(255,184,84,0.22) 46%, transparent 72%);
+}
+.evolved-outcome-kicker {
+  position: relative;
+  z-index: 1;
+  font-family: 'Fredoka', system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.is-kamikaze .evolved-outcome-kicker { color: #ffb27a; }
+.is-carre .evolved-outcome-kicker { color: #e8c873; }
+.evolved-outcome-title {
+  position: relative;
+  z-index: 1;
+  font-family: 'Fredoka', system-ui, sans-serif;
+  font-weight: 900;
+  font-size: clamp(56px, 12vw, 132px);
+  line-height: 0.95;
+  letter-spacing: 2px;
+}
+.is-kamikaze .evolved-outcome-title {
+  color: #ff5b3a;
+  text-shadow: 0 0 26px rgba(255,80,40,0.7), 0 6px 0 rgba(120,10,0,0.6), 0 12px 32px rgba(0,0,0,0.6);
+}
+.is-carre .evolved-outcome-title {
+  color: #c79bff;
+  text-shadow: 0 0 26px rgba(190,130,255,0.7), 0 6px 0 rgba(80,30,140,0.6), 0 12px 32px rgba(0,0,0,0.6);
+}
+.evolved-outcome-sub {
+  position: relative;
+  z-index: 1;
+  margin-top: 14px;
+  font-size: clamp(16px, 2.6vw, 24px);
+  font-weight: 600;
+  color: #f4ebff;
+  max-width: 620px;
+}
+.evolved-outcome-hint {
+  position: relative;
+  z-index: 1;
+  margin-top: 26px;
+  font-size: 13px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: rgba(244,235,255,0.6);
+}
+
+/* Kamikaze explainer under the round-end modal buttons. */
+.round-end-kamikaze-note {
+  margin-top: 14px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(255, 90, 50, 0.12);
+  border: 1px solid rgba(255, 120, 60, 0.5);
+  color: #ffb27a;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.4;
+}
+
+/* ── Game-mode selector on the bot picker (Classic / Cabo Evolved) ── */
+.mode-select {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 18px;
+}
+.mode-select-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: rgba(244, 235, 255, 0.6);
+}
+.mode-select-options {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px;
+  border-radius: 16px;
+  background: rgba(13, 22, 56, 0.6);
+  border: 1.5px solid rgba(168, 123, 255, 0.4);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+.mode-option {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: #d8ccff;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 15px;
+  padding: 9px 18px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+  white-space: nowrap;
+}
+.mode-option:hover { color: #fff; background: rgba(255, 255, 255, 0.06); }
+.mode-option.active {
+  background: linear-gradient(160deg, #a87bff 0%, #7d4ec9 100%);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(120, 70, 200, 0.45);
+}
+.mode-option.evolved.active {
+  background: linear-gradient(160deg, #a64dff 0%, #ffe14d 145%);
+  color: #2e1065;
+  box-shadow: 0 4px 16px rgba(166, 77, 255, 0.5);
+}
+.mode-info-btn {
+  appearance: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(168, 123, 255, 0.55);
+  background: rgba(255, 255, 255, 0.05);
+  color: #c79bff;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.16s ease, transform 0.16s ease;
+}
+.mode-info-btn:hover { background: rgba(168, 123, 255, 0.2); transform: scale(1.08); }
+
+/* ── Cabo Evolved "how to play" modal ── */
+.evolved-info-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 360;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 4, 18, 0.74);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  padding: 20px;
+}
+.evolved-info-modal {
+  position: relative;
+  width: min(560px, 94vw);
+  max-height: 88vh;
+  overflow-y: auto;
+  background: linear-gradient(165deg, #1a1542 0%, #140e30 100%);
+  border: 2px solid rgba(168, 123, 255, 0.55);
+  border-radius: 22px;
+  padding: 26px 26px 22px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6);
+  color: #f4ebff;
+}
+.evolved-info-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: #d8ccff;
+  font-size: 15px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.evolved-info-close:hover { background: rgba(255, 255, 255, 0.16); color: #fff; }
+.evolved-info-kicker {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #ffe14d;
+}
+.evolved-info-title {
+  margin: 4px 0 8px;
+  font-size: 34px;
+  font-weight: 900;
+  background: linear-gradient(100deg, #c79bff 0%, #ffe14d 120%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.evolved-info-sub {
+  margin: 0 0 18px;
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: #cfc3ee;
+}
+.evolved-info-section { margin-bottom: 18px; }
+.evolved-info-h3 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: rgba(199, 155, 255, 0.95);
+}
+.evolved-info-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.evolved-info-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: #ece5ff;
+}
+.evolved-info-dot {
+  flex: 0 0 7px;
+  width: 7px;
+  height: 7px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: #a87bff;
+}
+.evolved-info-list strong { color: #ffd86b; font-weight: 700; }
+.evolved-info-rules { display: flex; flex-direction: column; gap: 8px; }
+.evolved-info-rule {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(168, 123, 255, 0.18);
+}
+.evolved-info-rule.special.kamikaze {
+  background: rgba(255, 90, 50, 0.1);
+  border-color: rgba(255, 120, 60, 0.4);
+}
+.evolved-info-rule.special.carre {
+  background: rgba(160, 90, 255, 0.12);
+  border-color: rgba(190, 130, 255, 0.45);
+}
+.evolved-info-badge {
+  flex: 0 0 auto;
+  min-width: 46px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 15px;
+  color: #ffd86b;
+}
+.evolved-info-rule.special .evolved-info-badge { font-size: 18px; color: #fff; background: rgba(0, 0, 0, 0.25); }
+.evolved-info-rule-title { font-weight: 700; font-size: 14.5px; color: #fff; }
+.evolved-info-rule-body { font-size: 13px; line-height: 1.4; color: #cfc3ee; margin-top: 2px; }
+.evolved-info-got-it { width: 100%; margin-top: 6px; }
 
 /* ── Sudden Death scoreboard cells (gold tint for F-columns) ── */
 .sb-th-final {
