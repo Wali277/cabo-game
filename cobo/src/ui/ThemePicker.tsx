@@ -64,8 +64,12 @@ export function ThemePicker() {
   const mp = useStore((s) => s.mp);
   const open = useStore((s) => s.themeOpen);
   const setOpen = useStore((s) => s.setThemeOpen);
+  // Cabo Evolved locks the card skin, so the "Card" tab is hidden there —
+  // only the wallpaper picker remains.
+  const evolvedLock = useStore((s) => s.game?.variant === "evolved");
   const chatHidden = mode !== "mp" || !mp;
   const [tab, setTab] = useState<Tab>("wallpaper");
+  const activeTab: Tab = evolvedLock ? "wallpaper" : tab;
   const rootRef = useRef<HTMLDivElement>(null);
 
   // Close on outside click + Escape.
@@ -121,31 +125,35 @@ export function ThemePicker() {
             <div className="customize-tabs" role="tablist" aria-label="Customize">
               <button
                 role="tab"
-                aria-selected={tab === "wallpaper"}
-                className={`customize-tab ${tab === "wallpaper" ? "active" : ""}`}
+                aria-selected={activeTab === "wallpaper"}
+                className={`customize-tab ${activeTab === "wallpaper" ? "active" : ""}`}
                 onClick={() => { Audio.playSfx("click"); setTab("wallpaper"); }}
               >
                 <span className="customize-tab-icon" aria-hidden="true">🖼</span>
                 Wallpaper
               </button>
-              <button
-                role="tab"
-                aria-selected={tab === "card"}
-                className={`customize-tab ${tab === "card" ? "active" : ""}`}
-                onClick={() => { Audio.playSfx("click"); setTab("card"); }}
-              >
-                <span className="customize-tab-icon" aria-hidden="true">🂠</span>
-                Card
-              </button>
-              <motion.div
-                className="customize-tab-indicator"
-                animate={{ x: tab === "wallpaper" ? 0 : "100%" }}
-                transition={{ type: "spring", stiffness: 380, damping: 32 }}
-              />
+              {!evolvedLock && (
+                <button
+                  role="tab"
+                  aria-selected={activeTab === "card"}
+                  className={`customize-tab ${activeTab === "card" ? "active" : ""}`}
+                  onClick={() => { Audio.playSfx("click"); setTab("card"); }}
+                >
+                  <span className="customize-tab-icon" aria-hidden="true">🂠</span>
+                  Card
+                </button>
+              )}
+              {!evolvedLock && (
+                <motion.div
+                  className="customize-tab-indicator"
+                  animate={{ x: activeTab === "wallpaper" ? 0 : "100%" }}
+                  transition={{ type: "spring", stiffness: 380, damping: 32 }}
+                />
+              )}
             </div>
 
             {/* ── Wallpaper tab ───────────────────────────────────────── */}
-            {tab === "wallpaper" && (
+            {activeTab === "wallpaper" && (
               <motion.div
                 key="tab-wallpaper"
                 initial={{ opacity: 0, x: -8 }}
@@ -177,7 +185,7 @@ export function ThemePicker() {
             )}
 
             {/* ── Card tab ────────────────────────────────────────────── */}
-            {tab === "card" && (
+            {activeTab === "card" && (
               <motion.div
                 key="tab-card"
                 initial={{ opacity: 0, x: 8 }}

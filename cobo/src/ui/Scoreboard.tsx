@@ -84,8 +84,12 @@ interface ScoreRow {
   total: number;
   /** Per-round combined bonus values (cabo + snap), parallel to rounds. */
   perRoundBonus: number[];
-  /** Per-round penalty values (parallel to rounds). */
+  /** Per-round Cabo penalty values (parallel to rounds) — drives the "!" marker. */
   perRoundPenalty: number[];
+  /** Per-round Kamikaze levy (+20), parallel to rounds — drives the 💥 marker.
+   *  Included in penaltyTotal; pulled OUT of the round cell (it's folded into
+   *  scores) so the cell shows the hand value and the +20 reads as a penalty. */
+  perRoundKamikaze: number[];
 }
 
 function sum(xs: readonly number[]): number {
@@ -97,6 +101,7 @@ function buildRows(
   caboBonus: Record<string, number[]>,
   caboPenalty: Record<string, number[]>,
   snapBonus: Record<string, number[]>,
+  kamikaze: Record<string, number[]>,
   players: { id: string; name: string }[],
   exclude: Set<string>,
   /** Optional inclusive lower bound — slice each array to indices >= startIndex.
@@ -110,24 +115,32 @@ function buildRows(
       const caboFull = caboBonus[id] ?? [];
       const penaltyFull = caboPenalty[id] ?? [];
       const snapFull = snapBonus[id] ?? [];
+      const kamFull = kamikaze[id] ?? [];
       const cabo = startIndex > 0 ? caboFull.slice(startIndex) : caboFull;
       const penalty = startIndex > 0 ? penaltyFull.slice(startIndex) : penaltyFull;
       const snap = startIndex > 0 ? snapFull.slice(startIndex) : snapFull;
-      // Per-round bonus is cabo + snap (both apply as negative
-      // adjustments to the running total).
+      const kam = startIndex > 0 ? kamFull.slice(startIndex) : kamFull;
+      // The Kamikaze +20 is folded into `scores`; pull it back OUT of the round
+      // cell (so the cell reads as the hand value) and surface it in the
+      // Penalty column instead. The amounts cancel, so the total is unchanged.
+      const rounds = arr.map((v, i) => v - (kam[i] ?? 0));
+      const perRoundKamikaze = arr.map((_, i) => kam[i] ?? 0);
+      // Per-round bonus is cabo + snap (both apply as negative adjustments).
       const perRoundBonus = arr.map((_, i) => (cabo[i] ?? 0) + (snap[i] ?? 0));
       const bonusTotal = sum(perRoundBonus);
-      const penaltyTotal = sum(penalty);
-      const total = sum(arr) + penaltyTotal - bonusTotal;
+      // Penalty column combines the Cabo penalty (+5) and the Kamikaze levy (+20).
+      const penaltyTotal = sum(penalty) + sum(perRoundKamikaze);
+      const total = sum(rounds) + penaltyTotal - bonusTotal;
       return {
         id,
         name: players.find((p) => p.id === id)?.name ?? id,
-        rounds: arr,
+        rounds,
         bonusTotal,
         penaltyTotal,
         total,
         perRoundBonus,
         perRoundPenalty: penalty,
+        perRoundKamikaze,
       };
     });
   rows.sort((a, b) => a.total - b.total); // lowest wins
@@ -183,6 +196,7 @@ export function Scoreboard() {
     game.caboBonus ?? {},
     game.caboPenalty ?? {},
     game.snapBonus ?? {},
+    game.kamikaze ?? {},
     game.players,
     exclude,
     startIndex,
@@ -249,6 +263,7 @@ export function Scoreboard() {
                   const tiedAtLowest = isLowest && roundLowestCounts[ri] > 1;
                   const hadBonus = (t.perRoundBonus[ri] ?? 0) > 0;
                   const hadPenalty = (t.perRoundPenalty[ri] ?? 0) > 0;
+                  const hadKamikaze = (t.perRoundKamikaze[ri] ?? 0) > 0;
                   const cls = tiedAtLowest
                     ? " sb-td-round-tie"
                     : isLowest
@@ -260,6 +275,7 @@ export function Scoreboard() {
                       {v !== undefined ? v : "—"}
                       {hadBonus && <span className="sb-cell-marker bonus" title="Cabo bonus">✦</span>}
                       {hadPenalty && <span className="sb-cell-marker penalty" title="Cabo penalty">!</span>}
+                      {hadKamikaze && <span className="sb-cell-marker penalty" title="Kamikaze +20">💥</span>}
                     </span>
                   );
                 })}
@@ -399,7 +415,8 @@ export function RoundEndOverlay() {
     if (elim.bustedThisRound.includes(humanId)) return;
     if (playedFor.current === game.roundNumber) return;
     playedFor.current = game.roundNumber;
-    Audio.playSfx(game.winnerId === humanId ? "win" : "lose");
+    // On an all-zero Kamikaze tie (Evolved) winnerId is null — skip win/lose.
+    if (game.winnerId) Audio.playSfx(game.winnerId === humanId ? "win" : "lose");
   }, [game.phase, game.roundNumber, game.winnerId, humanId, elim.gloriosVictory, elim.bustedThisRound]);
 
   const confettiFiredFor = useRef<number | null>(null);
@@ -428,6 +445,7 @@ export function RoundEndOverlay() {
     game.caboBonus ?? {},
     game.caboPenalty ?? {},
     game.snapBonus ?? {},
+    game.kamikaze ?? {},
     game.players,
     kickedSet,
     startIndex,
@@ -438,7 +456,7 @@ export function RoundEndOverlay() {
   const handSums = game.players
     .filter((p) => !kickedSet.has(p.id))
     .map((p) => {
-      const handSum = p.hand.reduce((s, c) => s + (c ? cardScore(c) : 0), 0);
+      const handSum = p.hand.reduce((s, c) => s + (c ? cardScore(c, game.variant) : 0), 0);
       const roundIdx = (game.scores[p.id]?.length ?? 1) - 1;
       const roundBonus = (game.caboBonus[p.id] ?? [])[roundIdx] ?? 0;
       const roundPenalty = (game.caboPenalty[p.id] ?? [])[roundIdx] ?? 0;
@@ -487,6 +505,13 @@ export function RoundEndOverlay() {
     : (game.winnerId
         ? (game.players.find((p) => p.id === game.winnerId)?.name ?? roundWinner?.name ?? "")
         : (roundWinner?.name ?? ""));
+
+  // Cabo Evolved: explain the +20 levy beneath the buttons when a Kamikaze hit.
+  const kamikazeNames = (game.roundOutcome?.kamikaze ?? [])
+    .map((id) => game.players.find((p) => p.id === id)?.name ?? "A player");
+  const kamikazeNote = kamikazeNames.length
+    ? `💥 +20 added to everyone — ${kamikazeNames.join(" & ")} scored a Kamikaze (hand of 0)!`
+    : null;
 
   return (
     <AnimatePresence>
@@ -614,6 +639,7 @@ export function RoundEndOverlay() {
                       const tiedAtLowest = isLowest && modalLowestCounts[ri] > 1;
                       const hadBonus = (t.perRoundBonus[ri] ?? 0) > 0;
                       const hadPenalty = (t.perRoundPenalty[ri] ?? 0) > 0;
+                      const hadKamikaze = (t.perRoundKamikaze[ri] ?? 0) > 0;
                       const cls = tiedAtLowest
                         ? " sb-td-round-tie"
                         : isLowest
@@ -625,6 +651,7 @@ export function RoundEndOverlay() {
                           {v !== undefined ? v : "—"}
                           {hadBonus && <span className="sb-cell-marker bonus" title="Cabo bonus">✦</span>}
                           {hadPenalty && <span className="sb-cell-marker penalty" title="Cabo penalty">!</span>}
+                          {hadKamikaze && <span className="sb-cell-marker penalty" title="Kamikaze +20">💥</span>}
                         </span>
                       );
                     })}
@@ -664,6 +691,9 @@ export function RoundEndOverlay() {
             </button>
             <button className="btn" onClick={backToMenu}>Return to main</button>
           </div>
+          {kamikazeNote && (
+            <div className="round-end-kamikaze-note">{kamikazeNote}</div>
+          )}
         </motion.div>
         )}
         </AnimatePresence>

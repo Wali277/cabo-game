@@ -2,18 +2,29 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "../state/store";
 
-/** Visual presentation of each action rank — label, emoji, accent color. */
-const ACTION_INFO: Record<
+/**
+ * Visual presentation keyed by the ACTION PHASE, not the card rank.
+ *
+ * Phase-keying makes the cinematic correct in BOTH variants:
+ *  - Classic: each action rank maps 1:1 to a phase, so labels are unchanged.
+ *  - Evolved 7/8 (peek-OR-spy): the cinematic fires AFTER the player picks, on
+ *    the resolved peek_own/peek_other phase — so it shows the chosen action,
+ *    never a fixed rank label.
+ *  - Evolved 9/10 (peek AND spy): the engine chains peek_own → peek_other under
+ *    one source card. Keying by (source + cinematic kind) plays the PEEK
+ *    cinematic, then the SPY cinematic — two separate beats.
+ *
+ * `kind` groups peek_and_swap's two phases (pick + decide) into one cinematic.
+ */
+const PHASE_INFO: Record<
   string,
-  { text: string; emoji: string; color: string; sub: string }
+  { kind: string; text: string; emoji: string; color: string; sub: string }
 > = {
-  "7":  { text: "PEEK OWN",    emoji: "👁",  color: "#67e0a3", sub: "Look at one of your cards" },
-  "8":  { text: "PEEK OWN",    emoji: "👁",  color: "#67e0a3", sub: "Look at one of your cards" },
-  "9":  { text: "SPY",         emoji: "🔍", color: "#7aa8ff", sub: "Look at an opponent's card" },
-  "10": { text: "SPY",         emoji: "🔍", color: "#7aa8ff", sub: "Look at an opponent's card" },
-  J:    { text: "BLIND SWAP",  emoji: "🔀", color: "#ff8ec0", sub: "Swap a card with an opponent" },
-  Q:    { text: "BLIND SWAP",  emoji: "🔀", color: "#ff8ec0", sub: "Swap a card with an opponent" },
-  K:    { text: "PEEK & SWAP", emoji: "👑", color: "#ffd86b", sub: "See it, then choose to swap" },
+  action_peek_own:   { kind: "peek", text: "PEEK OWN",   emoji: "👁",  color: "#67e0a3", sub: "Look at one of your cards" },
+  action_peek_other: { kind: "spy",  text: "SPY",        emoji: "🔍", color: "#7aa8ff", sub: "Look at an opponent's card" },
+  action_blind_swap: { kind: "swap", text: "BLIND SWAP", emoji: "🔀", color: "#ff8ec0", sub: "Swap a card with an opponent" },
+  action_peek_and_swap_pick:   { kind: "peekswap", text: "PEEK & SWAP", emoji: "👑", color: "#ffd86b", sub: "See it, then choose to swap" },
+  action_peek_and_swap_decide: { kind: "peekswap", text: "PEEK & SWAP", emoji: "👑", color: "#ffd86b", sub: "See it, then choose to swap" },
 };
 
 /**
@@ -40,10 +51,10 @@ export function ActionBanner() {
   // info on entry so the cinematic doesn't flicker if pendingActionSource
   // changes mid-exit (the engine clears it when the action resolves).
   const [shownInfo, setShownInfo] = useState<
-    | (typeof ACTION_INFO)[keyof typeof ACTION_INFO] & { keyId: string }
+    | ((typeof PHASE_INFO)[keyof typeof PHASE_INFO] & { keyId: string })
     | null
   >(null);
-  const lastSourceId = useRef<string | null>(null);
+  const lastKey = useRef<string | null>(null);
   const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Detect when an action phase begins. We treat the cinematic as a one-shot
@@ -51,28 +62,25 @@ export function ActionBanner() {
   // pendingActionSource we play the cinematic, then auto-dismiss after 1.5s.
   useEffect(() => {
     if (!game) return;
-    const isActionPhase =
-      game.phase === "action_peek_own" ||
-      game.phase === "action_peek_other" ||
-      game.phase === "action_blind_swap" ||
-      game.phase === "action_peek_and_swap_pick" ||
-      game.phase === "action_peek_and_swap_decide";
-
+    const info = PHASE_INFO[game.phase];
     const src = game.pendingActionSource;
-    if (isActionPhase && src && src.id !== lastSourceId.current) {
-      const info = ACTION_INFO[src.rank];
-      if (info) {
-        lastSourceId.current = src.id;
-        setShownInfo({ ...info, keyId: src.id });
+    // Key the cinematic on (source card + cinematic kind). A new card OR a new
+    // kind under the same card (Evolved 9/10's peek → spy chain) re-fires; the
+    // same phase persisting does not. peek_and_swap's two phases share a kind,
+    // so classic K still shows a single cinematic.
+    if (info && src) {
+      const key = `${src.id}:${info.kind}`;
+      if (key !== lastKey.current) {
+        lastKey.current = key;
+        setShownInfo({ ...info, keyId: key });
         if (dismissTimer.current) clearTimeout(dismissTimer.current);
         // Reduced motion: shorter on-screen time (still showing the label).
         const holdMs = reduced ? 350 : 800;
         dismissTimer.current = setTimeout(() => setShownInfo(null), holdMs);
       }
-    } else if (!isActionPhase && shownInfo) {
-      // Action resolved before the timer fired (rare) — clear immediately.
+    } else if (!info && shownInfo) {
+      // Left the action phases (resolved, or into the 7/8 choose step) — clear.
       setShownInfo(null);
-      lastSourceId.current = null;
     }
     return () => {
       if (dismissTimer.current) {
@@ -86,7 +94,7 @@ export function ActionBanner() {
   // action plays a fresh cinematic.
   useEffect(() => {
     if (game?.phase === "round_over" || game?.phase === "setup_peek") {
-      lastSourceId.current = null;
+      lastKey.current = null;
     }
   }, [game?.phase]);
 

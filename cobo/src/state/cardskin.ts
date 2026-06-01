@@ -19,7 +19,10 @@ export type CardSkin =
   | "handdrawn"
   | "minimalist"
   | "mclaren_papaya"
-  | "mclaren_senna";
+  | "mclaren_senna"
+  // Mode-exclusive: forced on in Cabo Evolved, never offered in the picker
+  // (intentionally absent from VALID + the ThemePicker SKINS list).
+  | "evolved";
 
 export const DEFAULT_SKIN: CardSkin = "classic";
 
@@ -43,6 +46,7 @@ export const SKIN_LABELS: Record<CardSkin, string> = {
   minimalist:      "Minimalist",
   mclaren_papaya:  "McLaren Papaya",
   mclaren_senna:   "Senna Monaco '24",
+  evolved:         "Cabo Evolved",
 };
 
 function loadFromStorage(): CardSkin {

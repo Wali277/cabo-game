@@ -4,7 +4,9 @@ import { useStore } from "../state/store";
 import { useViewMode } from "../state/viewmode";
 import { Audio } from "../audio/sounds";
 import { MenuWallpaper } from "./MenuWallpaper";
+import { CaboEvolvedInfo } from "./CaboEvolvedInfo";
 import { BOT_PROFILES, type BotDifficulty } from "../ai/bots";
+import type { GameVariant } from "../engine/types";
 
 /**
  * Bot difficulty picker — second screen of the single-player flow. The user
@@ -104,7 +106,10 @@ export function BotPicker() {
   const init = useStore((s) => s.init);
   const numBots = useStore((s) => s.pendingNumBots);
   const setScreen = useStore((s) => s.setScreen);
+  const variant = useStore((s) => s.pendingVariant);
+  const setVariant = useStore((s) => s.setPendingVariant);
   const [hoveredId, setHoveredId] = useState<BotDifficulty | null>(null);
+  const [infoOpen, setInfoOpen] = useState(false);
 
   // groupReady flips true once the staggered entrance has had time to
   // finish for every card. We use a single timer (not onAnimationComplete
@@ -121,12 +126,18 @@ export function BotPicker() {
 
   function pick(id: BotDifficulty) {
     Audio.playSfx("click");
-    init(numBots, id);
+    init(numBots, id, variant);
+  }
+
+  function chooseVariant(v: GameVariant) {
+    Audio.playSfx("click");
+    setVariant(v);
   }
 
   const orderedIds: BotDifficulty[] = ["billy", "marcy", "bob"];
 
   return (
+    <>
     <div className="menu bot-picker-screen">
       <MenuWallpaper />
 
@@ -160,6 +171,41 @@ export function BotPicker() {
       </motion.p>
 
       <motion.div
+        className="mode-select"
+        initial={{ opacity: 0, y: 14 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.22 }}
+      >
+        <span className="mode-select-label">Game mode</span>
+        <div className="mode-select-options" role="radiogroup" aria-label="Game mode">
+          <button
+            role="radio"
+            aria-checked={variant === "classic"}
+            className={`mode-option ${variant === "classic" ? "active" : ""}`}
+            onClick={() => chooseVariant("classic")}
+          >
+            Classic
+          </button>
+          <button
+            role="radio"
+            aria-checked={variant === "evolved"}
+            className={`mode-option evolved ${variant === "evolved" ? "active" : ""}`}
+            onClick={() => chooseVariant("evolved")}
+          >
+            Cabo Evolved
+          </button>
+          <button
+            className="mode-info-btn"
+            onClick={() => { Audio.playSfx("click"); setInfoOpen(true); }}
+            aria-label="How Cabo Evolved works"
+            title="How Cabo Evolved works"
+          >
+            &#9432;
+          </button>
+        </div>
+      </motion.div>
+
+      <motion.div
         className="bot-picker-grid"
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
@@ -178,5 +224,7 @@ export function BotPicker() {
         ))}
       </motion.div>
     </div>
+    <CaboEvolvedInfo open={infoOpen} onClose={() => setInfoOpen(false)} />
+    </>
   );
 }

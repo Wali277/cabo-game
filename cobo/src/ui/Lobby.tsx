@@ -6,7 +6,9 @@ import {
   createRoom as createRoomMp,
   joinRoom as joinRoomMp,
   sendReady,
+  setVariantMp,
 } from "../state/mp";
+import { CaboEvolvedInfo } from "./CaboEvolvedInfo";
 
 interface Props {
   initialCode?: string;
@@ -23,6 +25,8 @@ export function Lobby({ initialCode }: Props) {
   const [err, setErr] = useState<string | null>(null);
   const [codeCopied, setCodeCopied] = useState(false);
   const [urlCopied, setUrlCopied] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
+  const [variantBusy, setVariantBusy] = useState(false);
   const [now, setNow] = useState(Date.now());
   const backToMenu = useStore((s) => s.backToMenu);
   const leaveRoomToLobby = useStore((s) => s.leaveRoomToLobby);
@@ -83,6 +87,7 @@ export function Lobby({ initialCode }: Props) {
       ? mp.members.find((m) => m.id === opponentReadyId)?.name ?? "Opponent"
       : null;
     const enoughPlayers = mp.members.length >= 2;
+    const isHost = mp.hostId === mp.viewerId;
     const readySecondsLeft = mp.readyStartedAt
       ? Math.max(0, Math.ceil((10_000 - (now - mp.readyStartedAt)) / 1000))
       : null;
@@ -102,8 +107,15 @@ export function Lobby({ initialCode }: Props) {
       await sendReady();
       setBusy(false);
     }
+    async function chooseVariant(v: "classic" | "evolved") {
+      if (!isHost || mp!.variant === v || variantBusy) return;
+      setVariantBusy(true);
+      await setVariantMp(v);
+      setVariantBusy(false);
+    }
 
     return (
+      <>
       <div className="lobby menu-refresh">
         <MenuWallpaper />
         <motion.h1
@@ -148,6 +160,54 @@ export function Lobby({ initialCode }: Props) {
               ))}
             </div>
 
+            {/* Game mode — the host chooses; everyone else sees it read-only. */}
+            <div className="mode-select" style={{ margin: "10px 0 4px" }}>
+              <span className="mode-select-label">Game mode</span>
+              <div
+                className="mode-select-options"
+                role={isHost ? "radiogroup" : "group"}
+                aria-label="Game mode"
+              >
+                {isHost ? (
+                  <>
+                    <button
+                      role="radio"
+                      aria-checked={mp.variant === "classic"}
+                      className={`mode-option ${mp.variant === "classic" ? "active" : ""}`}
+                      disabled={variantBusy}
+                      onClick={() => chooseVariant("classic")}
+                    >
+                      Classic
+                    </button>
+                    <button
+                      role="radio"
+                      aria-checked={mp.variant === "evolved"}
+                      className={`mode-option evolved ${mp.variant === "evolved" ? "active" : ""}`}
+                      disabled={variantBusy}
+                      onClick={() => chooseVariant("evolved")}
+                    >
+                      Cabo Evolved
+                    </button>
+                  </>
+                ) : (
+                  <span
+                    className={`mode-option active ${mp.variant === "evolved" ? "evolved" : ""}`}
+                  >
+                    {mp.variant === "evolved" ? "Cabo Evolved" : "Classic"}
+                  </span>
+                )}
+                <button
+                  className="mode-info-btn"
+                  onClick={() => setInfoOpen(true)}
+                  aria-label="How Cabo Evolved works"
+                  title="How Cabo Evolved works"
+                >
+                  &#9432;
+                </button>
+              </div>
+              {!isHost && <div className="hint">Mode is set by the host</div>}
+            </div>
+
             {/* Ready-up section */}
             {enoughPlayers && (
               <div className="ready-section">
@@ -189,6 +249,8 @@ export function Lobby({ initialCode }: Props) {
           </div>
         </div>
       </div>
+      <CaboEvolvedInfo open={infoOpen} onClose={() => setInfoOpen(false)} />
+      </>
     );
   }
 
