@@ -2205,7 +2205,10 @@ body.standalone .lobby.menu-refresh {
   top: 16px;
   /* Fill from top to near bottom of viewport so the log can expand */
   max-height: calc(100vh - 52px);
-  overflow: hidden;
+  /* overflow VISIBLE so the scoreboard can float-expand LEFTWARD over the empty
+     top-right board area when it has many rounds. The log scrolls its own rows
+     (.log-rows max-height:200px), so we don't need the column to clip. */
+  overflow: visible;
 }
 
 /* ========== Table Grid — players on all four sides ========== */
@@ -2978,6 +2981,24 @@ body.mobile-mode .round-start-label {
   min-width: 310px;
   border: 2px solid #a87bff;
   font-size: 14px;
+  /* Float-expand: right-anchored in the sidebar and sized to its content, so a
+     long round history grows the panel LEFTWARD over the empty top-right board
+     area (cards are centred — this corner is clear). The table below caps the
+     width at ~5 rounds and scrolls the rest. position/z-index sit it above the
+     board it floats over. */
+  align-self: flex-end;
+  width: max-content;
+  position: relative;
+  z-index: 5;
+}
+/* In-game scoreboard table: grow to fit the rounds but CAP, then scroll the tail.
+   The cap is the SMALLER of ~5 rounds (432px) and a viewport-relative value
+   (50vw - 240px) so the floated panel's left edge always clears the
+   viewport-centred cards — wider screens allow the full 5 rounds; tighter ones
+   float less (and scroll more). The round-end MODAL uses .modal-sb, unaffected. */
+.scoreboard .sb-table {
+  width: max-content;
+  max-width: min(432px, calc(50vw - 280px));
 }
 .sb-title { font-weight: 700; font-size: 13px; color: #6e4ec9; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
 
@@ -4920,6 +4941,20 @@ body.mobile-mode .right-sidebar {
 }
 body.mobile-mode .right-sidebar.open {
   transform: translateY(0);
+}
+
+/* The desktop scoreboard float (align-self + a viewport-relative max-width that
+   goes NEGATIVE on phone widths) must be fully reset on mobile, where the
+   scoreboard lives in a full-width bottom sheet and scrolls its own rounds. */
+body.mobile-mode .scoreboard {
+  align-self: stretch;
+  width: auto;
+  min-width: 0;
+  position: static;
+}
+body.mobile-mode .scoreboard .sb-table {
+  width: auto;
+  max-width: none;
 }
 
 /* Drawer backdrop — dim layer behind the active drawer; tap dismisses */
