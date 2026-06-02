@@ -1,21 +1,18 @@
 /**
- * debugLog — a tiny, dependency-free, framework-agnostic diagnostics buffer.
+ * debugLog - a tiny, dependency-free, framework-agnostic diagnostics channel.
  *
- * Purpose: let the game owner SEE what caused a runtime error and COPY it to
- * report it, INCLUDING on the live production site. Nothing here is gated
- * behind `import.meta.env.DEV` — it is intentionally production-safe.
+ * Purpose: record runtime diagnostics and mirror them into the browser
+ * DevTools Console, INCLUDING on the live production site. Nothing here is
+ * gated behind `import.meta.env.DEV` - it is intentionally production-safe.
  *
  * SECURITY: this is a hidden-information game. Callers must NEVER pass raw game
  * state, the Zustand store, `room:state` payloads, or any card / hidden-hand
- * values into the buffer. Only error messages, stacks, event names, action
- * TYPE strings, and non-sensitive connection metadata belong here. The global
- * capture records error/console text and connection events; note the console
- * patch also surfaces whatever React itself writes to a warning, but cards are
- * keyed by id/index (never by value) and production builds strip warning text,
- * so no hidden card value reaches the buffer in practice.
+ * values into the diagnostics channel. Only error messages, stacks, event names,
+ * action TYPE strings, and non-sensitive connection metadata belong here.
  *
- * Design: a bounded ring buffer (last ~200 entries) with O(1) push and a cheap
- * subscriber notification. No React, no per-frame work.
+ * Design: a bounded ring buffer (last ~200 entries) with O(1) push, plus a
+ * structured DevTools Console echo for caught errors that the browser would
+ * otherwise hide behind UI state.
  */
 
 export type DebugLevel = "error" | "warn" | "info";
@@ -32,16 +29,25 @@ export interface DebugEntry {
   detail?: string;
 }
 
+interface LogOptions {
+  /** Disable console echo when the browser console already received the entry. */
+  echoToConsole?: boolean;
+}
+
+type ConsoleWriter = (...args: unknown[]) => void;
+
 const MAX_ENTRIES = 200;
 
 const buffer: DebugEntry[] = [];
 let nextId = 1;
 let errorCount = 0;
-/** Bumped on every push/clear. Lets React's useSyncExternalStore cache a stable
- *  snapshot (return the same array identity until the version actually changes),
- *  which avoids the "getSnapshot should be cached" infinite-loop warning. */
+/** Bumped on every push/clear for callers that cache snapshots. */
 let version = 0;
 const subscribers = new Set<() => void>();
+
+let rawConsoleError: ConsoleWriter | null = null;
+let rawConsoleWarn: ConsoleWriter | null = null;
+let rawConsoleInfo: ConsoleWriter | null = null;
 
 function notify() {
   // Subscriber callbacks must never break the logger. Swallow anything.
@@ -54,15 +60,41 @@ function notify() {
   }
 }
 
+function getConsoleWriter(method: "error" | "warn" | "info"): ConsoleWriter | null {
+  if (typeof console === "undefined") return null;
+  if (method === "error" && rawConsoleError) return rawConsoleError;
+  if (method === "warn" && rawConsoleWarn) return rawConsoleWarn;
+  if (method === "info" && rawConsoleInfo) return rawConsoleInfo;
+
+  const writer = console[method];
+  return typeof writer === "function" ? writer.bind(console) : null;
+}
+
+function emitToDevConsole(entry: DebugEntry): void {
+  const method =
+    entry.level === "error" ? "error" : entry.level === "warn" ? "warn" : "info";
+  const writer = getConsoleWriter(method);
+  if (!writer) return;
+
+  const head = `[Cabo:${entry.level}] ${entry.source}: ${entry.message}`;
+  const args = entry.detail ? [head, entry.detail] : [head];
+  try {
+    writer(...args);
+  } catch {
+    /* never let diagnostics break gameplay */
+  }
+}
+
 /**
  * Record a diagnostic entry. Cheap and never throws. `detail` is optional and
- * is where stacks / locations go (kept separate so the panel can collapse it).
+ * is where stacks / locations go.
  */
 export function logDebug(
   level: DebugLevel,
   source: string,
   message: string,
   detail?: string,
+  options: LogOptions = {},
 ): void {
   const entry: DebugEntry = {
     id: nextId++,
@@ -74,18 +106,16 @@ export function logDebug(
   };
   buffer.push(entry);
   if (entry.level === "error") errorCount++;
-  // Trim from the front so memory stays bounded. If the dropped entry was an
-  // error, decrement the badge so it never exceeds the error rows still visible
-  // in the buffer.
   if (buffer.length > MAX_ENTRIES) {
     const dropped = buffer.shift();
     if (dropped?.level === "error" && errorCount > 0) errorCount--;
   }
   version++;
+  if (options.echoToConsole !== false) emitToDevConsole(entry);
   notify();
 }
 
-/** A snapshot copy of the current entries (oldest → newest). */
+/** A snapshot copy of the current entries (oldest -> newest). */
 export function getEntries(): DebugEntry[] {
   return buffer.slice();
 }
@@ -110,8 +140,7 @@ export function clear(): void {
 
 /**
  * Subscribe to buffer changes. Returns an unsubscribe function. The callback
- * fires on every push and on clear; callers that only need the badge can read
- * `getErrorCount()` instead of subscribing.
+ * fires on every push and on clear.
  */
 export function subscribe(fn: () => void): () => void {
   subscribers.add(fn);
@@ -120,11 +149,8 @@ export function subscribe(fn: () => void): () => void {
   };
 }
 
-// ── Global capture ─────────────────────────────────────────────────────────
-
 let captureInstalled = false;
-/** Re-entrancy guard so a patched console called from inside the logger (or a
- *  subscriber) can never recurse into itself. */
+/** Re-entrancy guard so a patched console can never recurse into itself. */
 let inConsolePatch = false;
 
 /**
@@ -157,9 +183,9 @@ function stringifyArgs(args: unknown[]): string {
 }
 
 /**
- * Install global error/console capture. Idempotent — safe to call more than
+ * Install global error/console capture. Idempotent - safe to call more than
  * once; only the first call wires anything up. Must run BEFORE React renders so
- * crashes during the first paint are still recorded.
+ * crashes during the first paint are still reported.
  */
 export function installDebugCapture(): void {
   if (captureInstalled) return;
@@ -189,18 +215,23 @@ export function installDebugCapture(): void {
     logDebug("error", "promise", message, detail);
   });
 
-  // Monkey-patch console.error / console.warn so they ALSO land in the buffer,
-  // then forward to the original implementation. The re-entrancy guard ensures
-  // that if the logger or a subscriber itself calls console.*, we forward only
-  // (no second buffer push, no infinite loop).
+  // Patch console.error / console.warn so they ALSO land in the buffer, then
+  // forward to the original implementation. They skip the extra echo because
+  // the original browser console call is already being forwarded.
   const origError = console.error.bind(console);
   const origWarn = console.warn.bind(console);
+  const origInfo = console.info.bind(console);
+  rawConsoleError = origError;
+  rawConsoleWarn = origWarn;
+  rawConsoleInfo = origInfo;
 
   console.error = (...args: unknown[]) => {
     if (!inConsolePatch) {
       inConsolePatch = true;
       try {
-        logDebug("error", "console", stringifyArgs(args));
+        logDebug("error", "console", stringifyArgs(args), undefined, {
+          echoToConsole: false,
+        });
       } catch {
         /* never let logging break console */
       } finally {
@@ -214,7 +245,9 @@ export function installDebugCapture(): void {
     if (!inConsolePatch) {
       inConsolePatch = true;
       try {
-        logDebug("warn", "console", stringifyArgs(args));
+        logDebug("warn", "console", stringifyArgs(args), undefined, {
+          echoToConsole: false,
+        });
       } catch {
         /* never let logging break console */
       } finally {
@@ -225,7 +258,7 @@ export function installDebugCapture(): void {
   };
 }
 
-/** Format a single entry as one plain-text block (used by the "Copy" buttons). */
+/** Format a single entry as one plain-text block. */
 export function formatEntry(e: DebugEntry): string {
   const ts = new Date(e.t).toLocaleString();
   const head = `[${ts}] ${e.level.toUpperCase()} (${e.source}) ${e.message}`;
@@ -243,9 +276,8 @@ export function formatAll(): string {
 
 /**
  * Copy text to the clipboard, resolving to whether it actually succeeded. Falls
- * back to a hidden-textarea + execCommand path for insecure origins (e.g. LAN
- * http on a phone) where navigator.clipboard is unavailable — so the UI never
- * shows a false "Copied!" confirmation.
+ * back to a hidden-textarea + execCommand path for insecure origins where
+ * navigator.clipboard is unavailable.
  */
 export async function copyToClipboard(text: string): Promise<boolean> {
   try {

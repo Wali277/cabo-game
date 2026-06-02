@@ -12,7 +12,6 @@ import { HelpButton } from "./ui/HelpButton";
 import { ChatPanel } from "./ui/ChatPanel";
 import { ThemePicker } from "./ui/ThemePicker";
 import { EliminatedOverlay } from "./ui/EliminatedOverlay";
-import { DebugLog } from "./ui/DebugLog";
 import { SnapControls } from "./ui/SnapControls";
 import { SnapCinematic } from "./ui/SnapCinematic";
 import { SnapBonusOverlay } from "./ui/SnapBonusOverlay";
@@ -147,9 +146,6 @@ function App() {
           which doesn't exist on the menu or lobby. */}
       {screen === "game" && <ThemePicker />}
       <EliminatedOverlay />
-      {/* Always-on owner diagnostics: a bottom-left bug toggle (the other FABs
-          all sit bottom-right) that opens the captured error/console log. */}
-      <DebugLog />
     </>
   );
 }

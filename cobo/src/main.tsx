@@ -5,9 +5,9 @@ import { useStore } from './state/store'
 import { ErrorBoundary } from './ui/ErrorBoundary'
 import { installDebugCapture } from './state/debugLog'
 
-// Capture uncaught errors, promise rejections and console.error/warn into the
-// shared debug buffer BEFORE React mounts, so first-paint crashes are recorded.
-// Intentionally NOT gated on DEV — the on-screen log must work in production.
+// Capture uncaught errors, promise rejections and console.error/warn BEFORE
+// React mounts, so first-paint crashes are reported in DevTools Console.
+// Intentionally NOT gated on DEV - production errors need the same context.
 installDebugCapture()
 
 if (import.meta.env.DEV) {

@@ -17,8 +17,8 @@ interface State {
  * blank-white-screen behaviour on a render crash with a readable fallback card
  * that shows the error and lets the owner copy it (works in production too).
  *
- * The caught error + component stack are also pushed to the shared debugLog
- * buffer, so the on-screen Debug panel keeps a record even after a reload.
+ * The caught error + component stack are also reported through debugLog, so the
+ * browser DevTools Console shows the useful details even in production builds.
  *
  * SECURITY: only the error message and stacks are recorded/displayed — never
  * game state or card values.
@@ -64,8 +64,8 @@ export class ErrorBoundary extends Component<Props, State> {
         <div className="error-boundary-card">
           <h2 className="error-boundary-title">Something went wrong</h2>
           <p className="error-boundary-sub">
-            The game hit an unexpected error. You can copy the details to report
-            it, then reload.
+            The game hit an unexpected error. The details were written to the
+            browser console; you can also copy them, then reload.
           </p>
           <pre className="error-boundary-message">{this.state.message}</pre>
           <div className="error-boundary-actions">
