@@ -226,7 +226,7 @@ export function Lobby({ initialCode }: Props) {
                       You're ready — waiting for everyone else…
                     </div>
                     <button
-                      className="btn ghost"
+                      className="btn danger"
                       disabled={busy}
                       onClick={handleUnready}
                     >
