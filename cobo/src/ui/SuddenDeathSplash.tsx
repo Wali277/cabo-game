@@ -34,7 +34,6 @@ function makeEmbers(count: number): Ember[] {
  *   beat 2  fade    (1.5s onward)  : overlay fades to reveal the table.
  *
  * Reduced motion → skips straight to the fade-out (brief flash only).
- * Tap-anywhere advances to beat 2 early.
  */
 export function SuddenDeathSplash() {
   const game = useStore((s) => s.game);
@@ -89,7 +88,6 @@ export function SuddenDeathSplash() {
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         style={{ zIndex: 280 }}
-        onClick={() => setStage("done")}
       >
         <div className="sudden-death-splash-wrap">
           {/* Expanding golden halo behind the wordmark */}
@@ -146,14 +144,6 @@ export function SuddenDeathSplash() {
               {names}
             </motion.div>
           )}
-          <motion.div
-            className="sudden-death-hint"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 1.1, duration: 0.4 }}
-          >
-            tap to continue
-          </motion.div>
         </div>
       </motion.div>
     </AnimatePresence>

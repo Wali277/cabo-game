@@ -64,7 +64,7 @@ export function EvolvedOutcomeCinematic() {
 
   const current = index < beats.length ? beats[index] : null;
 
-  // SFX + auto-advance per beat. Tap-anywhere also advances (onClick below).
+  // SFX + auto-advance per beat (each beat plays its full duration).
   useEffect(() => {
     if (!current) return;
     Audio.playSfx(current.kind === "kamikaze" ? "cabo" : "snap_correct");
@@ -84,7 +84,6 @@ export function EvolvedOutcomeCinematic() {
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         style={{ zIndex: 320 }}
-        onClick={() => setIndex((i) => i + 1)}
       >
         <div className="evolved-outcome-wrap">
           {!reduced && (
@@ -120,14 +119,6 @@ export function EvolvedOutcomeCinematic() {
             {isKam
               ? `${current.name} hit zero — everyone else +20`
               : `${current.name} — four ${current.rank}s count as zero`}
-          </motion.div>
-          <motion.div
-            className="evolved-outcome-hint"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 1.0, duration: 0.4 }}
-          >
-            tap to continue
           </motion.div>
         </div>
       </motion.div>

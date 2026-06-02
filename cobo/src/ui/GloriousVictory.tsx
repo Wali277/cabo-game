@@ -91,7 +91,6 @@ export function GloriousVictory() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         style={{ zIndex: 400 }}
-        onClick={stage === "splash" ? () => setStage("modal") : undefined}
       >
         {/* Fireworks ride the whole overlay lifetime — splash + modal */}
         <FireworksLayer count={6} />

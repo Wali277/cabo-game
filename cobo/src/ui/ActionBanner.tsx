@@ -75,7 +75,7 @@ export function ActionBanner() {
         setShownInfo({ ...info, keyId: key });
         if (dismissTimer.current) clearTimeout(dismissTimer.current);
         // Reduced motion: shorter on-screen time (still showing the label).
-        const holdMs = reduced ? 350 : 800;
+        const holdMs = reduced ? 350 : 1000;
         dismissTimer.current = setTimeout(() => setShownInfo(null), holdMs);
       }
     } else if (!info && shownInfo) {
@@ -98,12 +98,6 @@ export function ActionBanner() {
     }
   }, [game?.phase]);
 
-  // Tap-to-skip: clicking the vignette dismisses the cinematic early.
-  const skip = () => {
-    if (dismissTimer.current) clearTimeout(dismissTimer.current);
-    setShownInfo(null);
-  };
-
   return (
     <AnimatePresence>
       {shownInfo && (
@@ -114,7 +108,6 @@ export function ActionBanner() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0, transition: { duration: 0.2, ease: [0.16, 0.7, 0.32, 1] } }}
           transition={{ duration: 0.25, ease: "easeOut" }}
-          onClick={skip}
           style={{ ["--accent" as any]: shownInfo.color }}
         >
           {/* Vignette — radial darkening that focuses attention center-stage. */}
@@ -184,7 +177,6 @@ export function ActionBanner() {
             {shownInfo.sub}
           </motion.div>
 
-          <div className="action-cinematic-skip-hint">tap to skip</div>
         </motion.div>
       )}
     </AnimatePresence>

@@ -519,8 +519,6 @@ export function RoundEndOverlay() {
         className="overlay round-end-overlay"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        onClick={stage !== "modal" ? () => setStage("modal") : undefined}
-        style={{ cursor: stage !== "modal" ? "pointer" : "default" }}
       >
         <AnimatePresence mode="wait">
           {stage !== "modal" && (
@@ -576,7 +574,6 @@ export function RoundEndOverlay() {
                 </motion.div>
               )}
 
-              <div className="cinematic-skip-hint">tap to skip</div>
             </motion.div>
           )}
 

@@ -68,7 +68,6 @@ export function BustedOverlay() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         style={{ zIndex: 300 }}
-        onClick={stage === "splash" ? () => setStage("modal") : undefined}
       >
         <AnimatePresence mode="wait">
           {stage === "splash" ? (

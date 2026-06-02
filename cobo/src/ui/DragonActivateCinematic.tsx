@@ -15,7 +15,7 @@ import { Audio } from "../audio/sounds";
  *
  * Detection mirrors SnapCinematic: a handled-id ref dedupes so each activate
  * plays exactly once even as the animation queue churns. Reduced-motion gets a
- * fast crossfade. Tap dismisses early.
+ * fast crossfade. It plays its full beat, then auto-dismisses.
  */
 export function DragonActivateCinematic() {
   const anims = useStore((s) => s.game?.animations);
@@ -54,7 +54,6 @@ export function DragonActivateCinematic() {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.25 }}
           style={{ zIndex: 350 }}
-          onClick={() => setBeat(null)}
         >
           {!reduced && (
             <motion.div

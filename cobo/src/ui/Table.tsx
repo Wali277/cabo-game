@@ -33,7 +33,7 @@ import { useFitToViewport } from "./fitScale";
 // How long a transient peek / spy reveal stays face-up before it auto-flips
 // back. There is no tap-to-skip — it dismisses smoothly on its own. Snappy but
 // long enough to read and memorise the card. (Tunable: lower = faster.)
-const REVEAL_HOLD_MS = 1800;
+const REVEAL_HOLD_MS = 1200;
 
 export function Table() {
   const game = useStore((s) => s.game!);

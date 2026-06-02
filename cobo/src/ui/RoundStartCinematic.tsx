@@ -51,11 +51,6 @@ export function RoundStartCinematic() {
     };
   }, [game?.phase, game?.roundNumber, reduced]);
 
-  const skip = () => {
-    if (dismissTimer.current) clearTimeout(dismissTimer.current);
-    setShownRound(null);
-  };
-
   return (
     <AnimatePresence>
       {shownRound !== null && (
@@ -66,7 +61,6 @@ export function RoundStartCinematic() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0, transition: { duration: 0.4, ease: [0.16, 0.7, 0.32, 1] } }}
           transition={{ duration: 0.18, ease: "easeOut" }}
-          onClick={skip}
         >
           <div className="round-start-vignette" aria-hidden="true" />
 

@@ -1,6 +1,94 @@
 import { useStore } from "../state/store";
+import type { ElimState } from "../state/store";
 import { CardView } from "./Card";
-import type { Card } from "../engine/types";
+import type { Card, GameState, Reveal } from "../engine/types";
+
+// ─── DEV scenario helpers ────────────────────────────────────────────────────
+// Each builds the minimal state snapshot needed to trigger a specific overlay /
+// cinematic without playing through a full round. Training-only — never called
+// in production builds (this component only renders when training === true).
+
+function makeRoundEndReveals(players: GameState["players"]): Reveal[] {
+  return players.flatMap((p) =>
+    p.hand.flatMap((card, i) =>
+      card
+        ? [{ playerId: p.id, index: i, card, toPlayerIds: players.map((pp) => pp.id), reason: "round_end" as const }]
+        : [],
+    ),
+  );
+}
+
+function triggerBust() {
+  const { game, elim, humanId } = useStore.getState();
+  if (!game) return;
+  const otherWinner = game.players.find((p) => p.id !== humanId);
+  useStore.setState({
+    game: {
+      ...game,
+      phase: "round_over",
+      winnerId: otherWinner?.id ?? null,
+      reveals: makeRoundEndReveals(game.players),
+      roundOutcome: null,
+    },
+    elim: { ...elim, bustedThisRound: [humanId], gloriosVictory: null } satisfies ElimState,
+  });
+}
+
+function triggerGloriousVictory() {
+  const { game, elim, humanId } = useStore.getState();
+  if (!game) return;
+  useStore.setState({
+    game: {
+      ...game,
+      phase: "round_over",
+      winnerId: humanId,
+      reveals: makeRoundEndReveals(game.players),
+      roundOutcome: null,
+    },
+    elim: { ...elim, gloriosVictory: humanId, gloriosVictoryReason: "survivor", bustedThisRound: [] } satisfies ElimState,
+  });
+}
+
+function triggerKamikaze() {
+  const { game, elim, humanId } = useStore.getState();
+  if (!game || game.variant !== "evolved") return;
+  useStore.setState({
+    game: {
+      ...game,
+      phase: "round_over",
+      winnerId: humanId,
+      reveals: makeRoundEndReveals(game.players),
+      roundOutcome: { kamikaze: [humanId], carre: [] },
+    },
+    elim: { ...elim, bustedThisRound: [], gloriosVictory: null } satisfies ElimState,
+  });
+}
+
+function triggerCarre() {
+  const { game, elim, humanId } = useStore.getState();
+  if (!game || game.variant !== "evolved") return;
+  // Replace the human's first 4 hand slots with Aces so the Carré is real.
+  const carreRank = "A" as const;
+  const newPlayers = game.players.map((p) => {
+    if (p.id !== humanId) return p;
+    const newHand = p.hand.map((c, i) =>
+      i < 4 ? { id: `carre_force_${i}`, rank: carreRank, suit: "S" as const } : c,
+    );
+    return { ...p, hand: newHand, knownToSelf: newHand.map(() => true) };
+  });
+  const newGame = { ...game, players: newPlayers };
+  useStore.setState({
+    game: {
+      ...newGame,
+      phase: "round_over",
+      winnerId: humanId,
+      reveals: makeRoundEndReveals(newPlayers),
+      roundOutcome: { kamikaze: [], carre: [{ playerId: humanId, rank: carreRank }] },
+    },
+    elim: { ...elim, bustedThisRound: [], gloriosVictory: null } satisfies ElimState,
+  });
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 type TrainCard = { card: Card; label: string };
 
@@ -76,15 +164,31 @@ export function TrainingPanel() {
             onClick={() => injectCard(card)}
             title={`Inject ${card.rank} (${label})`}
           >
-            <CardView
-              card={card}
-              faceUp={true}
-              size="sm"
-              flipDuration={0}
-            />
+            <CardView card={card} faceUp={true} size="sm" flipDuration={0} />
             <span className="training-card-label">{label}</span>
           </button>
         ))}
+      </div>
+
+      {/* Scenario buttons — trigger specific overlays/cinematics directly */}
+      <div className="training-scenarios">
+        <span className="training-scenarios-label">Scenarios</span>
+        <button className="training-scenario-btn bust" onClick={triggerBust}>
+          💀 Bust
+        </button>
+        <button className="training-scenario-btn gv" onClick={triggerGloriousVictory}>
+          🏆 Glorious Victory
+        </button>
+        {isEvolved && (
+          <>
+            <button className="training-scenario-btn kamikaze" onClick={triggerKamikaze}>
+              💥 Kamikaze
+            </button>
+            <button className="training-scenario-btn carre" onClick={triggerCarre}>
+              ♦ Carré
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

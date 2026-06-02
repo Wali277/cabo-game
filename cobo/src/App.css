@@ -4094,6 +4094,46 @@ body.mobile-mode .round-start-label {
   letter-spacing: 0.4px;
   text-transform: uppercase;
 }
+
+/* Scenario trigger buttons */
+.training-scenarios {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(168, 123, 255, 0.2);
+}
+.training-scenarios-label {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: rgba(168, 123, 255, 0.55);
+  white-space: nowrap;
+  margin-right: 2px;
+}
+.training-scenario-btn {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  padding: 4px 12px;
+  border-radius: 8px;
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.12s, transform 0.12s;
+  background: rgba(255,255,255,0.07);
+  color: #f4ebff;
+}
+.training-scenario-btn:hover { opacity: 0.85; transform: translateY(-2px); }
+.training-scenario-btn:active { transform: translateY(0); }
+.training-scenario-btn.bust      { border-color: #ff5b6e; color: #ff8a97; }
+.training-scenario-btn.gv        { border-color: #ffd86b; color: #ffd86b; }
+.training-scenario-btn.kamikaze  { border-color: #ff8c42; color: #ffb07a; }
+.training-scenario-btn.carre     { border-color: #a87bff; color: #c9a7ff; }
+
 .modal-row .cum { font-size: 13px; color: #4a4356; }
 
 /* ============================================================
