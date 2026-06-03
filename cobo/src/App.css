@@ -1751,6 +1751,155 @@ body.standalone .lobby.menu-refresh {
 .tut-dots .dot:hover { transform: scale(1.2); }
 .tut-dots .dot.active { background: #6e4ec9; transform: scale(1.3); }
 
+/* ========== Help Reference (Notepad) ========== */
+.help-ref-overlay { z-index: 240; }
+.help-ref {
+  background: #fff;
+  color: #0d1638;
+  border-radius: 24px;
+  border: 4px solid #a87bff;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  width: min(880px, calc(100vw - 24px));
+  max-height: calc(100vh - 28px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+.help-ref-close {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1.5px solid #c9b8f0;
+  background: #f1ecff;
+  color: #4a2f8f;
+  font-size: 18px;
+  font-weight: 900;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 140ms ease, transform 140ms ease;
+  z-index: 3;
+}
+.help-ref-close:hover { background: #e3d8ff; transform: scale(1.08); }
+.help-ref-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 20px 24px 16px 72px; /* room for the top-left close button */
+  border-bottom: 2px solid #efeaff;
+}
+.help-ref-head-icon { font-size: 26px; }
+.help-ref-head-title { font-size: 27px; font-weight: 900; letter-spacing: 0.5px; }
+.help-ref-head-sub {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: #8a7fb0;
+  font-weight: 800;
+}
+.help-ref-body { display: flex; min-height: 0; flex: 1; }
+.help-ref-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+  border-right: 2px solid #efeaff;
+  background: #faf8ff;
+  flex: 0 0 212px;
+  overflow-y: auto;
+}
+.help-ref-tab {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  text-align: left;
+  padding: 13px 15px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: #3a3450;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 130ms ease, color 130ms ease;
+}
+.help-ref-tab:hover { background: #efe8ff; }
+.help-ref-tab.active { background: #6e4ec9; color: #fff; box-shadow: 0 3px 0 #1a1a4a; }
+.help-ref-tab-icon { font-size: 20px; }
+.help-ref-content {
+  flex: 1;
+  min-width: 0;
+  padding: 24px 30px 28px;
+  overflow-y: auto;
+  text-align: left;
+}
+.help-ref-content-title { margin: 0 0 14px; font-size: 25px; font-weight: 900; color: #0d1638; }
+.help-ref-content p { margin: 0 0 14px; line-height: 1.6; font-size: 16.5px; color: #2a2640; }
+.help-ref-content em { color: #7a3fb0; font-style: normal; font-weight: 700; }
+.help-ref-list { margin: 0 0 14px; padding-left: 22px; display: flex; flex-direction: column; gap: 10px; }
+.help-ref-list li { line-height: 1.6; font-size: 16px; color: #2a2640; }
+.help-ref-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.help-ref-subhead {
+  font-size: 13.5px;
+  font-weight: 900;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: #6e4ec9;
+  margin: 8px 0 9px;
+}
+.help-ref-values { font-size: 16.5px; font-weight: 700; }
+.help-ref-muted { color: #8a82a0; font-weight: 600; }
+.help-ref-score { padding-left: 0; list-style: none; gap: 13px; }
+.help-ref-score li { display: flex; gap: 12px; align-items: flex-start; }
+.help-ref-tag {
+  flex: 0 0 auto;
+  min-width: 36px;
+  height: 27px;
+  padding: 0 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  font-size: 14.5px;
+  font-weight: 900;
+  margin-top: 2px;
+}
+.help-ref-tag.good { background: #d6f5e3; color: #1c7a4a; }
+.help-ref-tag.bad { background: #ffe0e6; color: #c2295a; }
+.help-ref-tag.bust { background: #2a2238; color: #ffd86b; }
+.help-ref-rule {
+  border: none;
+  border-top: 2px dashed #d9cffb;
+  margin: 22px 0 16px;
+}
+.help-ref-subhead.evolved { color: #b5820e; }
+
+/* Mobile: stack the tabs above the content as a scrollable row. */
+@media (max-width: 760px) {
+  .help-ref { width: calc(100vw - 16px); }
+  .help-ref-body { flex-direction: column; }
+  .help-ref-tabs {
+    flex: 0 0 auto;
+    flex-direction: row;
+    overflow-x: auto;
+    border-right: none;
+    border-bottom: 2px solid #efeaff;
+    padding: 10px;
+  }
+  .help-ref-tab { flex: 0 0 auto; }
+  .help-ref-tab-label { white-space: nowrap; }
+  .help-ref-cols { grid-template-columns: 1fr; }
+}
+
+/* Shortened snap tooltip hint line (#5) */
+.snap-rules-hint { margin-bottom: 0; opacity: 0.82; font-size: 10px; }
+
 /* ========== Buttons ========== */
 .btn {
   border: 3px solid #0d1638;

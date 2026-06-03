@@ -15,7 +15,10 @@ function createWindow() {
     minWidth: 960,
     minHeight: 640,
     title: 'Cobo',
-    icon: path.join(__dirname, '../build/icon.png'),
+    // Window/title-bar icon. Point at a packaged asset (cobo/dist is included
+    // in the electron-builder `files`); the old build/icon.png is NOT packaged,
+    // so it failed to load at runtime and the window fell back to a generic icon.
+    icon: path.join(__dirname, '../cobo/dist/icon-512.png'),
     backgroundColor: '#0d1638',   // matches the body/cosmic gradient — no flash on load
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -40,6 +43,11 @@ function createWindow() {
         'Content-Security-Policy': [
           "default-src 'self' file: data: blob:; " +
           "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+          // canvas-confetti renders off the main thread via a Worker created
+          // from a blob: URL. worker-src does NOT inherit blob: from script-src's
+          // fallback, so allow self + blob: workers explicitly. Safe — the app
+          // only ever loads its own bundled code (no remote/untrusted scripts).
+          "worker-src 'self' blob:; " +
           "style-src 'self' 'unsafe-inline'; " +
           "connect-src 'self' wss: ws: https: " +
           "wss://*.onrender.com https://*.onrender.com " +

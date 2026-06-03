@@ -40,6 +40,18 @@ function isStandaloneDisplay(): boolean {
   );
 }
 
+/** Phone test: a coarse (touch) PRIMARY pointer. Desktop Chromium browsers
+ *  (mouse = fine pointer) fire `beforeinstallprompt` too, but the "Add to Home
+ *  Screen" banner is meaningless on a PC — so we only surface it on phones. */
+function isPhoneDevice(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.matchMedia("(pointer: coarse)").matches;
+  } catch {
+    return false;
+  }
+}
+
 /** Whether to show the manual install recommendation: iOS Safari that isn't
  *  already running as an installed PWA. Chromium/Android uses the native
  *  `beforeinstallprompt` event instead, handled in Menu's effect below.
@@ -95,7 +107,9 @@ export function Menu() {
 
   useEffect(() => {
     const onBeforeInstallPrompt = (event: Event) => {
-      if (installDismissed() || isStandaloneDisplay()) return;
+      // Phones only — never pop our install banner on desktop Chromium, which
+      // also fires this event but where "Add to Home Screen" makes no sense.
+      if (installDismissed() || isStandaloneDisplay() || !isPhoneDevice()) return;
       event.preventDefault();
       setInstallPrompt(event as BeforeInstallPromptEvent);
       setShowInstall(true);

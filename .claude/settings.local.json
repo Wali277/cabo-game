@@ -68,7 +68,27 @@
       "Bash(npx electron-builder *)",
       "Bash(curl -s -o \"fredoka-latin.woff2\" \"https://fonts.gstatic.com/s/fredoka/v17/X7n64b87HvSqjb_WIi2yDCRwoQ_k7367_DWu89XgHPyh.woff2\")",
       "Bash(curl -s -o \"fredoka-latin-ext.woff2\" \"https://fonts.gstatic.com/s/fredoka/v17/X7n64b87HvSqjb_WIi2yDCRwoQ_k7367_DWg89XgHPyhRMw.woff2\")",
-      "Bash(curl -s -o \"fredoka-hebrew.woff2\" \"https://fonts.gstatic.com/s/fredoka/v17/X7n64b87HvSqjb_WIi2yDCRwoQ_k7367_DWs89XgHPyhRMw.woff2\")"
+      "Bash(curl -s -o \"fredoka-hebrew.woff2\" \"https://fonts.gstatic.com/s/fredoka/v17/X7n64b87HvSqjb_WIi2yDCRwoQ_k7367_DWs89XgHPyhRMw.woff2\")",
+      "Bash(curl -sI --max-time 30 https://cabo-game.onrender.com/)",
+      "Bash(curl -sI --max-time 30 https://cabo-game-r5xb.onrender.com/)",
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" api repos/Wali277/cabo-game/commits/main --jq '.sha[0:7] + \" \" + .commit.message')",
+      "Bash(curl -s --max-time 15 https://cabo-game-r5xb.onrender.com/health)",
+      "PowerShell(\\(Get-Command npm\\).Source; \\(Get-Command node\\).Source)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Program Files\\\\nodejs\", \"C:\\\\Program Files \\(x86\\)\\\\nodejs\", \"$env:APPDATA\\\\npm\", \"$env:USERPROFILE\\\\AppData\\\\Local\\\\Programs\\\\nodejs\", \"$env:USERPROFILE\\\\nvm\", \"C:\\\\nvm\" -Filter \"node.exe\" -Recurse -ErrorAction SilentlyContinue 2>&1 | Select-Object -First 5 FullName)",
+      "Bash(git checkout *)",
+      "mcp__Desktop_Commander__start_process",
+      "Bash(cd \"/c/Users/adamw/OneDrive/Desktop/Cabo game/cabo-game-main\" && find cobo/src -name \"cardskin*\" -type f)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5173)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8787)",
+      "Bash(cd \"/c/Users/adamw/OneDrive/Desktop/Cabo game/cabo-game-main\" && find . -iname \"japanese*\" -o -iname \"japan*\" 2>/dev/null | head -10; echo \"---DESKTOP---\"; find \"/c/Users/adamw/Downloads\" \"/c/Users/adamw/Desktop\" \"/c/Users/adamw/OneDrive/Desktop\" -maxdepth 2 -iname \"*.png\" -newer /tmp -mmin -60 2>/dev/null | head -20)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8787/health)",
+      "Bash(ls -la \"C:\\\\Users\\\\adamw\\\\OneDrive\\\\Desktop\\\\Cabo game\\\\cabo-game-main\\\\\" 2>&1 | head -20)",
+      "Bash(where gh *)",
+      "Bash(gh --version)",
+      "Bash(where node *)",
+      "Bash(where npm *)",
+      "Bash(git config *)",
+      "Bash(curl -s --max-time 10 -o nul -w \"%{http_code}\" https://cabo-game-r5xb.onrender.com/health)"
     ]
   }
 }
