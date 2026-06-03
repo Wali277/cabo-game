@@ -29,6 +29,18 @@ assert.deepEqual(detailedAnimate.y, [260, -6]);
 assert.deepEqual(detailedAnimate.scale, [1.26, 1]);
 assert.deepEqual(detailedAnimate.rotate, [0, -8]);
 
+const mobileTrajectory = swapHandDiscardTrajectory(null, "mobile");
+assert.equal(mobileTrajectory.initial.scale, 1.08);
+assert.equal(mobileTrajectory.animate.scale, 1);
+
+const mobileDetailedAnimate = swapHandDiscardAnimate(
+  { x: 4, y: -6 },
+  -8,
+  null,
+  "mobile",
+);
+assert.deepEqual(mobileDetailedAnimate.scale, [1.08, 1]);
+
 recordSwapHandSource(
   "old-card",
   { left: 100, top: 300, width: 110, height: 160 },
@@ -41,6 +53,11 @@ const transition = swapHandDiscardTransition(false);
 
 assert.equal(transition.duration, 0.7);
 assert.deepEqual(transition.times, [0, 1]);
+
+const mobileTransition = swapHandDiscardTransition(false, "mobile");
+assert.equal(mobileTransition.duration, 0.54);
+assert.deepEqual(mobileTransition.ease, [0.16, 1, 0.3, 1]);
+assert.deepEqual(mobileTransition.times, [0, 1]);
 
 const reducedTransition = swapHandDiscardTransition(true);
 assert.equal(reducedTransition.duration, 0.15);

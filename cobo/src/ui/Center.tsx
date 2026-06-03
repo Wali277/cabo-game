@@ -11,77 +11,15 @@ import {
   swapHandDiscardTrajectory,
   swapHandDiscardTransition,
 } from "./swapHandMotion";
-
-/** Slow, premium-feeling spring for cards arriving at the centre slots.
- *  Cards GLIDE — they do not snap into place. */
-const CARD_SPRING = { type: "spring" as const, stiffness: 115, damping: 22, mass: 1.25 };
-
-/** ~15% slower variant used when a swap card lands on the discard pile,
- *  so the discard arrival matches the pace of the swap glide. */
-const SWAP_CARD_SPRING = { type: "spring" as const, stiffness: 87, damping: 20, mass: 1.25 };
-
-/** Mobile: a short fixed-duration tween instead of the springs above for the
- *  drawn-slot and discard-pile arrivals. Springs re-solve physics every frame
- *  and ran long on phones — that's the "jaggy" discard/draw feel. A ~0.34s
- *  ease-out tween over the same arc keyframes is far cheaper and snappier.
- *  Desktop keeps its premium springs. */
-const MOBILE_CARD_TWEEN = { type: "tween" as const, duration: 0.34, ease: [0.22, 1, 0.36, 1] as const };
+import {
+  centerCardArrivalTransition,
+  discardCardTrajectory,
+  drawnCardTrajectory,
+} from "./centerCardMotion";
 
 /** How many cards of the discard pile are visibly rendered as a stack.
  *  Older cards exist in `game.discard` but stay invisibly buried. */
 const VISIBLE_PILE_DEPTH = 5;
-
-/**
- * Build a "fly + arc" trajectory for a card arriving in the drawn or
- * discard slot. Three-keyframe path so the card visibly lifts mid-flight.
- */
-type Trajectory = {
-  initial: { x: number; y: number; opacity: number; scale: number; rotate: number };
-  animate: { x: number[]; y: number[]; opacity: number; scale: number; rotate: number };
-};
-
-function withArc(start: { x: number; y: number; rotate: number; scale: number }, lift: number): Trajectory {
-  const midX = start.x / 2;
-  const peakY = Math.min(start.y, 0) - lift;
-  return {
-    initial: { ...start, opacity: 0 },
-    animate: {
-      x: [start.x, midX, 0],
-      y: [start.y, peakY, 0],
-      opacity: 1,
-      scale: 1,
-      rotate: 0,
-    },
-  };
-}
-
-function drawnTrajectory(g: GameState): Trajectory {
-  const last = g.animations[g.animations.length - 1];
-  if (last?.kind === "draw_discard") {
-    return withArc({ x: 110, y: -28, rotate: 8, scale: 0.85 }, 30);
-  }
-  return withArc({ x: -90, y: -50, rotate: -6, scale: 0.85 }, 35);
-}
-
-function discardTrajectory(g: GameState): Trajectory {
-  const last = g.animations[g.animations.length - 1];
-  switch (last?.kind) {
-    case "discard_drawn":
-      return withArc({ x: -100, y: -30, rotate: -10, scale: 0.85 }, 30);
-    case "swap_hand":
-    case "snap_correct":
-      return withArc({ x: 0, y: 110, rotate: 6, scale: 0.85 }, 50);
-    case "blind_swap":
-      return withArc({ x: 0, y: 85, rotate: 4, scale: 0.85 }, 40);
-    case "peek_and_swap":
-      return withArc({ x: 0, y: 85, rotate: -4, scale: 0.85 }, 40);
-    default:
-      return {
-        initial: { x: 0, y: 0, opacity: 0, scale: 0.7, rotate: 0 },
-        animate: { x: [0, 0, 0], y: [0, 0, 0], opacity: 1, scale: 1, rotate: 0 },
-      };
-  }
-}
 
 /** Stable hash → [0,1) seeded by a string. Used for per-card jitter so
  *  every card on the pile sits in a unique but deterministic spot. */
@@ -168,6 +106,7 @@ export function Center() {
   const canDrawDiscard = canDraw && game.discard.length > 0;
 
   const drawn = game.drawnCard;
+  const drawnId = drawn?.id ?? null;
   const lastAnimKind = game.animations.length > 0
     ? game.animations[game.animations.length - 1].kind
     : null;
@@ -179,6 +118,7 @@ export function Center() {
   const visiblePile = game.discard.slice(-VISIBLE_PILE_DEPTH);
   const pileBaseAbsoluteIdx = game.discard.length - visiblePile.length;
   const topDiscard = visiblePile[visiblePile.length - 1] ?? null;
+  const topDiscardId = topDiscard?.id ?? null;
 
   // Stabilise the trajectories so framer-motion doesn't re-trigger
   // animations on unrelated game state changes (animations consumed, bot
@@ -192,7 +132,6 @@ export function Center() {
     [topDiscard?.id],
   );
   const isHandSwapDiscard =
-    isDesktop &&
     (discardArrivalKind === "swap_hand" || discardArrivalKind === "snap_correct");
   const isSwapDiscard =
     discardArrivalKind === "blind_swap" ||
@@ -203,7 +142,6 @@ export function Center() {
     () => {
       if (
         !topDiscard ||
-        !isDesktop ||
         (discardArrivalKind !== "swap_hand" && discardArrivalKind !== "snap_correct")
       ) {
         return null;
@@ -215,46 +153,43 @@ export function Center() {
     },
     // Capture once for this top discard card. The source map is single-use.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [topDiscard?.id, isDesktop],
+    [topDiscardId],
   );
   const drawnTraj = useMemo(
-    () => drawnTrajectory(game),
+    () => drawnCardTrajectory(lastAnimKind, viewMode),
     // Re-compute only when the card occupying the slot changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [drawn?.id],
+    [drawnId, viewMode],
   );
   const discardTraj = useMemo(
     () => {
-      if (
-        isDesktop &&
-        (discardArrivalKind === "swap_hand" || discardArrivalKind === "snap_correct")
-      ) {
-        return swapHandDiscardTrajectory(swapHandSource);
+      if (isHandSwapDiscard) {
+        return swapHandDiscardTrajectory(swapHandSource, viewMode);
       }
-      return discardTrajectory(game);
+      return discardCardTrajectory(discardArrivalKind, viewMode);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [topDiscard?.id, isDesktop, swapHandSource],
+    [topDiscardId, viewMode, swapHandSource],
   );
   const topRotation = useMemo(
-    () => topDiscard ? pileRotation(topDiscard.id, game.discard.length - 1, viewMode) : 0,
-    [topDiscard?.id, game.discard.length, viewMode],
+    () => topDiscardId ? pileRotation(topDiscardId, game.discard.length - 1, viewMode) : 0,
+    [topDiscardId, game.discard.length, viewMode],
   );
   const topOffset = useMemo(
-    () => topDiscard ? pileOffset(topDiscard.id, visiblePile.length - 1, viewMode) : { x: 0, y: 0 },
-    [topDiscard?.id, visiblePile.length, viewMode],
+    () => topDiscardId ? pileOffset(topDiscardId, visiblePile.length - 1, viewMode) : { x: 0, y: 0 },
+    [topDiscardId, visiblePile.length, viewMode],
   );
 
   // Pre-compute the stable animate target arrays so framer-motion doesn't
   // see "new array reference" on every render and restart the animation.
   const drawnAnimate = useMemo(
-    () => drawn ? drawnTraj.animate : null,
-    [drawn?.id, drawnTraj],
+    () => drawnId ? drawnTraj.animate : null,
+    [drawnId, drawnTraj],
   );
   const discardAnimate = useMemo(() => {
-    if (!topDiscard) return null;
+    if (!topDiscardId) return null;
     if (isHandSwapDiscard) {
-      return swapHandDiscardAnimate(topOffset, topRotation, swapHandSource);
+      return swapHandDiscardAnimate(topOffset, topRotation, swapHandSource, viewMode);
     }
     return {
       x: [...discardTraj.animate.x.slice(0, -1), topOffset.x],
@@ -263,19 +198,17 @@ export function Center() {
       scale: 1,
       rotate: topRotation,
     };
-  }, [topDiscard?.id, discardTraj, topOffset, topRotation, isHandSwapDiscard, swapHandSource]);
+  }, [topDiscardId, discardTraj, topOffset, topRotation, isHandSwapDiscard, swapHandSource, viewMode]);
+  const drawnTransition = useMemo(
+    () => centerCardArrivalTransition({ reduced, viewMode, isSwapDiscard: false }),
+    [reduced, viewMode],
+  );
   const discardTransition = useMemo(
     () =>
       isHandSwapDiscard
-        ? swapHandDiscardTransition(reduced)
-        : reduced
-        ? { duration: 0.15 }
-        : !isDesktop
-        ? MOBILE_CARD_TWEEN
-        : isSwapDiscard
-        ? SWAP_CARD_SPRING
-        : CARD_SPRING,
-    [topDiscard?.id, isHandSwapDiscard, isSwapDiscard, reduced, isDesktop],
+        ? swapHandDiscardTransition(reduced, viewMode)
+        : centerCardArrivalTransition({ reduced, viewMode, isSwapDiscard }),
+    [isHandSwapDiscard, isSwapDiscard, reduced, viewMode],
   );
 
   return (
@@ -301,7 +234,7 @@ export function Center() {
                 initial={reduced ? { opacity: 0 } : drawnTraj.initial}
                 animate={reduced ? { opacity: 1 } : drawnAnimate!}
                 exit={{ opacity: 0, scale: 0.85, transition: { duration: 0.18 } }}
-                transition={reduced ? { duration: 0.15 } : isDesktop ? CARD_SPRING : MOBILE_CARD_TWEEN}
+                transition={drawnTransition}
                 style={{ position: "relative", zIndex: 5 }}
               >
                 <CardView

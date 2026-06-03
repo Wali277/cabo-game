@@ -4188,6 +4188,12 @@ body:not(.mobile-mode) .card-wrap.layout-glide {
      measured layout transform and cause a small end-of-flight twitch. */
   transition: filter 0.25s ease !important;
 }
+body.mobile-mode .card-wrap.layout-glide {
+  /* Same transform ownership rule on phones. A CSS transform transition on
+     top of Framer's layout transform makes mobile glides feel like they
+     hesitate or snap at the end. */
+  transition: filter 0.25s ease !important;
+}
 body:not(.mobile-mode) .card-wrap.layout-glide.hl {
   animation: none;
 }

@@ -1,4 +1,5 @@
 import { getFitScale } from "./fitScale";
+import type { ViewMode } from "../state/viewmode";
 
 type Trajectory = {
   initial: { x: number; y: number; opacity: number; scale: number; rotate: number };
@@ -9,6 +10,7 @@ type RectLike = Pick<DOMRect, "left" | "top" | "width" | "height">;
 type Offset = { x: number; y: number };
 
 const SWAP_HAND_DISCARD_EASE: [number, number, number, number] = [0.4, 0, 0.2, 1];
+const MOBILE_SWAP_HAND_DISCARD_EASE = [0.16, 1, 0.3, 1] as const;
 const DEFAULT_HAND_SOURCE: Offset = { x: -340, y: 260 };
 const swapHandSourceOffsets = new Map<string, Offset>();
 
@@ -50,11 +52,15 @@ function sourceOffset(offset?: Offset | null): Offset {
   return offset ?? DEFAULT_HAND_SOURCE;
 }
 
-export function swapHandDiscardTrajectory(offset?: Offset | null): Trajectory {
+export function swapHandDiscardTrajectory(
+  offset?: Offset | null,
+  viewMode: ViewMode = "desktop",
+): Trajectory {
   const source = sourceOffset(offset);
+  const scale = viewMode === "mobile" ? 1.08 : 1.26;
 
   return {
-    initial: { x: source.x, y: source.y, opacity: 1, scale: 1.26, rotate: 0 },
+    initial: { x: source.x, y: source.y, opacity: 1, scale, rotate: 0 },
     animate: {
       x: [source.x, 0],
       y: [source.y, 0],
@@ -69,20 +75,33 @@ export function swapHandDiscardAnimate(
   topOffset: { x: number; y: number },
   topRotation: number,
   offset?: Offset | null,
+  viewMode: ViewMode = "desktop",
 ) {
   const source = sourceOffset(offset);
+  const scale = viewMode === "mobile" ? 1.08 : 1.26;
 
   return {
     x: [source.x, topOffset.x],
     y: [source.y, topOffset.y],
     opacity: 1,
-    scale: [1.26, 1],
+    scale: [scale, 1],
     rotate: [0, topRotation],
   };
 }
 
-export function swapHandDiscardTransition(reduced: boolean) {
+export function swapHandDiscardTransition(
+  reduced: boolean,
+  viewMode: ViewMode = "desktop",
+) {
   if (reduced) return { duration: 0.15, ease: "easeOut" as const };
+
+  if (viewMode === "mobile") {
+    return {
+      duration: 0.54,
+      ease: MOBILE_SWAP_HAND_DISCARD_EASE,
+      times: [0, 1],
+    };
+  }
 
   return {
     duration: 0.7,

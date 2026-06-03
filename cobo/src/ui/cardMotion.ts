@@ -8,6 +8,8 @@ const ACTION_SWAP_KINDS = new Set<AnimationEvent["kind"]>([
   "peek_and_swap",
 ]);
 
+const MOBILE_GLIDE_EASE = [0.16, 1, 0.3, 1] as const;
+
 export function isActionSwapKind(kind: AnimationKind): boolean {
   return !!kind && ACTION_SWAP_KINDS.has(kind);
 }
@@ -16,6 +18,8 @@ export function actionSwapAnimationHoldMs(
   kind: AnimationKind,
   viewMode: ViewMode,
 ): number {
+  if (viewMode === "mobile" && isActionSwapKind(kind)) return 700;
+  if (viewMode === "mobile" && kind === "swap_hand") return 650;
   // Swap-hand is now a distance-adaptive spring (see cardLayoutTransition).
   // 850ms covers the longest path (drawn slot → bottom row) plus a small
   // settle margin; short side-player swaps consume the animation earlier
@@ -28,7 +32,8 @@ export function shouldSuppressCssTransformTransition(
   kind: AnimationKind,
   viewMode: ViewMode,
 ): boolean {
-  return viewMode === "desktop" && (isActionSwapKind(kind) || kind === "swap_hand");
+  return (viewMode === "desktop" || viewMode === "mobile") &&
+    (isActionSwapKind(kind) || kind === "swap_hand");
 }
 
 export function cardLayoutTransition({
@@ -71,16 +76,14 @@ export function cardLayoutTransition({
   }
 
   if (viewMode === "mobile") {
-    // Mobile: short fixed-duration tweens instead of springs. A spring solves
-    // physics every frame and the previous soft configs (stiffness 75–140) ran
-    // 40–60+ frames before settling — that's the sluggish/janky card movement
-    // on phones. A ~0.3–0.45s ease-out tween settles in far fewer frames
-    // (cheaper) and reads snappier. All durations stay under the 500ms mobile
-    // animation hold (see actionSwapAnimationHoldMs). Desktop keeps its springs.
+    // Mobile uses transform-only tweens rather than springs. The longer glide
+    // timings make seat-to-seat transfers readable without reintroducing
+    // physics work on every frame; the mobile hold window keeps this event
+    // alive until the card settles.
     return {
       type: "tween" as const,
-      duration: isActionCardSwap ? 0.45 : isHandSwap ? 0.4 : 0.34,
-      ease: [0.22, 1, 0.36, 1] as const,
+      duration: isActionCardSwap ? 0.6 : isHandSwap ? 0.54 : 0.38,
+      ease: MOBILE_GLIDE_EASE,
     };
   }
 

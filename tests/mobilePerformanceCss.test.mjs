@@ -46,4 +46,11 @@ assert.match(
   "Mobile selectable-card highlight should be static, not an infinite box-shadow animation",
 );
 
+const mobileLayoutGlide = ruleFor("body.mobile-mode .card-wrap.layout-glide");
+assert.match(
+  mobileLayoutGlide,
+  /transition:\s*filter\s+0\.25s\s+ease\s*!important/,
+  "Mobile layout glides should let Framer own transform without CSS transition interference",
+);
+
 console.log("mobilePerformanceCss tests passed");
