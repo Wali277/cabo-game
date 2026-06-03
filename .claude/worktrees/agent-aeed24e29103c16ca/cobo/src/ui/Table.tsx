@@ -1,0 +1,505 @@
+import { useEffect, useRef, useState } from "react";
+import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
+import { useStore } from "../state/store";
+import { useViewMode } from "../state/viewmode";
+import { PlayerSeat } from "./PlayerSeat";
+import { Center } from "./Center";
+import { LeftPanel } from "./LeftPanel";
+import { Scoreboard, RoundEndOverlay } from "./Scoreboard";
+import { BustedOverlay } from "./BustedOverlay";
+import { GameLostOverlay } from "./GameLostOverlay";
+import { GloriousVictory } from "./GloriousVictory";
+import { ActionBanner } from "./ActionBanner";
+import { RoundStartCinematic } from "./RoundStartCinematic";
+import { ActionLog } from "./ActionLog";
+import { TrainingPanel } from "./TrainingPanel";
+import { MpNotices } from "./MpNotices";
+import { botMove, executeBotSnap, findBotSnap, ingestReveals, reactToRoundEnd, resetBotKnowledge } from "../ai/bot";
+import { clearReveals as clearRevealsEngine } from "../engine/game";
+import { Audio } from "../audio/sounds";
+import { useTheme } from "../state/theme";
+import { AquariumWallpaper } from "./AquariumWallpaper";
+import { NorthernLightsWallpaper } from "./NorthernLightsWallpaper";
+import { EmeraldWallpaper } from "./EmeraldWallpaper";
+import { OceanWallpaper } from "./OceanWallpaper";
+import { CrimsonWallpaper } from "./CrimsonWallpaper";
+import { CosmicWallpaper } from "./CosmicWallpaper";
+import { CaboLettersBurst } from "./Particles";
+import { actionSwapAnimationHoldMs } from "./cardMotion";
+
+export function Table() {
+  const game = useStore((s) => s.game!);
+  const humanId = useStore((s) => s.humanId);
+  const mode = useStore((s) => s.mode);
+  const toast = useStore((s) => s.toast);
+  const setToast = useStore((s) => s.setToast);
+  const consumeAnimations = useStore((s) => s.consumeAnimations);
+  // Current user-selected table background theme (persisted in localStorage).
+  // The `<div className="table-bg" />` below uses its `data-theme` attribute
+  // to pick which gradient stack renders behind the table.
+  const tableTheme = useTheme();
+
+  // Phone-mode layout state. When `isMobile`, the LeftPanel renders INLINE
+  // in the table-grid (between deck and human cards) when it's the human's
+  // turn — no more drawer/toggle for actions. The right-sidebar still slides
+  // up as a bottom sheet via the 📊 Scores top-bar button.
+  const viewMode = useViewMode();
+  const isMobile = viewMode === "mobile";
+  const [rightDrawerOpen, setRightDrawerOpen] = useState(false);
+
+  // CABO letter-burst particle anchor — set when a "cabo_called" animation
+  // event lands. Cleared 1.2s later so the burst auto-unmounts.
+  const [caboBurst, setCaboBurst] = useState<{ x: number; y: number; key: number } | null>(null);
+
+  // Reveals that the human can tap-anywhere to dismiss early
+  // (peek_own / peek_other only — peek_and_swap stays until user decides)
+  const hasDismissableReveal =
+    game.reveals.some((r) => r.reason === "peek_own" || r.reason === "peek_other") &&
+    game.phase !== "action_peek_and_swap_decide";
+
+  const lastRound = useRef(game.roundNumber);
+  useEffect(() => {
+    if (lastRound.current !== game.roundNumber) {
+      resetBotKnowledge();
+      lastRound.current = game.roundNumber;
+    }
+  }, [game.roundNumber]);
+
+  // Ingest reveals into bot beliefs each render
+  useEffect(() => {
+    ingestReveals(game);
+  }, [game.reveals, game.phase, game.currentPlayer]);
+
+  // Auto-play bots — read latest store at timer fire to avoid stale closures.
+  // Don't fire while a transient reveal is being shown to the human, so the
+  // human can actually read peeked cards before the next turn starts.
+  const hasTransientReveal = game.reveals.some((r) => r.reason !== "round_end");
+  useEffect(() => {
+    if (mode === "mp") return; // bots only in single-player
+    if (game.phase === "setup_peek") return;
+    if (game.phase === "round_over") return;
+    if (hasTransientReveal) return;
+    const cur = game.players[game.currentPlayer];
+    if (!cur.isBot) return;
+    const delay = 950 + Math.floor(Math.random() * 700);
+    const t = setTimeout(() => {
+      const latest = useStore.getState().game;
+      if (!latest) return;
+      const curNow = latest.players[latest.currentPlayer];
+      if (!curNow.isBot) return;
+      if (latest.phase === "setup_peek" || latest.phase === "round_over") return;
+      if (latest.reveals.some((r) => r.reason !== "round_end")) return;
+      useStore.setState({ game: botMove(latest) });
+    }, delay);
+    return () => clearTimeout(t);
+  }, [game.phase, game.currentPlayer, hasTransientReveal, mode]);
+
+  // SP-only: bot snap reactions. The trigger is a CHANGE to the discard top
+  // (i.e. a fresh card just landed), not every state tick. Watching the full
+  // players array used to re-arm this timer on every action in 3-4 player
+  // games — Bob's 320-700ms reaction window kept getting cancelled before it
+  // could fire. We key on the top card's identity instead so the timer
+  // survives until it fires (or the discard changes for real).
+  const botDifficulty = useStore((s) => s.botDifficulty);
+  const discardTopId = game.discard[game.discard.length - 1]?.id;
+  useEffect(() => {
+    if (mode === "mp") return;
+    if (!botDifficulty) return;
+    if (game.phase === "setup_peek" || game.phase === "round_over") return;
+    if (hasTransientReveal) return;
+    // Read the latest game when planning so we don't snapshot a stale view
+    // (this effect only re-runs on discard-top change, not on every action).
+    const live = useStore.getState().game;
+    if (!live) return;
+    const plan = findBotSnap(live, botDifficulty);
+    if (!plan) return;
+    const t = setTimeout(() => {
+      const latest = useStore.getState().game;
+      if (!latest) return;
+      if (latest.phase === "setup_peek" || latest.phase === "round_over") return;
+      // Re-validate: discard top might have changed, or the bot already used
+      // its snap budget via a parallel path.
+      const bot = latest.players.find((p) => p.id === plan.botId);
+      if (!bot) return;
+      if (plan.kind === "self" && bot.snapsUsed.self) return;
+      if (plan.kind === "other" && bot.snapsUsed.other) return;
+      useStore.setState({ game: executeBotSnap(latest, plan) });
+    }, plan.delayMs);
+    return () => clearTimeout(t);
+  }, [discardTopId, game.phase, mode, botDifficulty, hasTransientReveal]);
+
+  // SP-only: fire a bot speech bubble at each round transition (winner gloats /
+  // loser complains). Keyed on roundNumber so a new round triggers exactly once.
+  // Auto-clears the bubble after a short window via the next effect.
+  const lastReactedRound = useRef(-1);
+  useEffect(() => {
+    if (mode !== "sp") return;
+    if (game.phase !== "round_over") return;
+    if (lastReactedRound.current === game.roundNumber) return;
+    lastReactedRound.current = game.roundNumber;
+    // Small delay so the cinematic round-end stamp lands first.
+    const t = setTimeout(() => reactToRoundEnd(game), 1600);
+    return () => clearTimeout(t);
+  }, [mode, game.phase, game.roundNumber, game]);
+
+  // Auto-clear bot speech bubble ~3.5s after it appears.
+  const botSpeech = useStore((s) => s.botSpeech);
+  useEffect(() => {
+    if (!botSpeech) return;
+    const t = setTimeout(() => {
+      const latest = useStore.getState().botSpeech;
+      if (latest && latest.at === botSpeech.at) {
+        useStore.setState({ botSpeech: null });
+      }
+    }, 3500);
+    return () => clearTimeout(t);
+  }, [botSpeech]);
+
+  // Auto-clear transient reveals after a short window so cards flip back.
+  // Setup peek reveals are intentionally NOT auto-cleared — they stay face-up
+  // until startPlay() so players can take their time memorising their cards.
+  useEffect(() => {
+    if (game.phase === "setup_peek") return;
+    const transients = game.reveals.filter(
+      (r) => r.reason !== "round_end" && r.reason !== "setup",
+    );
+    if (transients.length === 0) return;
+    const t = setTimeout(() => {
+      const latest = useStore.getState().game;
+      if (!latest) return;
+      useStore.setState({ game: clearRevealsEngine(latest) });
+      if (useStore.getState().mode === "mp") {
+        import("../state/mp").then((m) => m.sendAction({ type: "clear_reveals" }));
+      }
+    }, 2400);
+    return () => clearTimeout(t);
+  }, [game.reveals, game.phase]);
+
+  // Spawn the CABO letter-burst particle when a "cabo_called" animation
+  // event arrives. Anchor to the centre of the caller's seat by querying
+  // the `.seat-{N}` DOM element — a small concession to running outside
+  // React, but lighter than forwarding refs through PlayerSeat for a
+  // one-frame visual effect.
+  //
+  // NOTE: the 1.2s auto-clear setTimeout deliberately is NOT registered
+  // in this effect's cleanup. game.animations is consumed ~500ms after
+  // the cabo_called event lands, which would otherwise tear down the
+  // setTimeout and yank the burst off-screen mid-animation. Instead we
+  // self-clear inside the timer using the burst's key to verify the
+  // burst hasn't been replaced by a newer one.
+  useEffect(() => {
+    if (game.animations.length === 0) return;
+    const latest = game.animations[game.animations.length - 1];
+    if (latest.kind !== "cabo_called") return;
+    const callerId = latest.payload.playerId as string;
+    const seatIdx = game.players.findIndex((p) => p.id === callerId);
+    if (seatIdx < 0) return;
+    const raf = requestAnimationFrame(() => {
+      const el = document.querySelector<HTMLElement>(`.seat-${seatIdx}`);
+      const rect = el?.getBoundingClientRect();
+      if (!rect) return;
+      const key = Date.now();
+      setCaboBurst({
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+        key,
+      });
+      setTimeout(() => {
+        setCaboBurst((curr) => (curr?.key === key ? null : curr));
+      }, 1200);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [game.animations, game.players]);
+
+  // Show toasts AND play sound effects for latest animations
+  useEffect(() => {
+    if (game.animations.length === 0) return;
+    const latest = game.animations[game.animations.length - 1];
+    let msg: string | null = null;
+    switch (latest.kind) {
+      case "cabo_called":
+        msg = `${nameById(game, latest.payload.playerId as string)} called CABO — final round!`;
+        Audio.playSfx("cabo");
+        break;
+      case "deal":          Audio.playSfx("card_deal"); break;
+      case "draw_deck":     Audio.playSfx("card_draw"); break;
+      case "draw_discard":  Audio.playSfx("card_draw"); break;
+      case "discard_drawn": Audio.playSfx("card_discard"); break;
+      case "swap_hand":     Audio.playSfx("card_swap"); break;
+      case "blind_swap":    Audio.playSfx("card_swap"); break;
+      case "peek_and_swap": Audio.playSfx("card_swap"); break;
+      case "reveal": {
+        // Use spy SFX when an opponent is shown a card; otherwise peek SFX
+        const toIds = (latest.payload.toPlayerIds as string[]) || [];
+        const ownerId = latest.payload.playerId as string;
+        if (toIds.length && !toIds.includes(ownerId)) {
+          Audio.playSfx("spy");
+        } else {
+          Audio.playSfx("peek");
+        }
+        break;
+      }
+      case "round_end":
+        // Win/lose SFX is played by RoundEndOverlay on mount so it fires even
+        // when this animation is consumed before a player reconnects.
+        break;
+      case "snap_correct":
+      case "snap_wrong":
+        // SFX fires inside SnapCinematic so it lines up with the splash.
+        break;
+      case "snap_penalty_draw":
+        Audio.playSfx("snap_penalty");
+        break;
+    }
+    if (msg) setToast(msg);
+    const holdMs = actionSwapAnimationHoldMs(latest.kind, viewMode);
+    const t = setTimeout(() => consumeAnimations(), holdMs);
+    return () => clearTimeout(t);
+  }, [game.animations, viewMode]);
+
+  // POV rotation: each viewer sees themselves at the bottom. The other players
+  // are arranged in turn-order, starting with the player who plays next.
+  //  - next player (1 ahead) → top
+  //  - 2 ahead             → right
+  //  - 3 ahead (previous)  → left
+  // This keeps each player's view consistent (the same opponent appears in the
+  // same relative position from every viewer's POV).
+  const humanIdx = game.players.findIndex((p) => p.id === humanId);
+  const human = game.players[humanIdx];
+  const playerCount = game.players.length;
+
+  const sortedOthers = game.players
+    .filter((p) => p.id !== humanId)
+    .map((p) => ({
+      player: p,
+      dist:
+        (game.players.findIndex((pp) => pp.id === p.id) - humanIdx + playerCount) %
+        playerCount,
+    }))
+    .sort((a, b) => a.dist - b.dist)
+    .map((x) => x.player);
+
+  type SlotName = "top" | "left" | "right";
+  const slotByIndex: SlotName[] = ["top", "right", "left"];
+  const slotMap: Partial<Record<SlotName, (typeof game.players)[number]>> = {};
+  sortedOthers.forEach((p, i) => {
+    const slot = slotByIndex[i];
+    if (slot) slotMap[slot] = p;
+  });
+
+  const training = useStore((s) => s.training);
+  const backToMenu = useStore((s) => s.backToMenu);
+  function handleQuit() {
+    if (game.phase === "round_over") { backToMenu(); return; }
+    const ok = window.confirm("Leave the game and return to the main menu?");
+    if (ok) backToMenu();
+  }
+
+  function seatFor(p: (typeof game.players)[number]) {
+    return game.players.findIndex((pp) => pp.id === p.id);
+  }
+
+  return (
+    <LayoutGroup>
+      <div className={`table-root players-${game.players.length}${training ? " training-active" : ""}`}>
+        {/* Themed background layer (first child so it sits visually at z=0; all
+            sibling UI is bumped to z=1 via CSS). The `data-theme` attribute
+            selects which gradient renders — see `.table-bg[data-theme=…]` in
+            App.css. Two themes also overlay an animated wallpaper (fish for
+            Ocean, aurora ribbons for Northern Lights); the others use the
+            pure gradient. The current value is local-only and persisted via
+            `cabo:theme` in localStorage. */}
+        <div className="table-bg" data-theme={tableTheme} aria-hidden="true">
+          {/* Ocean = pure dark-blue gradient (no overlay).
+              Aquarium = full animated underwater scene (fish, kelp, etc).
+              Northern Lights = aurora ribbons + stars overlay. */}
+          {tableTheme === "emerald"  && <EmeraldWallpaper />}
+          {tableTheme === "ocean"    && <OceanWallpaper />}
+          {tableTheme === "crimson"  && <CrimsonWallpaper />}
+          {tableTheme === "cosmic"   && <CosmicWallpaper />}
+          {tableTheme === "northern" && <NorthernLightsWallpaper />}
+          {tableTheme === "aquarium" && <AquariumWallpaper />}
+        </div>
+
+        {/* Compact top bar */}
+        <div className="top-bar">
+          <button className="btn ghost menu-back" onClick={handleQuit}>← Menu</button>
+          <span className="top-round-label">Round {game.roundNumber}</span>
+          {/* Phone-mode: scoreboard still toggles as a bottom sheet.
+              The action panel is now rendered INLINE in the table-grid below,
+              so there's no Actions drawer toggle anymore. */}
+          {isMobile && (
+            <button
+              className={`btn ghost mobile-drawer-btn ${rightDrawerOpen ? "active" : ""}`}
+              onClick={() => {
+                Audio.playSfx("click");
+                setRightDrawerOpen((o) => !o);
+              }}
+              aria-label="Toggle scores panel"
+              aria-expanded={rightDrawerOpen}
+            >
+              📊 Scores
+            </button>
+          )}
+        </div>
+
+        {/* Three-column game body: left panel | table grid | right sidebar
+            In mobile mode the LeftPanel is rendered INSIDE the table-grid as
+            an extra slot (tslot-action) so it appears between the deck and
+            the human's cards. Only when it's the human's turn. */}
+        <div className="game-body">
+          {!isMobile && <LeftPanel />}
+
+          {/* Table grid — players sit on each side of the deck */}
+          <div className="table-grid">
+            {/* Top opponent */}
+            <div className="tslot tslot-top">
+              {slotMap.top && (
+                <PlayerSeat
+                  key={slotMap.top.id}
+                  player={slotMap.top}
+                  seatIndex={seatFor(slotMap.top)}
+                  totalSeats={game.players.length}
+                  isCurrent={game.players[game.currentPlayer].id === slotMap.top.id}
+                  isHuman={false}
+                  tablePos="top"
+                />
+              )}
+            </div>
+
+            {/* Left opponent */}
+            <div className="tslot tslot-left">
+              {slotMap.left && (
+                <PlayerSeat
+                  key={slotMap.left.id}
+                  player={slotMap.left}
+                  seatIndex={seatFor(slotMap.left)}
+                  totalSeats={game.players.length}
+                  isCurrent={game.players[game.currentPlayer].id === slotMap.left.id}
+                  isHuman={false}
+                  tablePos="left"
+                />
+              )}
+            </div>
+
+            {/* Centre — deck & discard */}
+            <div className="tslot tslot-center">
+              <Center />
+            </div>
+
+            {/* Right opponent */}
+            <div className="tslot tslot-right">
+              {slotMap.right && (
+                <PlayerSeat
+                  key={slotMap.right.id}
+                  player={slotMap.right}
+                  seatIndex={seatFor(slotMap.right)}
+                  totalSeats={game.players.length}
+                  isCurrent={game.players[game.currentPlayer].id === slotMap.right.id}
+                  isHuman={false}
+                  tablePos="right"
+                />
+              )}
+            </div>
+
+            {/* Mobile-only: inline action panel between the deck and the
+                human's cards. Shows up only when it's the human's turn (or
+                during setup_peek where every player taps to start). Hidden
+                during bot turns and round_over so it doesn't take up screen
+                space when there's nothing to do. */}
+            {isMobile &&
+              (game.players[game.currentPlayer].id === humanId ||
+                game.phase === "setup_peek") &&
+              game.phase !== "round_over" && (
+                <div className="tslot tslot-action">
+                  <LeftPanel />
+                </div>
+              )}
+
+            {/* Bottom — human player */}
+            <div className="tslot tslot-bottom">
+              <PlayerSeat
+                player={human}
+                seatIndex={humanIdx}
+                totalSeats={game.players.length}
+                isCurrent={game.players[game.currentPlayer].id === humanId}
+                isHuman={true}
+                tablePos="bottom"
+              />
+            </div>
+          </div>
+
+          {/* Right sidebar: scoreboard + action log */}
+          <div className={`right-sidebar ${isMobile && rightDrawerOpen ? "open" : ""}`}>
+            <Scoreboard />
+            <ActionLog />
+          </div>
+        </div>
+
+        {/* Phone-mode drawer backdrop — tap outside to dismiss. Only the
+            Scores sidebar uses drawer mode now; the Actions panel is inline. */}
+        {isMobile && rightDrawerOpen && (
+          <div
+            className="drawer-backdrop"
+            onClick={() => setRightDrawerOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+
+        <AnimatePresence>
+          {toast && (
+            <motion.div
+              className="toast"
+              initial={{ y: 40, opacity: 0, scale: 0.7 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: -10, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 240, damping: 18 }}
+            >
+              {toast}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <ActionBanner />
+        <RoundStartCinematic />
+        <RoundEndOverlay />
+        <BustedOverlay />
+        <GameLostOverlay />
+        <GloriousVictory />
+        <MpNotices />
+
+        {caboBurst && (
+          <CaboLettersBurst
+            key={caboBurst.key}
+            x={caboBurst.x}
+            y={caboBurst.y}
+          />
+        )}
+
+        {/* Tap-anywhere overlay to dismiss peek/spy reveals early */}
+        {hasDismissableReveal && (
+          <div
+            className="reveal-dismiss-overlay"
+            onClick={() => {
+              const latest = useStore.getState().game;
+              if (!latest) return;
+              useStore.setState({ game: clearRevealsEngine(latest) });
+              if (mode === "mp") {
+                import("../state/mp").then((m) =>
+                  m.sendAction({ type: "clear_reveals" }),
+                );
+              }
+            }}
+          />
+        )}
+      </div>
+
+      {/* Training Chamber dev panel — fixed bar at the bottom of the screen */}
+      <TrainingPanel />
+    </LayoutGroup>
+  );
+}
+
+function nameById(game: ReturnType<typeof useStore.getState>["game"] & {}, id: string) {
+  return game.players.find((p) => p.id === id)?.name ?? id;
+}
