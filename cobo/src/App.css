@@ -402,6 +402,19 @@ body.mobile-mode .action-log {
 }
 .a2hs-text strong { font-size: 14px; font-weight: 800; color: #fff; }
 .a2hs-text span { font-size: 12px; color: rgba(244, 235, 255, 0.82); }
+.a2hs-install {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 6px 12px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(255, 216, 107, 0.75);
+  background: rgba(255, 216, 107, 0.18);
+  color: #ffd86b;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
 .a2hs-dismiss {
   flex: 0 0 auto;
   width: 26px;
@@ -4926,13 +4939,17 @@ body.mobile-mode .right-sidebar {
   max-height: 72vh;
   overflow-y: auto;
   transform: translateY(105%);
-  transition: transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 0.22s ease,
+    visibility 0s linear 0.32s;
   z-index: 270;
   border-radius: 18px 18px 0 0;
   padding: 18px 12px calc(env(safe-area-inset-bottom, 0px) + 24px);
-  background: rgba(13, 22, 56, 0.96);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background: rgba(13, 22, 56, 0.98);
   box-shadow: 0 -16px 48px rgba(0, 0, 0, 0.55);
   border: 2px solid rgba(168, 123, 255, 0.5);
   border-bottom: none;
@@ -4941,6 +4958,13 @@ body.mobile-mode .right-sidebar {
 }
 body.mobile-mode .right-sidebar.open {
   transform: translateY(0);
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition:
+    transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 0.18s ease,
+    visibility 0s;
 }
 
 /* The desktop scoreboard float (align-self + a viewport-relative max-width that
@@ -5154,8 +5178,11 @@ body.mobile-mode .card-wrap.hl::before {
   z-index: 3;
 }
 body.mobile-mode .card-wrap.hl::after {
-  /* Replace the bobbing motion with a gentle glow-only pulse */
-  animation: cardGlowMobile 2s ease-in-out infinite;
+  /* Static glow only. Animating box-shadow is a per-frame paint cost on phones. */
+  animation: none;
+  box-shadow:
+    0 0 0 2px rgba(255, 216, 107, 0.85),
+    0 0 16px 4px rgba(255, 216, 107, 0.42);
 }
 @keyframes cardGlowMobile {
   0%, 100% {
