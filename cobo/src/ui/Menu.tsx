@@ -6,6 +6,11 @@ import { Audio } from "../audio/sounds";
 import { MenuWallpaper } from "./MenuWallpaper";
 import { useViewMode, setViewMode } from "../state/viewmode";
 
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+};
+
 /** Small iOS "Share" glyph (box with an up arrow) for the install banner. */
 function ShareGlyph() {
   return (
@@ -17,25 +22,39 @@ function ShareGlyph() {
   );
 }
 
-/** Whether to show the "Add to Home Screen" recommendation: iOS Safari that
- *  isn't already running as an installed PWA, and the user hasn't dismissed it.
- *  `?a2hs=1` forces it on in any browser for local preview testing. */
-function shouldOfferInstall(): boolean {
+function installDismissed(): boolean {
+  try {
+    return localStorage.getItem("cabo:a2hs-dismissed") === "1";
+  } catch { /* private mode — fall through */ }
+  return false;
+}
+
+function markInstallDismissed(): void {
+  try { localStorage.setItem("cabo:a2hs-dismissed", "1"); } catch { /* ignore */ }
+}
+
+function isStandaloneDisplay(): boolean {
+  return (
+    (navigator as { standalone?: boolean }).standalone === true ||
+    window.matchMedia("(display-mode: standalone)").matches
+  );
+}
+
+/** Whether to show the manual install recommendation: iOS Safari that isn't
+ *  already running as an installed PWA. Chromium/Android uses the native
+ *  `beforeinstallprompt` event instead, handled in Menu's effect below.
+ *  `?a2hs=1` forces the manual banner on in any browser for local preview. */
+function shouldOfferManualInstall(): boolean {
   if (typeof window === "undefined") return false;
   const params = new URLSearchParams(window.location.search);
   if (params.get("a2hs") === "1") return true;
-  try {
-    if (localStorage.getItem("cabo:a2hs-dismissed") === "1") return false;
-  } catch { /* private mode — fall through */ }
+  if (installDismissed()) return false;
   const ua = navigator.userAgent || "";
   const isIOS =
     /iphone|ipad|ipod/i.test(ua) ||
     // iPadOS 13+ masquerades as macOS, so also treat touch-capable "Macs" as iOS.
     (navigator.platform === "MacIntel" && (navigator as { maxTouchPoints?: number }).maxTouchPoints! > 1);
-  const isStandalone =
-    (navigator as { standalone?: boolean }).standalone === true ||
-    window.matchMedia("(display-mode: standalone)").matches;
-  return isIOS && !isStandalone;
+  return isIOS && !isStandaloneDisplay();
 }
 
 export function Menu() {
@@ -71,7 +90,48 @@ export function Menu() {
     if (!next) Audio.playSfx("click"); // little chirp so unmuting is audible
   };
 
-  const [showInstall, setShowInstall] = useState(shouldOfferInstall);
+  const [showInstall, setShowInstall] = useState(shouldOfferManualInstall);
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+
+  useEffect(() => {
+    const onBeforeInstallPrompt = (event: Event) => {
+      if (installDismissed() || isStandaloneDisplay()) return;
+      event.preventDefault();
+      setInstallPrompt(event as BeforeInstallPromptEvent);
+      setShowInstall(true);
+    };
+    const onAppInstalled = () => {
+      markInstallDismissed();
+      setInstallPrompt(null);
+      setShowInstall(false);
+    };
+    window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+    window.addEventListener("appinstalled", onAppInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", onAppInstalled);
+    };
+  }, []);
+
+  const dismissInstall = () => {
+    markInstallDismissed();
+    setInstallPrompt(null);
+    setShowInstall(false);
+  };
+
+  const promptInstall = async () => {
+    if (!installPrompt) return;
+    Audio.playSfx("click");
+    const promptEvent = installPrompt;
+    setInstallPrompt(null);
+    try {
+      await promptEvent.prompt();
+      await promptEvent.userChoice;
+    } finally {
+      markInstallDismissed();
+      setShowInstall(false);
+    }
+  };
 
   return (
     <div className="menu menu-refresh">
@@ -202,15 +262,21 @@ export function Menu() {
         >
           <span className="a2hs-icon" aria-hidden="true"><ShareGlyph /></span>
           <div className="a2hs-text">
-            <strong>Add CABO to your Home Screen</strong>
-            <span>Tap Share, then “Add to Home Screen” for full-screen play.</span>
+            <strong>{installPrompt ? "Install CABO" : "Add CABO to your Home Screen"}</strong>
+            <span>
+              {installPrompt
+                ? "Tap Install for full-screen play from your phone."
+                : "Tap Share, then “Add to Home Screen” for full-screen play."}
+            </span>
           </div>
+          {installPrompt && (
+            <button className="a2hs-install" onClick={promptInstall}>
+              Install
+            </button>
+          )}
           <button
             className="a2hs-dismiss"
-            onClick={() => {
-              try { localStorage.setItem("cabo:a2hs-dismissed", "1"); } catch { /* ignore */ }
-              setShowInstall(false);
-            }}
+            onClick={dismissInstall}
             aria-label="Dismiss"
           >
             ✕
