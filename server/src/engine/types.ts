@@ -147,7 +147,7 @@ export interface GameState {
   /** Per-round cabo penalty: flat +5 added when a player called cabo and
    *  didn't win the round. 0 for rounds without a penalty. */
   caboPenalty: Record<string, number[]>;
-  /** Per-round snap bonus: flat -5 subtracted when a player lands BOTH a
+  /** Per-round snap bonus: flat -10 subtracted when a player lands BOTH a
    *  correct rival-snap and a correct self-snap in the same round. Stored
    *  as the magnitude (positive); the scoreboard renders it as a negative
    *  adjustment. 0 for rounds without a bonus. */

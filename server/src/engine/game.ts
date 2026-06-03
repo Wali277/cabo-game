@@ -37,7 +37,18 @@ export function newGame(opts: NewGameOptions): GameState {
   const handSize = variant === "evolved" ? 5 : 4;
   const seed = opts.seed ?? Math.floor(Math.random() * 1e9);
   const rng = mulberry32(seed);
-  const deck = shuffle(makeDeck(variant), rng);
+  let deck = shuffle(makeDeck(variant), rng);
+
+  // Cabo Evolved: keep the two Dragons OUT of the opening deal and the initial
+  // face-up discard. Burying a Dragon face-down at setup wastes it — there it's
+  // just a 20-point liability to be swapped away, when its real value is being
+  // DRAWN and activated mid-round to swing the game. Set them aside, deal from
+  // the Dragon-free remainder, then shuffle them back into the draw deck below.
+  let setAsideDragons: Card[] = [];
+  if (variant === "evolved") {
+    setAsideDragons = deck.filter((c) => c.rank === "Dragon");
+    deck = deck.filter((c) => c.rank !== "Dragon");
+  }
 
   const players: PlayerState[] = opts.players.map((p) => ({
     id: p.id,
@@ -65,6 +76,13 @@ export function newGame(opts: NewGameOptions): GameState {
   // start of every match. This gives the first player an immediate choice
   // between drawing from the deck or taking the known discard card.
   const initialDiscard = deck.shift()!;
+
+  // Evolved: return the set-aside Dragons to the draw deck and reshuffle so
+  // their positions are unpredictable. A Dragon can now only enter play via a
+  // draw (where it can be activated), never as a dealt or initial-discard card.
+  if (setAsideDragons.length > 0) {
+    deck = shuffle([...deck, ...setAsideDragons], rng);
+  }
 
   const state: GameState = {
     variant,
@@ -551,8 +569,8 @@ function placePenalty(
 /** When a player has just landed a CORRECT snap (rival or self), check
  *  whether they now hold BOTH a correct rival-snap and a correct self-snap
  *  for the round. If so, emit a snap_bonus animation event so the UI can
- *  surface the in-game "Snap bonus! −5 points" overlay only to that
- *  player. The actual −5 is applied during endRound. Idempotent — caller
+ *  surface the in-game "Snap bonus! −10 points" overlay only to that
+ *  player. The actual −10 is applied during endRound. Idempotent — caller
  *  fires this twice per round at most (once per correct snap) and only
  *  the second call emits the event. */
 function maybeAwardSnapBonus(state: GameState, snapper: import("./types").PlayerState) {
@@ -564,8 +582,8 @@ function maybeAwardSnapBonus(state: GameState, snapper: import("./types").Player
   )) {
     return;
   }
-  pushAnim(state, "snap_bonus", { playerId: snapper.id, amount: 5 });
-  pushLog(state, `${snapper.name} earned a SNAP BONUS — minus 5 points!`);
+  pushAnim(state, "snap_bonus", { playerId: snapper.id, amount: 10 });
+  pushLog(state, `${snapper.name} earned a SNAP BONUS — minus 10 points!`);
 }
 
 /**
@@ -930,11 +948,11 @@ function endRound(state: GameState): GameState {
       s.caboBonus[t.id].push(0);
       s.caboPenalty[t.id].push(0);
     }
-    // Snap bonus is independent of Cabo math: -5 off the running total
+    // Snap bonus is independent of Cabo math: -10 off the running total
     // whenever the player landed BOTH a correct rival-snap and a correct
     // self-snap this round. Stored as a positive magnitude; the scoreboard
     // renders it as a negative adjustment.
-    s.snapBonus[t.id].push(earnedSnapBonus ? 5 : 0);
+    s.snapBonus[t.id].push(earnedSnapBonus ? 10 : 0);
     // Mirror the Kamikaze levy (already folded into `scores` above) so the
     // scoreboard can show it in the Penalty column. 0 in classic / non-Kamikaze.
     s.kamikaze[t.id].push(kamikazeLevy);

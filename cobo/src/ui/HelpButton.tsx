@@ -1,13 +1,13 @@
 import { motion } from "framer-motion";
 import { useStore } from "../state/store";
-import { Tutorial } from "./Tutorial";
+import { HelpReference } from "./HelpReference";
 import { Audio } from "../audio/sounds";
 
 /**
  * In-game help button — sits bottom-right, just to the LEFT of the audio
- * FAB. Tap to open the Tutorial overlay. Renders the Tutorial conditionally
- * via the helpOpen store flag so any screen with HelpButton mounted has
- * the rules a click away.
+ * FAB. Tap to open the reference "notepad" overlay (HelpReference). Rendered
+ * conditionally via the helpOpen store flag so any screen with HelpButton
+ * mounted has the rules a click away.
  */
 export function HelpButton() {
   const helpOpen = useStore((s) => s.helpOpen);
@@ -26,7 +26,7 @@ export function HelpButton() {
       >
         ?
       </motion.button>
-      {helpOpen && <Tutorial onClose={() => setHelpOpen(false)} />}
+      {helpOpen && <HelpReference onClose={() => setHelpOpen(false)} />}
     </>
   );
 }

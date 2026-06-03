@@ -7,7 +7,7 @@ import { useStore } from "../state/store";
  * sees. Fires when the engine pushes a snap_bonus animation event whose
  * payload.playerId matches the local viewer. Auto-dismisses after ~2.6s.
  *
- * The bonus itself (−5 off the round score) is applied by endRound in
+ * The bonus itself (−10 off the round score) is applied by endRound in
  * the engine; this overlay is the in-game feedback so the player knows
  * the reward landed before the round actually ends.
  */
@@ -52,7 +52,7 @@ export function SnapBonusOverlay() {
           role="status"
         >
           <div className="snap-bonus-title">Snap bonus!</div>
-          <div className="snap-bonus-sub">−5 off your total score</div>
+          <div className="snap-bonus-sub">−10 off your total score</div>
         </motion.div>
       )}
     </AnimatePresence>

@@ -107,32 +107,12 @@ export function SnapControls() {
                   </div>
                   <div className="snap-rules-prompt">
                     {armingKind === "other"
-                      ? "Tap a rival's face-down card you believe matches the rank on top of the discard pile."
-                      : "Tap one of your own face-down cards you believe matches the rank on top of the discard pile."}
+                      ? "Tap a rival's card that matches the discard top."
+                      : "Tap one of your cards that matches the discard top."}
                   </div>
-                  <ul className="snap-rules-list">
-                    <li>
-                      <span className="snap-rules-pip ok">✓</span>
-                      <span>
-                        <strong>Correct:</strong>{" "}
-                        {armingKind === "other"
-                          ? "the rival's card hits the discard and they're dealt a fresh face-down card in its place."
-                          : "your card hits the discard and the slot empties — your hand shrinks by one until a penalty fills the gap."}
-                      </span>
-                    </li>
-                    <li>
-                      <span className="snap-rules-pip bad">✕</span>
-                      <span>
-                        <strong>Wrong:</strong> you draw a penalty card into your hand and your score rises. If you have an empty slot from a previous self-snap, the penalty refills it.
-                      </span>
-                    </li>
-                    <li>
-                      <span className="snap-rules-pip">◷</span>
-                      <span>
-                        <strong>One shot each round</strong> — one snap on a rival, one on yourself.
-                      </span>
-                    </li>
-                  </ul>
+                  <div className="snap-rules-prompt snap-rules-hint">
+                    Wrong = +1 penalty card · one each per round
+                  </div>
                 </>
               )}
               <span className="snap-rules-tail" />
