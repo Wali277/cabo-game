@@ -8,6 +8,7 @@
  * is: one entry in `SKIN_STYLES` here + one entry in `cardskin.ts`.
  */
 import type { CardSkin } from "../state/cardskin";
+import neonBack from "../assets/neon-back.png";
 
 /** Per-skin visual rules. Suit color override is by suit so red suits can
  *  pivot to gold (Royal), magenta (Neon) etc. while black suits get their
@@ -85,17 +86,19 @@ export const SKIN_STYLES: Record<CardSkin, SkinStyle> = {
     backCenter: "royal",
   },
 
-  // ── Neon — cyberpunk hex grid back ─────────────────────────────────
+  // ── Neon — player's pink/cyan "lightning CABO" art (back) + neon faces ─
   neon: {
-    faceBg:
-      "repeating-linear-gradient(180deg, #0a0a14 0px, #0a0a14 3px, #0d0d1a 3px, #0d0d1a 4px)",
-    faceBorder: "#00e5ff",
-    suitColor: { red: "#ff2dca", black: "#00e5ff" },
+    faceBg: "#070710",
+    faceBorder: "#ff3dd0",
+    faceBorderWidth: 2,
+    // ♥♦ glow pink, ♠♣ glow cyan — echoes the two-tone back.
+    suitColor: { red: "#ff3dd0", black: "#34e6ff" },
     font: FONT,
-    jesterBg: "#0a0a14",
-    backBg:
-      "repeating-linear-gradient(180deg, #050510 0px, #050510 3px, #08081a 3px, #08081a 4px)",
-    backBorder: "#ff2dca",
+    jesterBg: "#070710",
+    // Back is the artwork image (see NeonBack); no card border so it fills clean.
+    backBg: "#070710",
+    backBorder: "transparent",
+    backBorderWidth: 0,
     backCenter: "neon",
   },
 
@@ -406,87 +409,20 @@ export function RoyalBack({ w }: { w: number }) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   <NeonBack /> — cyberpunk hex with cyan/magenta glow.
+   <NeonBack /> — the player's neon "lightning CABO" artwork.
 
-   Glowing hexagon centerpiece, magenta inner triangle, scanline corners.
-   "CABO" rendered with a layered cyan + magenta text-shadow for chromatic
-   aberration vibes.
+   The card back is the uploaded image, stretched to fill the card (the chosen
+   "fill" fit). Imported via Vite so the URL resolves correctly in both the web
+   build (absolute "/") and the Electron file:// build ("./").
    ─────────────────────────────────────────────────────────────────────── */
-export function NeonBack({ w }: { w: number }) {
-  const cyan = "#00e5ff";
-  const magenta = "#ff2dca";
-
+export function NeonBack(_props: { w: number }) {
   return (
-    <div style={{
-      width: "100%", height: "100%",
-      position: "relative",
-      display: "flex", alignItems: "center", justifyContent: "center",
-    }}>
-      {/* Corner triangle accents — alternating cyan / magenta */}
-      {(
-        [
-          { pos: { top: 5, left: 5 },    color: cyan,    points: "0,0 8,0 0,8" },
-          { pos: { top: 5, right: 5 },   color: magenta, points: "8,0 0,0 8,8" },
-          { pos: { bottom: 5, left: 5 }, color: magenta, points: "0,8 8,8 0,0" },
-          { pos: { bottom: 5, right: 5 },color: cyan,    points: "8,8 0,8 8,0" },
-        ] as const
-      ).map((c, i) => (
-        <svg key={i} style={{ position: "absolute", ...c.pos }} width="8" height="8" viewBox="0 0 8 8" aria-hidden="true">
-          <polygon points={c.points} fill={c.color} opacity="0.85" style={{ filter: `drop-shadow(0 0 2px ${c.color})` }} />
-        </svg>
-      ))}
-
-      {/* Central hex emblem + CABO */}
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-        <svg
-          viewBox="0 0 100 100"
-          width={w * 0.62}
-          height={w * 0.62}
-          style={{ display: "block" }}
-          aria-hidden="true"
-        >
-          {/* Outer cyan hexagon */}
-          <polygon
-            points="50,10 84,30 84,70 50,90 16,70 16,30"
-            fill="none"
-            stroke={cyan}
-            strokeWidth="2.2"
-            style={{ filter: `drop-shadow(0 0 4px ${cyan})` }}
-          />
-          {/* Inner magenta triangle */}
-          <polygon
-            points="50,28 72,64 28,64"
-            fill="none"
-            stroke={magenta}
-            strokeWidth="1.6"
-            style={{ filter: `drop-shadow(0 0 3px ${magenta})` }}
-          />
-          {/* Smaller cyan inverted triangle inside */}
-          <polygon
-            points="36,40 64,40 50,60"
-            fill="none"
-            stroke={cyan}
-            strokeWidth="1.2"
-            opacity="0.7"
-          />
-          {/* Central dot */}
-          <circle cx="50" cy="50" r="2.4" fill={cyan} style={{ filter: `drop-shadow(0 0 3px ${cyan})` }} />
-        </svg>
-
-        <div style={{
-          fontSize: w * 0.15,
-          color: cyan,
-          fontWeight: 700,
-          letterSpacing: w * 0.04,
-          paddingLeft: w * 0.04,  // optical compensation for trailing tracking
-          fontFamily: FONT,
-          textShadow: `0 0 4px ${cyan}, 1.5px 0 0 ${magenta}, -1.5px 0 0 ${magenta}`,
-          lineHeight: 1,
-        }}>
-          CABO
-        </div>
-      </div>
-    </div>
+    <img
+      src={neonBack}
+      alt=""
+      aria-hidden="true"
+      style={{ width: "100%", height: "100%", objectFit: "fill", display: "block" }}
+    />
   );
 }
 
