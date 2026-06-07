@@ -516,7 +516,10 @@ export const useStore = create<StoreState>((set, get) => ({
   async refreshProfile() {
     const auth = await import("./auth");
     const profile = await auth.getMyProfile();
-    set({ account: profile ? { profile } : null });
+    // Only overwrite on a SUCCESSFUL fetch — never clear the account on a
+    // transient null (that would log a validly-signed-in user out). Explicit
+    // sign-out goes through logoutAccount() / auth.logout(), not here.
+    if (profile) set({ account: { profile } });
   },
   async logoutAccount() {
     const auth = await import("./auth");

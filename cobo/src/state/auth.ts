@@ -184,10 +184,25 @@ export async function login(input: {
   if (result.ok && result.session) {
     const sb = getSupabase();
     if (sb) {
-      await sb.auth.setSession({
+      const { error: sessionErr } = await sb.auth.setSession({
         access_token: result.session.access_token,
         refresh_token: result.session.refresh_token,
       });
+      if (sessionErr) {
+        // The server already minted a VALID session, so a failure here almost
+        // always means the client's Supabase project doesn't match the server's
+        // — typically VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY pointing at a
+        // different project (or a stray "/rest/v1" path on the URL). Without this
+        // log the user appears "signed in" (the profile below still renders) yet
+        // EVERY account action fails with "You need to be signed in." because the
+        // session never persisted. Make that misconfiguration loud + diagnosable.
+        console.error(
+          "[auth] Supabase setSession failed — the session was NOT persisted. " +
+            "Check that VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY match the " +
+            "server's Supabase project exactly (base URL, no /rest/v1). Error:",
+          sessionErr.message,
+        );
+      }
     }
     if (result.profile) {
       useStore.getState().setAccount(result.profile);
@@ -240,6 +255,24 @@ export async function getMyProfile(): Promise<Profile | null> {
   return data as Profile;
 }
 
+/**
+ * `getMyProfile` with a few quick retries. A signed-in user has a valid session
+ * persisted in localStorage; a TRANSIENT failure to fetch their profile (network
+ * blip, cold server) must NOT be treated as "logged out". We retry a couple of
+ * times before giving up. Returns null only when there's genuinely nothing to
+ * read (or every attempt failed) — callers must NOT clear the account on null.
+ */
+async function getMyProfileResilient(attempts = 3): Promise<Profile | null> {
+  for (let i = 0; i < attempts; i++) {
+    const p = await getMyProfile();
+    if (p) return p;
+    if (i < attempts - 1) {
+      await new Promise((r) => setTimeout(r, 400 * (i + 1)));
+    }
+  }
+  return null;
+}
+
 let authInitialised = false;
 
 /**
@@ -258,8 +291,11 @@ export async function initAuth(): Promise<void> {
   try {
     const { data } = await sb.auth.getSession();
     if (data.session) {
-      const profile = await getMyProfile();
-      useStore.getState().setAccount(profile);
+      // A persisted session means the user IS signed in. Only set the account
+      // when the profile actually loads — a transient fetch failure must NOT
+      // clear it (that would log a validly-signed-in user out on refresh).
+      const profile = await getMyProfileResilient();
+      if (profile) useStore.getState().setAccount(profile);
     }
   } catch {
     /* offline / misconfigured env — leave account null, UI still works */
@@ -271,13 +307,20 @@ export async function initAuth(): Promise<void> {
   // Keep the store in lockstep with supabase-js session changes (token
   // refresh, sign-out from another tab, etc.).
   sb.auth.onAuthStateChange((event, session) => {
-    if (event === "SIGNED_OUT" || !session) {
+    // Clear ONLY on a genuine sign-out: explicit logout, an expired/revoked
+    // refresh token, or sign-out from another tab — supabase-js always emits
+    // SIGNED_OUT for these. We deliberately do NOT clear on a falsy `session`
+    // for any other event, so a transient null can never log the user out.
+    if (event === "SIGNED_OUT") {
       useStore.getState().setAccount(null);
       return;
     }
-    // SIGNED_IN / TOKEN_REFRESHED / USER_UPDATED → refresh the mirrored profile.
-    void getMyProfile().then((profile) => {
-      useStore.getState().setAccount(profile);
+    if (!session) return;
+    // SIGNED_IN / TOKEN_REFRESHED / USER_UPDATED → refresh the mirrored profile,
+    // but only OVERWRITE the account on a SUCCESSFUL fetch (never clear on a
+    // transient null — that was a spurious-logout bug).
+    void getMyProfileResilient().then((profile) => {
+      if (profile) useStore.getState().setAccount(profile);
     });
   });
 }

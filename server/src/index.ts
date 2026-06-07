@@ -75,6 +75,11 @@ app.use(
     // Don't block the SPA's assets or the socket handshake.
     crossOriginEmbedderPolicy: false,
     crossOriginResourcePolicy: false,
+    // Drop two legacy headers browser devtools flag as unneeded. X-Frame-Options
+    // is superseded by CSP frame-ancestors (a later task); X-XSS-Protection is
+    // deprecated (helmet sets it to "0"). Safe to omit for this same-origin app.
+    xFrameOptions: false,
+    xXssProtection: false,
   }),
 );
 app.use(cors({ origin: (origin, cb) => cb(null, originAllowed(origin)) }));
@@ -223,7 +228,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CLIENT_DIST = path.resolve(__dirname, "..", "..", "cobo", "dist");
 const hasBuiltClient = fs.existsSync(path.join(CLIENT_DIST, "index.html"));
 if (hasBuiltClient) {
-  app.use(express.static(CLIENT_DIST));
+  // Hash-named assets (Vite) are immutable → cache them hard. `index: false`
+  // makes "/" (and other directory requests) fall through to the SPA handler
+  // below instead of being served — and cached — by express.static, so the
+  // entry HTML is NEVER long-term cached (otherwise users would never get new
+  // builds). Only the fingerprinted assets get the 1-year cache.
+  app.use(express.static(CLIENT_DIST, { maxAge: "1y", index: false }));
   // SPA fallback — anything that isn't a known API path or Socket.IO endpoint
   // returns index.html so /room/<code> works on first load.
   app.use((req, res, next) => {
@@ -234,6 +244,11 @@ if (hasBuiltClient) {
     if (req.path.startsWith("/webhooks")) return next();
     if (req.path.startsWith("/api")) return next();
     if (req.path === "/health" || req.path === "/rooms") return next();
+    // index.html must ALWAYS revalidate so a new deploy's hashed bundle names
+    // are picked up immediately; the hashed assets themselves are cached above.
+    // Explicit charset utf-8 (sendFile doesn't set one) clears a devtools warning.
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.status(200).sendFile(path.join(CLIENT_DIST, "index.html"));
   });
   console.log(`Serving built client from ${CLIENT_DIST}`);
