@@ -12,22 +12,16 @@
 //     simply ignored (treated as a guest) — it never rejects the report.
 //
 // Reports are written to public.bug_reports via the service_role-only submit_bug
-// RPC (migration 0010). The RPC returns the current unresolved backlog count;
-// every BUG_REPORT_BATCH-th report we fire a best-effort digest email to the
-// owner (BUG_REPORT_TO) so they know to check Supabase. A failed email NEVER
-// fails the user's submission.
+// RPC (migration 0010). On EVERY report we fire a best-effort notification email
+// to the owner (BUG_REPORT_TO, else RESEND_FROM) containing the full report, so
+// nothing is missed at low volume. A failed email NEVER fails the submission.
 // =============================================================================
 import { Router, type Request, type Response } from "express";
 import { admin } from "../auth/supabaseClients.js";
 import { verifyAccessToken } from "../auth/verifyToken.js";
-import { sendBugDigest } from "../auth/email.js";
+import { sendBugReportEmail } from "../auth/email.js";
 
 export const bugReportRouter: Router = Router();
-
-// Email the owner a nudge every Nth unresolved report (matches the user's
-// "every 5 reports" request). The owner clears the backlog by flipping a
-// report's status away from 'new' in the Supabase dashboard.
-const BUG_REPORT_BATCH = 5;
 
 // Server-side caps (defence-in-depth — the client also caps before sending, and
 // express.json's 16kb limit is the outer wall). Truncate, don't reject, so a
@@ -170,14 +164,20 @@ bugReportRouter.post("/report-bug", async (req: Request, res: Response) => {
       `[bug-report] id=${row?.id ?? "?"} unresolved=${newCount} account=${accountId ? "y" : "n"}`,
     );
 
-    // Every Nth unresolved report → nudge the owner. Best-effort, fire-and-forget:
-    // a digest failure must not fail the user's submission.
-    if (newCount > 0 && newCount % BUG_REPORT_BATCH === 0) {
-      sendBugDigest(newCount, message).catch((err) => {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error(`[bug-report] digest email failed: ${msg}`);
-      });
-    }
+    // Email the owner on EVERY report (best-effort, fire-and-forget) so nothing
+    // is missed at low volume. An email failure must NOT fail the submission.
+    sendBugReportEmail({
+      message,
+      consoleLog,
+      contactEmail: email,
+      reporter: username || "Guest",
+      screen,
+      appVersion,
+      unresolved: newCount,
+    }).catch((err) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[bug-report] notification email failed: ${msg}`);
+    });
 
     return res.status(200).json({ ok: true });
   } catch (err) {
