@@ -27,37 +27,53 @@ import type { Card } from "../engine/types";
  * them closes this. See store.ts `setThemeOpen` / `setChatOpen` / `setAudioOpen`.
  *
  * Visual stack on the right edge (bottom → top):
- *   - bottom: 18px   → audio FAB    (AudioControls — always shown)
- *   - bottom: 96px   → chat FAB     (multiplayer only)
- *   - bottom: 174px  → THIS FAB     (MP placement)
+ *   - bottom: 18px   → Settings gear (SettingsFab — global, always shown)
+ *   - bottom: 82px   → chat FAB      (multiplayer only)
+ *   - bottom: 146px  → THIS FAB      (MP placement)
  *
  * In single-player ChatPanel returns null, so this FAB drops down into the
- * empty chat slot via the `.sp` class (see App.css).
+ * empty chat slot (bottom: 82px) via the `.sp` class (see App.css).
  */
 
 const THEMES: TableTheme[] = [
+  "horizon",
   "emerald",
-  "ocean",
   "crimson",
+  "ocean",
   "northern",
   "cosmic",
   "aquarium",
-  "horizon",
+  "lagoon",
+  "auroraindigo",
 ];
 
 const SKINS: CardSkin[] = [
   "classic",
   "royal",
   "neon",
-  "handdrawn",
-  "minimalist",
-  "mclaren_papaya",
-  "mclaren_senna",
+  "deco",
+  "ivory",
+  "eclipse",
+  "vesica",
+  "orbit",
 ];
 
 type Tab = "wallpaper" | "card";
 
 export function ThemePicker() {
+  // The customize FAB is a DEV-ONLY override now: it applies ANY skin/wallpaper
+  // regardless of ownership, bypassing the unlock system. Normal players pick
+  // the cosmetics they own from their profile (Styles store), so the FAB is
+  // hidden for everyone except dev mode (DEV-BOOST redeemed). Guests never have
+  // an account, so they're excluded twice over.
+  const account = useStore((s) => s.account);
+  const devMode = useStore((s) => s.devMode);
+  // Hide this FAB while the Settings speed-dial is open: it springs UP from the
+  // gear into the column where this FAB lives, so they'd visually collide.
+  // (Opening Settings already closes the customize popover via the FAB mutex;
+  // this hides the button too.)
+  const settingsOpen = useStore((s) => s.settingsOpen);
+
   const theme = useTheme();
   const skin = useCardSkin();
   const mode = useStore((s) => s.mode);
@@ -108,6 +124,11 @@ export function ThemePicker() {
     { id: "p_a", rank: "A", suit: "H" }, // red
     { id: "p_b", rank: "K", suit: "S" }, // black
   ];
+
+  // Dev-only lock: no account, or not in dev mode → no customize FAB. Also
+  // hidden while Settings is open (see settingsOpen note above). Placed AFTER
+  // all hooks so the Rules of Hooks hold whichever branch we take.
+  if (!account || !devMode || settingsOpen) return null;
 
   return (
     <div className={`theme-picker${chatHidden ? " sp" : ""}${open ? " open" : ""}`} ref={rootRef}>

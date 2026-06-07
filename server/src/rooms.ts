@@ -5,6 +5,17 @@ export interface Member {
   playerId: string;
   name: string;
   connected: boolean;
+  /** Supabase user id, set when the member joined with a VALID access token
+   *  (resolved server-side via verifyAccessToken). Undefined for guests — a
+   *  guest plays normally but earns no XP (only linked members get grants). */
+  userId?: string;
+  /** Raw Supabase access token (JWT), kept IN-MEMORY only so the XP grant can
+   *  do a best-effort end-of-match RE-LINK if the original fire-and-forget
+   *  verify hasn't resolved by the time the match ends. It is NEVER broadcast
+   *  (not in publicView), NEVER logged, and is fine to keep in memory: it's the
+   *  same secret the socket that delivered it is already handling. Guests never
+   *  set it. */
+  authToken?: string;
 }
 
 export interface Room {
@@ -54,6 +65,19 @@ export interface Room {
   // Straw-draw continue: all players must click Continue (or timer runs out).
   strawReadyVotes: string[];
   strawReadyStartedAt: number | null;
+  // --- XP grant idempotency (Phase 4) ---------------------------------------
+  /** Monotonic per-room match counter. Bumped in startRoomGame to mint a fresh
+   *  matchId. We use a counter (NOT Date.now/Math.random) so the id is stable
+   *  and deterministic for a given room+match — handy for the ledger game_key. */
+  matchSeq: number;
+  /** Stable id for the CURRENT match, e.g. "ABCD-m1". The MP grant game_key is
+   *  `mp:${matchId}`, so the xp_grants UNIQUE(user_id, game_key) makes a grant
+   *  idempotent across this match (a replay/double-fire can't double-pay). */
+  matchId: string;
+  /** True once grantMpRewards has run for the current match. Guards against the
+   *  many code paths that can declare a winner from firing the grant twice.
+   *  RESET to false in startRoomGame so each new match can grant again. */
+  xpGranted: boolean;
 }
 
 function randomCode(): string {
@@ -70,14 +94,6 @@ export class Rooms {
 
   size() {
     return this.map.size;
-  }
-
-  list() {
-    return Array.from(this.map.values()).map((r) => ({
-      code: r.code,
-      members: r.members.length,
-      started: !!r.game,
-    }));
   }
 
   create(): Room {
@@ -106,6 +122,9 @@ export class Rooms {
       roundReadyStartedAt: null,
       strawReadyVotes: [],
       strawReadyStartedAt: null,
+      matchSeq: 0,
+      matchId: "",
+      xpGranted: false,
     };
     this.map.set(code, room);
     return room;

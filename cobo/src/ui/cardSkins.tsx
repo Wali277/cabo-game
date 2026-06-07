@@ -1,14 +1,16 @@
 /**
- * Visual config for every card skin + the inline SVG for the racing-helmet
- * silhouette used by the McLaren tributes (no logos, no trademarks — just
- * colors and a generic helmet shape based on a side-profile racing helmet).
+ * Visual config for every card skin. (Also includes a generic inline
+ * racing-helmet silhouette SVG — no logos or trademarks — kept for potential
+ * card-back art; not referenced by any current skin.)
  *
  * Each skin describes how its FACE and BACK should look. `Card.tsx` reads
  * `useCardSkin()` and pulls the matching record from here. Adding a new skin
  * is: one entry in `SKIN_STYLES` here + one entry in `cardskin.ts`.
  */
-import type { CardSkin } from "../state/cardskin";
+import { useId } from "react";
+import { CUSTOM_SKIN_DEFAULTS, type CardSkin } from "../state/cardskin";
 import neonBack from "../assets/neon-back.png";
+import decoBack from "../assets/deco-back.svg";
 
 /** Per-skin visual rules. Suit color override is by suit so red suits can
  *  pivot to gold (Royal), magenta (Neon) etc. while black suits get their
@@ -25,16 +27,17 @@ export interface SkinStyle {
   suitColor?: { red: string; black: string };
   /** Font stack for the rank corners + center glyph. */
   font?: string;
-  /** Card back style — which renderer to use. */
-  backCenter?: "cabo" | "helmet" | "handdrawn" | "royal" | "neon" | "minimalist" | "evolved";
+  /** Card back style — which renderer to use. "deco" renders NO center art
+   *  (the backBg image is the entire back). */
+  backCenter?: "cabo" | "helmet" | "royal" | "neon" | "evolved" | "deco" | "ivory" | "eclipse" | "vesica" | "orbit";
   /** Card back background. */
   backBg: string;
   backBorder: string;
   /** Back border width in px. Default 3. */
   backBorderWidth?: number;
-  /** Color of the "CABO" pill on the back when backCenter === "cabo". */
+  /** Color of the "LUMO" pill on the back when backCenter === "cabo". */
   caboColor?: string;
-  /** Background of the CABO pill on the back. */
+  /** Background of the LUMO pill on the back. */
   caboPillBg?: string;
   /** Optional sticker on the card back — small badge in a corner. */
   backBadge?: { text: string; color: string; bg: string } | null;
@@ -52,12 +55,6 @@ export interface SkinStyle {
 // consistency. Skin personality comes from layout, color, and accents.
 const FONT = "'Fredoka', 'Fredoka One', system-ui, sans-serif";
 
-/** Hand-drawn crosshatch overlay (diagonal pen strokes). */
-const CROSSHATCH = `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14'><g stroke='%23262220' stroke-width='0.7' opacity='0.20'><line x1='0' y1='14' x2='14' y2='0'/><line x1='-7' y1='7' x2='7' y2='-7'/><line x1='7' y1='21' x2='21' y2='7'/></g></svg>")`;
-
-/** Carbon-fibre pinstripe pattern overlay — diagonal weave. */
-const CARBON_PINSTRIPE = `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='8'><g stroke='%23000' stroke-width='0.4' opacity='0.18'><line x1='0' y1='8' x2='8' y2='0'/><line x1='-4' y1='4' x2='4' y2='-4'/><line x1='4' y1='12' x2='12' y2='4'/></g></svg>")`;
-
 export const SKIN_STYLES: Record<CardSkin, SkinStyle> = {
   // ── Classic — current yellow + black ───────────────────────────────
   classic: {
@@ -72,21 +69,48 @@ export const SKIN_STYLES: Record<CardSkin, SkinStyle> = {
     caboPillBg: "#ffd86b",
   },
 
-  // ── Royal — deep velvet with crown & gold filigree back ────────────
+  // ── Custom (Recolor) — FREE skin the player tints (body + border). ──
+  //    This is only the BASE used before any tint and as the render-time
+  //    fallback; Card.tsx overrides faceBg ← body and faceBorder ← border
+  //    from the signed-in profile's `custom_card_colors`. The back reuses the
+  //    classic "LUMO" pill so an untinted Custom card reads as a finished card.
+  custom: {
+    faceBg: CUSTOM_SKIN_DEFAULTS.body, // body
+    faceBorder: CUSTOM_SKIN_DEFAULTS.border, // border
+    // No suitColor → the suits keep the default red/black behaviour.
+    font: FONT,
+    jesterBg: CUSTOM_SKIN_DEFAULTS.body, // body
+    backBg: CUSTOM_SKIN_DEFAULTS.border, // border
+    backBorder: CUSTOM_SKIN_DEFAULTS.body, // body
+    backCenter: "cabo",
+    caboColor: CUSTOM_SKIN_DEFAULTS.border, // border — LUMO text
+    caboPillBg: CUSTOM_SKIN_DEFAULTS.body, // body — LUMO pill chip
+  },
+
+  // ── Royal — "Eclipse Royal": red + obsidian + gold (both sides). ───
+  //    Face echoes the back's split-field colorway — a red→obsidian gradient
+  //    framed in gold, with gold glyphs. The BACK is the full Eclipse Royal
+  //    artwork (RoyalBack) painted edge-to-edge, so the card border is removed
+  //    on the back and a dark fallback covers the ~1px clip inset (same
+  //    full-bleed approach as Deco / Neon).
   royal: {
     faceBg:
-      "radial-gradient(circle at 30% 18%, rgba(255,221,150,0.20) 0%, transparent 55%), linear-gradient(160deg, #7c1a26 0%, #5b1019 60%, #3d0911 100%)",
-    faceBorder: "#d4af37",
-    suitColor: { red: "#f4cf5b", black: "#f4cf5b" },
+      "linear-gradient(158deg, #a82236 0%, #7a1626 44%, #1d0a11 100%)",
+    faceBorder: "#caa85a",
+    faceBorderWidth: 3,
+    // Gold glyphs on both suits — nudged lighter (#e9c879) so they stay legible
+    // across both the red top and the obsidian bottom of the face gradient.
+    suitColor: { red: "#e9c879", black: "#e9c879" },
     font: FONT,
-    jesterBg: "#7c1a26",
-    backBg:
-      "radial-gradient(circle at 30% 18%, rgba(255,221,150,0.22) 0%, transparent 60%), linear-gradient(160deg, #7c1a26 0%, #4a0d15 100%)",
-    backBorder: "#d4af37",
+    jesterBg: "#3a0a13",
+    // Back is the artwork SVG (RoyalBack); dark fallback fills the clip inset.
+    backBg: "#1a0810",
+    backBorder: "transparent",
+    backBorderWidth: 0,
     backCenter: "royal",
   },
 
-  // ── Neon — player's pink/cyan "lightning CABO" art (back) + neon faces ─
+  // ── Neon — player's pink/cyan "lightning LUMO" art (back) + neon faces ─
   neon: {
     faceBg: "#070710",
     faceBorder: "#ff3dd0",
@@ -102,70 +126,95 @@ export const SKIN_STYLES: Record<CardSkin, SkinStyle> = {
     backCenter: "neon",
   },
 
-  // ── Hand-drawn — sketched ink with crosshatch on BOTH face & back ──
-  handdrawn: {
-    faceBg: "#f3ead4",
-    faceBorder: "#262220",
-    suitColor: { red: "#262220", black: "#262220" },
-    font: FONT,
-    jesterBg: "#f3ead4",
-    patternOverlay: CROSSHATCH,
-    backBg:
-      "linear-gradient(160deg, #f5ecd5 0%, #ede0bd 100%)",
-    backBorder: "#262220",
-    backCenter: "handdrawn",
-    backPatternOverlay: CROSSHATCH,
-  },
-
-  // ── Minimalist — pure black & white, modernist diamond back ────────
-  minimalist: {
-    faceBg: "#ffffff",
-    faceBorder: "#0a0a0a",
-    suitColor: { red: "#0a0a0a", black: "#0a0a0a" },
-    font: FONT,
-    jesterBg: "#ffffff",
-    backBg: "#ffffff",
-    backBorder: "#0a0a0a",
-    backCenter: "minimalist",
-  },
-
-  // ── McLaren Papaya — thicker border + pinstripe + top racing band ──
-  mclaren_papaya: {
+  // ── Art Deco — PREMIUM (2 tokens). Near-black field with a gold frame and a
+  //    crimson ♥♦ / emerald ♠♣ two-tone that echoes the back. The BACK is the
+  //    full art-deco artwork (deco-back.svg) painted edge-to-edge, so it carries
+  //    its own crimson border + gold/emerald deco — the card border is removed
+  //    on the back so the artwork fills cleanly (same approach as Neon).
+  deco: {
     faceBg:
-      "radial-gradient(circle at 50% 0%, rgba(255,255,255,0.22) 0%, transparent 55%), radial-gradient(circle at 50% 100%, rgba(0,0,0,0.15) 0%, transparent 60%), linear-gradient(160deg, #ff8a14 0%, #ff8000 50%, #e16a00 100%)",
-    faceBorder: "#0a0a0a",
-    faceBorderWidth: 5,
-    suitColor: { red: "#0a0a0a", black: "#0a0a0a" },
+      "radial-gradient(circle at 50% 10%, rgba(212,175,55,0.16) 0%, transparent 55%), linear-gradient(160deg, #16130b 0%, #0b0b0b 58%, #050505 100%)",
+    faceBorder: "#c9a227",
+    faceBorderWidth: 3,
+    suitColor: { red: "#e2313f", black: "#1faa66" },
     font: FONT,
-    jesterBg: "#ff8000",
-    patternOverlay: CARBON_PINSTRIPE,
-    backBg:
-      "radial-gradient(circle at 50% 30%, rgba(255,255,255,0.22) 0%, transparent 60%), radial-gradient(circle at 50% 110%, rgba(0,0,0,0.30) 0%, transparent 65%), linear-gradient(160deg, #ff8a14 0%, #ff8000 55%, #d96500 100%)",
-    backBorder: "#0a0a0a",
-    backBorderWidth: 5,
-    backCenter: "helmet",
+    jesterBg: "#0b0b0b",
+    backBg: `url(${decoBack}) center / 100% 100% no-repeat, #000000`,
+    backBorder: "transparent",
+    backBorderWidth: 0,
+    backCenter: "deco", // no center art — the artwork IS the whole back
   },
 
-  // ── McLaren Senna Monaco '24 — yellow / green / blue tribute ───────
-  mclaren_senna: {
+  // ── Ivory — LEGENDARY. Warm bone ground · solid ink diamond w/ inlay line.
+  //    Faces mirror the back's warm-bone colorway; the ink mark is the accent.
+  //    (Replaces the retired "Minimalist".) The back art is the full SVG
+  //    (IvoryBack) painted edge-to-edge — no card border on the back.
+  ivory: {
     faceBg:
-      "radial-gradient(circle at 50% 0%, rgba(255,255,255,0.28) 0%, transparent 50%), linear-gradient(160deg, #ffe533 0%, #ffdd00 40%, #f0cc00 100%)",
-    faceBorder: "#002776",
-    faceBorderWidth: 5,
-    suitColor: { red: "#002776", black: "#002776" },
+      "radial-gradient(120% 90% at 50% 40%, #f0ebe0 0%, #e7e0d1 70%, #ddd5c2 100%)",
+    faceBorder: "#16161b",
+    faceBorderWidth: 3,
+    suitColor: { red: "#16161b", black: "#16161b" },
     font: FONT,
-    jesterBg: "#ffdd00",
-    backBg:
-      "linear-gradient(180deg, #ffdd00 0%, #ffdd00 16%, #002776 16%, #002776 20%, #ffdd00 20%, #ffdd00 70%, #009739 70%, #009739 82%, #ffdd00 82%, #ffdd00 100%)",
-    backBorder: "#002776",
-    backBorderWidth: 5,
-    backCenter: "helmet",
-    backBadge: { text: "1", color: "#ffdd00", bg: "#002776" },
+    jesterBg: "#e7e0d1",
+    backBg: "#ddd5c2",
+    backBorder: "transparent",
+    backBorderWidth: 0,
+    backCenter: "ivory",
   },
 
-  // ── Cabo Evolved — unified sleek black + banana-yellow identity (both sides).
+  // ── Eclipse — LEGENDARY. Graphite ground · split disc, half bone solid.
+  //    (Replaces the retired "Hand-drawn".) Faces mirror the graphite back;
+  //    bone is the accent.
+  eclipse: {
+    faceBg:
+      "radial-gradient(120% 90% at 50% 42%, #202127 0%, #16171b 60%, #0c0d10 100%)",
+    faceBorder: "#e7e0d1",
+    faceBorderWidth: 3,
+    suitColor: { red: "#e7e0d1", black: "#e7e0d1" },
+    font: FONT,
+    jesterBg: "#16171b",
+    backBg: "#0c0d10",
+    backBorder: "transparent",
+    backBorderWidth: 0,
+    backCenter: "eclipse",
+  },
+
+  // ── Vesica — LEGENDARY. Plum ground · two interlocking champagne rings.
+  //    Faces mirror the plum back; champagne is the accent.
+  vesica: {
+    faceBg:
+      "radial-gradient(120% 90% at 50% 42%, #311a35 0%, #22132a 60%, #160c1c 100%)",
+    faceBorder: "#cdb583",
+    faceBorderWidth: 3,
+    suitColor: { red: "#cdb583", black: "#cdb583" },
+    font: FONT,
+    jesterBg: "#22132a",
+    backBg: "#160c1c",
+    backBorder: "transparent",
+    backBorderWidth: 0,
+    backCenter: "vesica",
+  },
+
+  // ── Orbit — LEGENDARY. Petrol ground · thin ring with a single node.
+  //    Faces mirror the petrol back; platinum is the accent.
+  orbit: {
+    faceBg:
+      "radial-gradient(120% 90% at 50% 40%, #0f343a 0%, #0a262b 60%, #06181c 100%)",
+    faceBorder: "#b9c2d4",
+    faceBorderWidth: 3,
+    suitColor: { red: "#b9c2d4", black: "#b9c2d4" },
+    font: FONT,
+    jesterBg: "#0a262b",
+    backBg: "#06181c",
+    backBorder: "transparent",
+    backBorderWidth: 0,
+    backCenter: "orbit",
+  },
+
+  // ── Lumo Evolved — unified sleek black + banana-yellow identity (both sides).
   //    Face: black field, banana rank/suit glyphs. Back ("Charge Line"): black
-  //    field, banana CABO wordmark, a lightning-bolt divider, tracked EVOLVED.
+  //    field, banana LUMO wordmark, a lightning-bolt divider, tracked EVOLVED.
   //    Mode-exclusive: forced on in Evolved mode, never shown in the picker.
   evolved: {
     faceBg:
@@ -219,203 +268,257 @@ export function HelmetIcon({
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   <HandDrawnBack /> — sketched notebook page (centring tightened).
-
-   Reduced font size, letter spacing, rotation angle, and underline width
-   so even on the smallest preview card (w=56) nothing kisses the edge.
+   Legendary minimalist card-backs — ported VERBATIM from the approved
+   `cobo/public/skin-preview.html` (functions skinIvory / skinEclipse /
+   skinVesica / skinOrbit + the open()/keyline()/diamond() helpers). Same
+   440×640 viewBox, same gradients / paths / circles / keyline stroke+opacity.
+   The string-built markup is translated to JSX; every internal id is uniquified
+   per instance with `useId()` so multiple cards on the table don't collide on a
+   shared gradient / clipPath / filter id (which would make the LAST-mounted
+   instance's def win for all of them).
    ─────────────────────────────────────────────────────────────────────── */
-export function HandDrawnBack({ w }: { w: number }) {
-  const ink = "#262220";
 
+/** keyline() helper — one quiet hairline keyline (the only framing element). */
+function Keyline({ stroke, opacity = 0.5 }: { stroke: string; opacity?: number }) {
   return (
-    <div
-      style={{
-        width: "100%", height: "100%",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        position: "relative",
-        padding: 4,
-      }}
-    >
-      {/* Small doodles around the corners */}
-      <svg
-        viewBox="0 0 100 145"
-        preserveAspectRatio="none"
-        style={{
-          position: "absolute", inset: 0,
-          width: "100%", height: "100%",
-          pointerEvents: "none",
-        }}
-        aria-hidden="true"
-      >
-        <path
-          d="M 14 14 q 5 -5 8 1 q -2 6 -6 2 q -1 -3 3 -3"
-          stroke={ink} strokeWidth="1.2" fill="none" strokeLinecap="round"
-          opacity="0.7"
-        />
-        <g stroke={ink} strokeWidth="1.1" fill="none" strokeLinecap="round" opacity="0.7">
-          <line x1="84" y1="12" x2="84" y2="22" />
-          <line x1="79" y1="17" x2="89" y2="17" />
-          <line x1="80.5" y1="13.5" x2="87.5" y2="20.5" />
-          <line x1="87.5" y1="13.5" x2="80.5" y2="20.5" />
-        </g>
-        <path
-          d="M 14 128 q -3 -4 0 -6 q 3 -2 4 1 q 1 -3 4 -1 q 3 2 0 6 q -3 4 -4 5 q -1 -1 -4 -5 z"
-          fill={ink} opacity="0.6"
-        />
-        <g fill={ink} opacity="0.65">
-          <circle cx="83" cy="128" r="1.6" />
-          <circle cx="88" cy="131" r="1.1" />
-          <circle cx="80" cy="133" r="1" />
-        </g>
-      </svg>
+    <rect
+      x="22" y="22" width="396" height="596" rx="30" ry="30"
+      fill="none" stroke={stroke} strokeWidth="1.4" opacity={opacity}
+    />
+  );
+}
 
-      <div
-        style={{
-          transform: "rotate(-4deg)",
-          textAlign: "center",
-          color: ink,
-          maxWidth: "82%",
-        }}
-      >
-        <div
-          style={{
-            fontFamily: "'Fredoka', system-ui, sans-serif",
-            fontWeight: 900,
-            fontSize: w * 0.27,
-            letterSpacing: 1,
-            lineHeight: 1,
-            textShadow: "1px 1px 0 rgba(0,0,0,0.06)",
-          }}
-        >
-          CABO
-        </div>
-        <svg
-          viewBox="0 0 80 10"
-          style={{ width: w * 0.5, height: w * 0.08, marginTop: 3 }}
-          aria-hidden="true"
-        >
-          <path
-            d="M 2 5 Q 12 1, 22 5 T 42 5 T 62 5 T 78 5"
-            stroke={ink}
-            strokeWidth="1.6"
-            fill="none"
-            strokeLinecap="round"
-          />
-        </svg>
-      </div>
-    </div>
+/** diamond() helper — a rotated-square path centred at (cx,cy) with "radius" r. */
+function diamondPath(cx: number, cy: number, r: number): string {
+  return `M${cx} ${cy - r} L${cx + r} ${cy} L${cx} ${cy + r} L${cx - r} ${cy} Z`;
+}
+
+/* IVORY — warm bone ground · solid ink diamond w/ inlay line. */
+export function IvoryBack() {
+  const uid = useId().replace(/:/g, "");
+  const clip = `cardclip${uid}`;
+  const bg = `iv-bg${uid}`;
+  const grain = `iv-grain${uid}`;
+  const ink = "#16161b";
+  const bone = "#ece6d9";
+  const cx = 220, cy = 320;
+  return (
+    <svg viewBox="0 0 440 640" width="100%" height="100%" preserveAspectRatio="none" style={{ display: "block" }}>
+      <defs>
+        <clipPath id={clip}><rect x="6" y="6" width="428" height="628" rx="40" ry="40" /></clipPath>
+        <radialGradient id={bg} cx="50%" cy="40%" r="80%">
+          <stop offset="0" stopColor="#f0ebe0" />
+          <stop offset="0.7" stopColor="#e7e0d1" />
+          <stop offset="1" stopColor="#ddd5c2" />
+        </radialGradient>
+        <filter id={grain} x="-5%" y="-5%" width="110%" height="110%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="5" result="n" />
+          <feColorMatrix in="n" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.03 0" />
+          <feComposite operator="over" in2="SourceGraphic" />
+        </filter>
+      </defs>
+      <g clipPath={`url(#${clip})`}>
+        <rect x="6" y="6" width="428" height="628" rx="40" fill={`url(#${bg})`} filter={`url(#${grain})`} />
+        <path d={diamondPath(cx, cy, 84)} fill={ink} />
+        <path d={diamondPath(cx, cy, 66)} fill="none" stroke={bone} strokeWidth="1.3" opacity="0.9" />
+      </g>
+      <Keyline stroke={ink} opacity={0.5} />
+    </svg>
+  );
+}
+
+/* ECLIPSE — graphite ground · split disc, half bone solid. */
+export function EclipseBack() {
+  const uid = useId().replace(/:/g, "");
+  const clip = `cardclip${uid}`;
+  const bg = `ec-bg${uid}`;
+  const bone = "#e7e0d1";
+  const cx = 220, cy = 320, r = 78;
+  return (
+    <svg viewBox="0 0 440 640" width="100%" height="100%" preserveAspectRatio="none" style={{ display: "block" }}>
+      <defs>
+        <clipPath id={clip}><rect x="6" y="6" width="428" height="628" rx="40" ry="40" /></clipPath>
+        <radialGradient id={bg} cx="50%" cy="42%" r="80%">
+          <stop offset="0" stopColor="#202127" />
+          <stop offset="0.6" stopColor="#16171b" />
+          <stop offset="1" stopColor="#0c0d10" />
+        </radialGradient>
+      </defs>
+      <g clipPath={`url(#${clip})`}>
+        <rect x="6" y="6" width="428" height="628" rx="40" fill={`url(#${bg})`} />
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke={bone} strokeWidth="1.4" />
+        <path d={`M${cx} ${cy - r} A ${r} ${r} 0 0 0 ${cx} ${cy + r} Z`} fill={bone} />
+      </g>
+      <Keyline stroke={bone} opacity={0.32} />
+    </svg>
+  );
+}
+
+/* VESICA — plum ground · two interlocking champagne rings. */
+export function VesicaBack() {
+  const uid = useId().replace(/:/g, "");
+  const clip = `cardclip${uid}`;
+  const bg = `ve-bg${uid}`;
+  const champ = "#cdb583";
+  const cx = 220, cy = 320, r = 62, d = 36;
+  return (
+    <svg viewBox="0 0 440 640" width="100%" height="100%" preserveAspectRatio="none" style={{ display: "block" }}>
+      <defs>
+        <clipPath id={clip}><rect x="6" y="6" width="428" height="628" rx="40" ry="40" /></clipPath>
+        <radialGradient id={bg} cx="50%" cy="42%" r="80%">
+          <stop offset="0" stopColor="#311a35" />
+          <stop offset="0.6" stopColor="#22132a" />
+          <stop offset="1" stopColor="#160c1c" />
+        </radialGradient>
+      </defs>
+      <g clipPath={`url(#${clip})`}>
+        <rect x="6" y="6" width="428" height="628" rx="40" fill={`url(#${bg})`} />
+        <circle cx={cx - d} cy={cy} r={r} fill="none" stroke={champ} strokeWidth="1.5" />
+        <circle cx={cx + d} cy={cy} r={r} fill="none" stroke={champ} strokeWidth="1.5" />
+        <circle cx={cx} cy={cy} r="3.4" fill={champ} />
+      </g>
+      <Keyline stroke={champ} opacity={0.4} />
+    </svg>
+  );
+}
+
+/* ORBIT — petrol ground · thin ring with a single node. */
+export function OrbitBack() {
+  const uid = useId().replace(/:/g, "");
+  const clip = `cardclip${uid}`;
+  const bg = `or-bg${uid}`;
+  const plat = "#b9c2d4";
+  const cx = 220, cy = 320, r = 76;
+  return (
+    <svg viewBox="0 0 440 640" width="100%" height="100%" preserveAspectRatio="none" style={{ display: "block" }}>
+      <defs>
+        <clipPath id={clip}><rect x="6" y="6" width="428" height="628" rx="40" ry="40" /></clipPath>
+        <radialGradient id={bg} cx="50%" cy="40%" r="80%">
+          <stop offset="0" stopColor="#0f343a" />
+          <stop offset="0.6" stopColor="#0a262b" />
+          <stop offset="1" stopColor="#06181c" />
+        </radialGradient>
+      </defs>
+      <g clipPath={`url(#${clip})`}>
+        <rect x="6" y="6" width="428" height="628" rx="40" fill={`url(#${bg})`} />
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke={plat} strokeWidth="1.3" />
+        <circle cx={cx} cy={cy - r} r="7" fill={plat} />
+        <circle cx={cx} cy={cy} r="3.4" fill={plat} />
+      </g>
+      <Keyline stroke={plat} opacity={0.38} />
+    </svg>
   );
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   <RoyalBack /> — gilt crown + filigree inner frame.
+   <RoyalBack /> — "Eclipse Royal".
 
-   Velvet red base (from skin.backBg) plus an inset 1.5px gold frame with
-   small fleur-de-lis cap ornaments, a centred crown in gold with red
-   jewels, and "CABO" beneath in spaced gold letters. Reads like an
-   heirloom playing card from a baroque set.
+   Ported VERBATIM from the approved `cobo/public/royal-preview.html`
+   (the single SKINS 'eclipse' config + makeCard / ringSet). A split field of
+   royal red and obsidian, with a gold disc that INVERTS the two fields
+   wherever it overlaps, tied by a thin gold seam and gold ring linework with
+   a central gem. Same 440×640 viewBox, same gradients / polys / circles /
+   stroke widths / opacities. The string-built markup is translated to JSX and
+   rendered full-bleed (like the Deco / Neon backs); every internal id is
+   uniquified per instance with `useId()` so multiple cards on the table don't
+   collide on a shared gradient / clipPath id.
+
+   Geometry (from the config): reg = diagSplit(372,300) → the gold seam runs
+   from (6,372) on the left to (434,300) on the right; disc at (220,326) r104;
+   dust dots and ring radii exactly as authored. Colors: GOLD #caa85a,
+   GOLD_LT #f0d89c, GOLD_DK #9c7d3e.
    ─────────────────────────────────────────────────────────────────────── */
-export function RoyalBack({ w }: { w: number }) {
-  const gold = "#d4af37";
-  const goldLight = "#f0d674";
-  const velvet = "#7c1a26";
+export function RoyalBack() {
+  const uid = useId().replace(/:/g, "");
+  const cc = `cc${uid}`;
+  const rId = `r${uid}`; // red radial gradient
+  const oId = `o${uid}`; // obsidian radial gradient
+  const gId = `g${uid}`; // gold linear gradient (gem)
+  const disc = `disc${uid}`; // disc clipPath for the field inversion
+
+  const GOLD = "#caa85a";
+  const GOLD_LT = "#f0d89c";
+  const GOLD_DK = "#9c7d3e";
+
+  const redFill = `url(#${rId})`;
+  const obFill = `url(#${oId})`;
+
+  // reg = diagSplit(372,300):
+  //   red region  = polygon (6,6)(434,6)(434,300)(6,372)
+  //   ob  region  = polygon (6,372)(434,300)(434,634)(6,634)
+  const redPoly = "M6 6 L434 6 L434 300 L6 372 Z";
+  const obPoly = "M6 372 L434 300 L434 634 L6 634 Z";
+
+  // dust dots: [cx, cy, r, opacity]
+  const dust: [number, number, number, number][] = [
+    [70, 470, 1.2, 0.5],
+    [120, 560, 1, 0.4],
+    [360, 520, 1.4, 0.55],
+    [300, 590, 1, 0.4],
+    [400, 452, 1.1, 0.45],
+    [176, 520, 0.9, 0.32],
+  ];
+
+  // disc (ringSet) geometry
+  const cx = 220, cy = 326, r = 104;
+  const diamond = (dcx: number, dcy: number, dr: number) =>
+    `M${dcx} ${dcy - dr} L${dcx + dr} ${dcy} L${dcx} ${dcy + dr} L${dcx - dr} ${dcy} Z`;
 
   return (
-    <div style={{
-      width: "100%", height: "100%",
-      position: "relative",
-      display: "flex", alignItems: "center", justifyContent: "center",
-    }}>
-      {/* Gold inner frame */}
-      <div style={{
-        position: "absolute",
-        inset: 5,
-        border: `1.5px solid ${gold}`,
-        borderRadius: 7,
-        pointerEvents: "none",
-        boxShadow: `inset 0 0 0 0.5px rgba(244,207,91,0.4)`,
-      }} />
-
-      {/* Corner fleur-de-lis dots */}
-      {(["tl", "tr", "bl", "br"] as const).map((corner) => {
-        const pos: React.CSSProperties =
-          corner === "tl" ? { top: 9, left: 9 } :
-          corner === "tr" ? { top: 9, right: 9 } :
-          corner === "bl" ? { bottom: 9, left: 9 } :
-                            { bottom: 9, right: 9 };
-        return (
-          <svg
-            key={corner}
-            viewBox="0 0 10 10"
-            width={Math.max(7, w * 0.10)}
-            height={Math.max(7, w * 0.10)}
-            style={{ position: "absolute", ...pos }}
-          >
-            {/* Simple fleur-de-lis: three teardrop petals from a center point */}
-            <path d="M 5 1 C 3 3, 3 5, 5 6 C 7 5, 7 3, 5 1 Z" fill={gold} />
-            <path d="M 1.5 4 C 2.5 5, 4 6, 5 6 C 4 6.5, 2.5 6.5, 1.5 4 Z" fill={gold} />
-            <path d="M 8.5 4 C 7.5 5, 6 6, 5 6 C 6 6.5, 7.5 6.5, 8.5 4 Z" fill={gold} />
-            <circle cx="5" cy="6.5" r="0.8" fill={gold} />
-          </svg>
-        );
-      })}
-
-      {/* Central crown */}
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, transform: "translateY(-4%)" }}>
-        <svg
-          viewBox="0 0 100 60"
-          width={w * 0.62}
-          height={w * 0.37}
-          style={{ display: "block", filter: `drop-shadow(0 1px 1px rgba(0,0,0,0.4))` }}
-        >
-          {/* Crown band */}
-          <path d="M 18 38 L 82 38 L 78 48 L 22 48 Z" fill={gold} />
-          {/* Three pointed spikes with cross at top centre */}
-          <path
-            d="M 18 38 L 26 22 L 33 34 L 42 14 L 50 30 L 58 14 L 67 34 L 74 22 L 82 38 Z"
-            fill={gold}
-            stroke={goldLight}
-            strokeWidth="0.6"
-          />
-          {/* Small cross on top of centre spike */}
-          <rect x="48.5" y="6" width="3" height="9" fill={gold} />
-          <rect x="46" y="9" width="8" height="3" fill={gold} />
-          {/* Jewels */}
-          <circle cx="50" cy="43" r="2.6" fill={velvet} stroke={goldLight} strokeWidth="0.5" />
-          <circle cx="34" cy="43" r="1.6" fill={velvet} />
-          <circle cx="66" cy="43" r="1.6" fill={velvet} />
-          {/* Jewel sparkles at spike tips */}
-          <circle cx="26" cy="23" r="1.3" fill={velvet} />
-          <circle cx="74" cy="23" r="1.3" fill={velvet} />
-          <circle cx="42" cy="16" r="1.3" fill={velvet} />
-          <circle cx="58" cy="16" r="1.3" fill={velvet} />
-        </svg>
-
-        <div style={{
-          fontSize: w * 0.16,
-          color: gold,
-          fontWeight: 700,
-          letterSpacing: w * 0.05,
-          paddingLeft: w * 0.05,  // compensate for trailing letter-spacing
-          fontFamily: FONT,
-          textShadow: `0 1px 1px rgba(0,0,0,0.5), 0 0 4px rgba(212,175,55,0.3)`,
-          lineHeight: 1,
-        }}>
-          CABO
-        </div>
-      </div>
-    </div>
+    <svg viewBox="0 0 440 640" width="100%" height="100%" preserveAspectRatio="none" style={{ display: "block" }}>
+      <defs>
+        <clipPath id={cc}><rect x="6" y="6" width="428" height="628" rx="40" ry="40" /></clipPath>
+        <radialGradient id={rId} gradientUnits="userSpaceOnUse" cx="188" cy="176" r="540">
+          <stop offset="0" stopColor="#a82236" />
+          <stop offset="0.5" stopColor="#7a1626" />
+          <stop offset="1" stopColor="#3a0a13" />
+        </radialGradient>
+        <radialGradient id={oId} gradientUnits="userSpaceOnUse" cx="252" cy="544" r="520">
+          <stop offset="0" stopColor="#1d0a11" />
+          <stop offset="1" stopColor="#120509" />
+        </radialGradient>
+        <linearGradient id={gId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor={GOLD_LT} />
+          <stop offset="1" stopColor={GOLD_DK} />
+        </linearGradient>
+        <clipPath id={disc}><circle cx={cx} cy={cy} r={r} /></clipPath>
+      </defs>
+      <g clipPath={`url(#${cc})`}>
+        {/* (a) full red-gradient field */}
+        <rect x="6" y="6" width="428" height="628" fill={redFill} />
+        {/* (b) obsidian lower region */}
+        <path d={obPoly} fill={obFill} />
+        {/* (c) gold dust */}
+        {dust.map((d, i) => (
+          <circle key={i} cx={d[0]} cy={d[1]} r={d[2]} fill={GOLD_LT} opacity={d[3]} />
+        ))}
+        {/* (d) inversion: inside the disc, swap the two fields */}
+        <g clipPath={`url(#${disc})`}>
+          <path d={redPoly} fill={obFill} />
+          <path d={obPoly} fill={redFill} />
+        </g>
+        {/* (e) gold seam line */}
+        <line x1="6" y1="372" x2="434" y2="300" stroke={GOLD} strokeWidth="1.4" opacity="0.85" />
+        {/* (f) ringSet accents: 3 concentric gold rings + gem */}
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke={GOLD} strokeWidth="2.6" />
+        <circle cx={cx} cy={cy} r={r - 12} fill="none" stroke={GOLD} strokeWidth="0.8" opacity="0.5" />
+        <circle cx={cx} cy={cy} r={r + 10} fill="none" stroke={GOLD} strokeWidth="0.7" opacity="0.28" />
+        <path d={diamond(cx, cy, 17)} fill="none" stroke={GOLD_LT} strokeWidth="1.5" />
+        <path d={diamond(cx, cy, 7.5)} fill={`url(#${gId})`} />
+      </g>
+    </svg>
   );
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   <NeonBack /> — the player's neon "lightning CABO" artwork.
+   <NeonBack /> — the player's neon "lightning LUMO" artwork.
 
-   The card back is the uploaded image, stretched to fill the card (the chosen
-   "fill" fit). Imported via Vite so the URL resolves correctly in both the web
-   build (absolute "/") and the Electron file:// build ("./").
+   The card back is the uploaded image, stretched to fill the card. It's shown
+   as-is with NO wordmark overlay — the previously baked-in text was removed
+   from the source raster (cobo/src/assets/neon-back.png), so the back is now
+   pure art.
    ─────────────────────────────────────────────────────────────────────── */
-export function NeonBack(_props: { w: number }) {
+export function NeonBack() {
   return (
     <img
       src={neonBack}
@@ -427,62 +530,10 @@ export function NeonBack(_props: { w: number }) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   <MinimalistBack /> — modernist diamond + thin frame.
-
-   White card with a thin 1px black inset frame, a single black diamond
-   (rotated square) at the centre, and a small wide-tracked "cabo" in
-   light grey at the bottom edge. Bauhaus restraint.
-   ─────────────────────────────────────────────────────────────────────── */
-export function MinimalistBack({ w }: { w: number }) {
-  const ink = "#0a0a0a";
-  const ghost = "#9a9a9a";
-
-  return (
-    <div style={{
-      width: "100%", height: "100%",
-      position: "relative",
-      display: "flex", alignItems: "center", justifyContent: "center",
-    }}>
-      {/* Thin inset frame */}
-      <div style={{
-        position: "absolute",
-        inset: 4,
-        border: `1px solid ${ink}`,
-        borderRadius: 7,
-        pointerEvents: "none",
-      }} />
-
-      {/* Central diamond */}
-      <div style={{
-        width: w * 0.22,
-        height: w * 0.22,
-        background: ink,
-        transform: "rotate(45deg) translateY(-6%)",
-      }} />
-
-      {/* Bottom-edge cabo wordmark, lowercase, very small */}
-      <div style={{
-        position: "absolute",
-        bottom: w * 0.11,
-        fontSize: w * 0.09,
-        color: ghost,
-        fontWeight: 500,
-        letterSpacing: w * 0.04,
-        paddingLeft: w * 0.04,
-        fontFamily: FONT,
-        textTransform: "lowercase",
-      }}>
-        cabo
-      </div>
-    </div>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────────────────
-   <EvolvedBack /> — Cabo Evolved back ("Charge Line").
+   <EvolvedBack /> — Lumo Evolved back ("Charge Line").
 
    Banana-yellow on the black field (skin.backBg), matching the card face:
-   a centred CABO wordmark, a lightning-bolt divider (rule · bolt · rule),
+   a centred LUMO wordmark, a lightning-bolt divider (rule · bolt · rule),
    then a wide-tracked EVOLVED with a clear gap beneath the bolt. The card
    aspect is exactly 220:319 (w : 1.45w) so the fixed viewBox maps cleanly.
    ─────────────────────────────────────────────────────────────────────── */
@@ -512,7 +563,7 @@ export function EvolvedBack({ w }: { w: number }) {
         fontFamily={FONT} fontWeight={700} fontSize="54"
         fill={banana} letterSpacing="0.5"
       >
-        CABO
+        LUMO
       </text>
 
       {/* Lightning divider: rule · bolt · rule */}
@@ -538,7 +589,7 @@ export function EvolvedBack({ w }: { w: number }) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   <DragonFace /> — the Cabo Evolved Dragon (rank "D").
+   <DragonFace /> — the Lumo Evolved Dragon (rank "D").
 
    A filled banana silhouette traced from the approved dragon art (the same
    art the user signed off on). Drawn on the card's black field with the

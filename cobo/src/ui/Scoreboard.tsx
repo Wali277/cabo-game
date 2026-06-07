@@ -71,7 +71,7 @@ function RollingNumber({
 interface ScoreRow {
   id: string;
   name: string;
-  /** Raw per-round contributions (hand value after Cabo bonus zeroing). */
+  /** Raw per-round contributions (hand value after Lumo bonus zeroing). */
   rounds: number[];
   /** Cumulative bonus magnitude — sum of cabo bonus AND snap bonus (both
    *  reduce the running total). Surfaced as one "Bonus" column in the
@@ -84,7 +84,7 @@ interface ScoreRow {
   total: number;
   /** Per-round combined bonus values (cabo + snap), parallel to rounds. */
   perRoundBonus: number[];
-  /** Per-round Cabo penalty values (parallel to rounds) — drives the "!" marker. */
+  /** Per-round Lumo penalty values (parallel to rounds) — drives the "!" marker. */
   perRoundPenalty: number[];
   /** Per-round Kamikaze levy (+20), parallel to rounds — drives the 💥 marker.
    *  Included in penaltyTotal; pulled OUT of the round cell (it's folded into
@@ -128,7 +128,7 @@ function buildRows(
       // Per-round bonus is cabo + snap (both apply as negative adjustments).
       const perRoundBonus = arr.map((_, i) => (cabo[i] ?? 0) + (snap[i] ?? 0));
       const bonusTotal = sum(perRoundBonus);
-      // Penalty column combines the Cabo penalty (+5) and the Kamikaze levy (+20).
+      // Penalty column combines the Lumo penalty (+5) and the Kamikaze levy (+20).
       const penaltyTotal = sum(penalty) + sum(perRoundKamikaze);
       const total = sum(rounds) + penaltyTotal - bonusTotal;
       return {
@@ -239,8 +239,8 @@ export function Scoreboard() {
               {roundCount > 0 ? `${colPrefix}${i + 1}` : "—"}
             </div>
           ))}
-          <div className="sb-th sb-th-bonus" title="Bonuses subtracted (Cabo bonus, Snap bonus)">Bonus</div>
-          <div className="sb-th sb-th-penalty" title="Cabo penalty added">Penalty</div>
+          <div className="sb-th sb-th-bonus" title="Bonuses subtracted (Lumo bonus, Snap bonus)">Bonus</div>
+          <div className="sb-th sb-th-penalty" title="Lumo penalty added">Penalty</div>
           <div className="sb-th sb-th-total">Total</div>
         </div>
         <div className="sb-tbody">
@@ -273,8 +273,8 @@ export function Scoreboard() {
                   return (
                     <span key={ri} className={`sb-td sb-td-round${cls}${finalCls}`}>
                       {v !== undefined ? v : "—"}
-                      {hadBonus && <span className="sb-cell-marker bonus" title="Cabo bonus">✦</span>}
-                      {hadPenalty && <span className="sb-cell-marker penalty" title="Cabo penalty">!</span>}
+                      {hadBonus && <span className="sb-cell-marker bonus" title="Lumo bonus">✦</span>}
+                      {hadPenalty && <span className="sb-cell-marker penalty" title="Lumo penalty">!</span>}
                       {hadKamikaze && <span className="sb-cell-marker penalty" title="Kamikaze +20">💥</span>}
                     </span>
                   );
@@ -506,7 +506,7 @@ export function RoundEndOverlay() {
         ? (game.players.find((p) => p.id === game.winnerId)?.name ?? roundWinner?.name ?? "")
         : (roundWinner?.name ?? ""));
 
-  // Cabo Evolved: explain the +20 levy beneath the buttons when a Kamikaze hit.
+  // Lumo Evolved: explain the +20 levy beneath the buttons when a Kamikaze hit.
   const kamikazeNames = (game.roundOutcome?.kamikaze ?? [])
     .map((id) => game.players.find((p) => p.id === id)?.name ?? "A player");
   const kamikazeNote = kamikazeNames.length
@@ -612,7 +612,7 @@ export function RoundEndOverlay() {
                   {roundCount > 0 ? `${inSuddenDeath ? "FR" : "R"}${i + 1}` : "—"}
                 </div>
               ))}
-              <div className="sb-th sb-th-bonus" title="Bonuses subtracted — Cabo bonus and Snap bonus combined.">Bonus</div>
+              <div className="sb-th sb-th-bonus" title="Bonuses subtracted — Lumo bonus and Snap bonus combined.">Bonus</div>
               <div className="sb-th sb-th-penalty">Penalty</div>
               <div className="sb-th sb-th-total">Total</div>
             </div>
@@ -646,8 +646,8 @@ export function RoundEndOverlay() {
                       return (
                         <span key={ri} className={`sb-td sb-td-round${cls}${finalCls}`}>
                           {v !== undefined ? v : "—"}
-                          {hadBonus && <span className="sb-cell-marker bonus" title="Cabo bonus">✦</span>}
-                          {hadPenalty && <span className="sb-cell-marker penalty" title="Cabo penalty">!</span>}
+                          {hadBonus && <span className="sb-cell-marker bonus" title="Lumo bonus">✦</span>}
+                          {hadPenalty && <span className="sb-cell-marker penalty" title="Lumo penalty">!</span>}
                           {hadKamikaze && <span className="sb-cell-marker penalty" title="Kamikaze +20">💥</span>}
                         </span>
                       );

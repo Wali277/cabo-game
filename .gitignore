@@ -4,6 +4,25 @@ server/node_modules/
 cobo/dist/
 dist-electron/
 build/icon.png
+# Secrets / env (never commit). The two negations keep the intentionally-tracked,
+# secret-free files (server/.env.example, cobo/.env.electron = public URL only).
 .env
+.env.*
+!.env.example
+!.env.electron
 *.local
+
+# Keys, certs, signing material — must never reach the public repo
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+credentials.json
+*-service-account.json
+*.secret
+
+# Stale agent worktrees (a latent secret-leak channel)
+.claude/worktrees/
+
 .DS_Store

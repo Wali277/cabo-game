@@ -192,13 +192,13 @@ export function BotPicker() {
             className={`mode-option evolved ${variant === "evolved" ? "active" : ""}`}
             onClick={() => chooseVariant("evolved")}
           >
-            Cabo Evolved
+            Lumo Evolved
           </button>
           <button
             className="mode-info-btn"
             onClick={() => { Audio.playSfx("click"); setInfoOpen(true); }}
-            aria-label="How Cabo Evolved works"
-            title="How Cabo Evolved works"
+            aria-label="How Lumo Evolved works"
+            title="How Lumo Evolved works"
           >
             &#9432;
           </button>

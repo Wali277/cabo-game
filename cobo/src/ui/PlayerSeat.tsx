@@ -45,7 +45,7 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
       ? "md"
       : "lg"
     : !isMobile
-    ? "md"
+    ? "lg" // opponents match the human's hand size (desktop)
     // Mobile: all opponents — top AND left/right — use sm (48), so the side
     // players match the top player's card size. Side players render in the
     // rotated vertical rail (below), same placement as the top row reads.
@@ -235,7 +235,7 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
   const known = player.knownToSelf;
 
   // Side players (left/right) render their card row horizontally then rotate it
-  // so CABO text faces the person sitting on that side.
+  // so LUMO text faces the person sitting on that side.
   // sm card: 56×81 → row of 4: ~266px wide × 93px tall
   // After rotation: wrapper is 93px wide × 266px tall.
   //
@@ -357,7 +357,7 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
           style={{ borderColor: botProfile!.accent }}
         >
           <BotPortraitComp size={isMobile ? (tablePos === "left" || tablePos === "right" ? 28 : 52) : 72} />
-          {player.calledCabo && <span className="cabo-badge bot-cabo-badge">CABO!</span>}
+          {player.calledCabo && <span className="cabo-badge bot-cabo-badge">LUMO!</span>}
           <AnimatePresence>
             {hasSpeech && (
               <motion.div
@@ -385,7 +385,7 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
           }}
         >
           <span>{player.name}</span>
-          {player.calledCabo && <span className="cabo-badge">CABO!</span>}
+          {player.calledCabo && <span className="cabo-badge">LUMO!</span>}
         </div>
       )}
 

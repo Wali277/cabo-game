@@ -1,7 +1,6 @@
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { useStore } from "../state/store";
-import { Tutorial } from "./Tutorial";
 import { Audio } from "../audio/sounds";
 import { MenuWallpaper } from "./MenuWallpaper";
 import { useViewMode, setViewMode } from "../state/viewmode";
@@ -75,8 +74,10 @@ export function Menu() {
   const setPendingNumBots = useStore((s) => s.setPendingNumBots);
   const viewMode = useViewMode();
   const [bots, setBots] = useState(1);
-  const [showTutorial, setShowTutorial] = useState(false);
-  // Training Chamber: clicking the button reveals a Classic / Cabo Evolved choice.
+  // "How to play" opens the same centered reference notepad as the in-game
+  // Help (?) button (rendered app-root by <HelpButton/>), via this store flag.
+  const setHelpOpen = useStore((s) => s.setHelpOpen);
+  // Training Chamber: clicking the button reveals a Classic / Lumo Evolved choice.
   const [trainOpen, setTrainOpen] = useState(false);
 
   // Master sound toggle (mutes/unmutes both music + SFX together). Kept in sync
@@ -168,7 +169,7 @@ export function Menu() {
             heavy embossed look is on a child span rather than on the
             motion.h1 itself (rotation + the shadow stack compose
             cleanly when they're on different elements). */}
-        <span className="title-text">CABO!</span>
+        <span className="title-text">LUMO!</span>
       </motion.h1>
       <motion.p
         initial={{ y: 10, opacity: 0 }}
@@ -218,10 +219,14 @@ export function Menu() {
         </button>
         <button
           className="btn ghost-light"
-          onClick={() => setShowTutorial(true)}
+          onClick={() => { Audio.playSfx("click"); setHelpOpen(true); }}
         >
           ? How to play
         </button>
+        {/* Accounts entry moved out of the menu card (Phase 3): the sign-in
+            invite / profile pill now lives in the fixed bottom-left
+            <AccountMenuTab/>, with the full Account · Styles · Settings panel
+            in <ProfilePanel/> (both mounted from App.tsx). */}
         <button
           className="btn ghost-light viewmode-toggle"
           onClick={() => {
@@ -254,7 +259,7 @@ export function Menu() {
                 ♣ Classic
               </button>
               <button className="btn ghost-light" onClick={() => trainInit("evolved")}>
-                🐉 Cabo Evolved
+                🐉 Lumo Evolved
               </button>
             </div>
             <button className="train-choice-cancel" onClick={() => setTrainOpen(false)}>
@@ -276,7 +281,7 @@ export function Menu() {
         >
           <span className="a2hs-icon" aria-hidden="true"><ShareGlyph /></span>
           <div className="a2hs-text">
-            <strong>{installPrompt ? "Install CABO" : "Add CABO to your Home Screen"}</strong>
+            <strong>{installPrompt ? "Install LUMO" : "Add LUMO to your Home Screen"}</strong>
             <span>
               {installPrompt
                 ? "Tap Install for full-screen play from your phone."
@@ -298,7 +303,6 @@ export function Menu() {
         </motion.div>
       )}
 
-      {showTutorial && <Tutorial onClose={() => setShowTutorial(false)} />}
     </div>
   );
 }

@@ -517,7 +517,7 @@ export function callCabo(state: GameState): GameState {
   s.caboCallerId = cur.id;
   s.finalRoundTurnsLeft = s.players.length - 1;
   pushAnim(s, "cabo_called", { playerId: cur.id });
-  pushLog(s, `${cur.name} called CABO!`);
+  pushLog(s, `${cur.name} called LUMO!`);
   return advanceTurn(s);
 }
 

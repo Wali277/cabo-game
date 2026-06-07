@@ -14,45 +14,111 @@ import { useEffect, useState } from "react";
 
 export type CardSkin =
   | "classic"
+  // FREE "Recolor" skin (Phase 7): a base face/back the player tints via their
+  // own `custom_card_colors` (body + border). A valid, selectable skin — the
+  // tint is layered at render time in Card.tsx, the base lives in cardSkins.tsx.
+  | "custom"
   | "royal"
   | "neon"
-  | "handdrawn"
-  | "minimalist"
-  | "mclaren_papaya"
-  | "mclaren_senna"
-  // Mode-exclusive: forced on in Cabo Evolved, never offered in the picker
+  // Premium art-deco skin (gold/emerald/crimson back) — 2-token unlock.
+  | "deco"
+  // Legendary two-tone minimalist set (ported from the approved skin-preview
+  // artwork). `ivory` replaces the retired `minimalist`, `eclipse` replaces the
+  // retired `handdrawn`; `vesica` + `orbit` are new editions.
+  | "ivory"
+  | "eclipse"
+  | "vesica"
+  | "orbit"
+  // Mode-exclusive: forced on in Lumo Evolved, never offered in the picker
   // (intentionally absent from VALID + the ThemePicker SKINS list).
   | "evolved";
 
 export const DEFAULT_SKIN: CardSkin = "classic";
 
+/**
+ * Default body + border for the FREE "Custom" recolor skin — used as the BASE
+ * (in `ui/cardSkins.tsx`) and the render-time FALLBACK (in `ui/Card.tsx`) until
+ * the player has tinted their own (`profile.custom_card_colors` is null/missing).
+ * Lives here (a pure module) so both the style table and the renderer share one
+ * source of truth. Classic-like banana/ink so an untinted Custom card still
+ * looks finished.
+ */
+export const CUSTOM_SKIN_DEFAULTS = {
+  body: "#ffd86b", // BODY — card face + the back's LUMO pill chip
+  border: "#1c1d2b", // BORDER — frame, the back background + the LUMO text
+} as const;
+
 const STORAGE_KEY = "cabo:cardskin";
 const EVENT_NAME = "cabo:cardskin-change";
 const VALID: ReadonlyArray<CardSkin> = [
   "classic",
+  "custom",
   "royal",
   "neon",
-  "handdrawn",
-  "minimalist",
-  "mclaren_papaya",
-  "mclaren_senna",
+  "deco",
+  // Legendary set last, after `deco`.
+  "ivory",
+  "eclipse",
+  "vesica",
+  "orbit",
 ];
 
 export const SKIN_LABELS: Record<CardSkin, string> = {
   classic:         "Classic",
+  custom:          "Custom",
   royal:           "Royal",
   neon:            "Neon",
-  handdrawn:       "Hand-drawn",
-  minimalist:      "Minimalist",
-  mclaren_papaya:  "McLaren Papaya",
-  mclaren_senna:   "Senna Monaco '24",
-  evolved:         "Cabo Evolved",
+  deco:            "Art Deco",
+  ivory:           "Ivory",
+  eclipse:         "Eclipse",
+  vesica:          "Vesica",
+  orbit:           "Orbit",
+  evolved:         "Lumo Evolved",
 };
+
+/**
+ * Legacy id → new id remap. The retired `minimalist` / `handdrawn` skins were
+ * replaced by `ivory` / `eclipse`. A player who owned (or had equipped) a legacy
+ * skin must resolve to its successor rather than clamp to the default — so no
+ * purchase is lost. Used by `coerceSkin` (profile/active_skin) and
+ * `loadFromStorage` (the local card-skin preference). Mirrors the DB migration
+ * `supabase/migrations/0008_skin_rename.sql`.
+ */
+const LEGACY_SKIN_ALIASES: Record<string, CardSkin> = {
+  minimalist: "ivory",
+  handdrawn: "eclipse",
+};
+
+/**
+ * Type guard: is `v` a user-selectable card skin? VALID intentionally EXCLUDES
+ * `evolved` (a mode-forced render override, never a chosen skin), so a profile
+ * that somehow stored `active_skin: "evolved"` clamps to the default rather
+ * than locking the player into the Evolved face outside an Evolved game.
+ */
+export function isValidSkin(v: string): v is CardSkin {
+  return VALID.includes(v as CardSkin);
+}
+
+/**
+ * Coerce an arbitrary stored/profile value to a valid skin: returns it when
+ * valid, otherwise falls back to `DEFAULT_SKIN`. Tolerates null/undefined so
+ * callers can pass `profile.active_skin` directly.
+ */
+export function coerceSkin(v: string | null | undefined): CardSkin {
+  if (v == null) return DEFAULT_SKIN;
+  if (isValidSkin(v)) return v;
+  // A retired skin id (minimalist/handdrawn) maps forward to its successor
+  // BEFORE we fall back to the default, so legacy owners keep their skin.
+  const alias = LEGACY_SKIN_ALIASES[v];
+  return alias ?? DEFAULT_SKIN;
+}
 
 function loadFromStorage(): CardSkin {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw && VALID.includes(raw as CardSkin)) return raw as CardSkin;
+    // Route through coerceSkin so a stored legacy id (minimalist/handdrawn)
+    // resolves to its successor (ivory/eclipse) instead of clamping to classic.
+    if (raw) return coerceSkin(raw);
   } catch { /* ignore */ }
   return DEFAULT_SKIN;
 }

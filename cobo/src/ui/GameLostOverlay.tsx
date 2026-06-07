@@ -17,6 +17,11 @@ export function GameLostOverlay() {
   const humanId = useStore((s) => s.humanId);
   const game = useStore((s) => s.game);
   const backToMenu = useStore((s) => s.backToMenu);
+  // End-of-game sequencing inputs (see deferForReward below).
+  const mode = useStore((s) => s.mode);
+  const account = useStore((s) => s.account);
+  const spGameKey = useStore((s) => s.spGameKey);
+  const rewardResolvedKey = useStore((s) => s.rewardResolvedKey);
 
   // Mode-agnostic: elim is mirrored from MP / computed locally in SP.
   const gloriosVictory = elim.gloriosVictory;
@@ -26,6 +31,22 @@ export function GameLostOverlay() {
   const iAmEliminated =
     elim.bustedThisRound.includes(humanId) ||
     elim.kickedIds.includes(humanId);
+
+  // End-of-game SEQUENCING: in SINGLE-PLAYER, when this match earns an XP reward
+  // (the human busted out → server grant fires), DEFER this scoreboard until the
+  // XP "experience" overlay has been shown AND dismissed. `rewardResolvedKey`
+  // flips to this match's `spGameKey` on dismiss (or if no reward arrives), so we
+  // hold until then, then slide in — giving "experience first, scoreboard after".
+  // Mirrors useSpXpGrant's grant condition (bustedThisRound) and is computed
+  // synchronously, so the deferral is in effect on the very first render (no
+  // flash). MP / guests / training never satisfy this, so their timing is
+  // unchanged.
+  const deferForReward =
+    mode === "sp" &&
+    !!account &&
+    !!spGameKey &&
+    elim.bustedThisRound.includes(humanId) &&
+    rewardResolvedKey !== spGameKey;
 
   // If we're being eliminated by a bust THIS round, the BustedOverlay splash
   // plays first (1.4s). Delay our render so the splash isn't interrupted.
@@ -50,7 +71,8 @@ export function GameLostOverlay() {
     !!gloriosVictory &&
     gloriosVictory !== humanId &&
     iAmEliminated &&
-    splashSettled;
+    splashSettled &&
+    !deferForReward;
 
   // Play lose SFX once when the overlay appears.
   useEffect(() => {

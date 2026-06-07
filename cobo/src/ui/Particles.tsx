@@ -1,8 +1,8 @@
 /**
  * Three particle systems for the v3.1 polish wave:
  *
- *   • CaboLettersBurst — 4 letters (C-A-B-O) explode outward from a screen
- *     coordinate when someone calls CABO. Hooked into Table.tsx via a useEffect
+ *   • CaboLettersBurst — 4 letters (L-U-M-O) explode outward from a screen
+ *     coordinate when someone calls LUMO. Hooked into Table.tsx via a useEffect
  *     watching the latest animation event.
  *
  *   • ShatterGlass — red glass shards radiate from the centre of the
@@ -20,7 +20,7 @@ import { useMemo } from "react";
 import { useViewMode } from "../state/viewmode";
 
 /* ─────────────────────────────────────────────────────────────────────────
-   CABO letter burst
+   LUMO letter burst
    ─────────────────────────────────────────────────────────────────────── */
 
 interface CaboLettersBurstProps {
@@ -32,9 +32,9 @@ interface CaboLettersBurstProps {
 }
 
 const BURST_LETTERS = [
-  { ch: "C", angle: -135 }, // up-left
-  { ch: "A", angle: -45  }, // up-right
-  { ch: "B", angle: 135  }, // down-left
+  { ch: "L", angle: -135 }, // up-left
+  { ch: "U", angle: -45  }, // up-right
+  { ch: "M", angle: 135  }, // down-left
   { ch: "O", angle: 45   }, // down-right
 ];
 

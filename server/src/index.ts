@@ -4,6 +4,7 @@ import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import cors from "cors";
+import helmet from "helmet";
 import { Server } from "socket.io";
 import { Rooms } from "./rooms.js";
 import {
@@ -27,7 +28,6 @@ import {
   dragonChooseRank,
   drawFromDeck,
   drawFromDiscard,
-  handScore,
   newGame,
   setupPeekCard,
   skipPendingAction,
@@ -36,12 +36,56 @@ import {
   triggerPendingAction,
 } from "./engine/game.js";
 import type { GameState, Rank } from "./engine/types.js";
+import { resolveRoundOver, seatSuddenDeathNextRound } from "./roundResolve.js";
+import { authRouter, accountRouter } from "./auth/router.js";
+import { verifyAccessToken } from "./auth/verifyToken.js";
+import { admin } from "./auth/supabaseClients.js";
+import { DEV_REDEEM_CODES_ACTIVE } from "./auth/redeemCodes.js";
+import { grantMpRewards } from "./mpGrants.js";
+import { kofiRouter } from "./webhooks/kofi.js";
+
+/**
+ * Allowed CORS origins. Production locks to the known LUMO domains; dev stays
+ * permissive so localhost:5173 AND phones on the LAN (http://<lan-ip>:5173) can
+ * still test. Requests with NO Origin header — Electron's file:// renderer sends
+ * Origin "null", and curl / native / server-to-server send none — are always
+ * allowed (auth is a Bearer header, never a cookie, so CORS isn't the auth boundary).
+ */
+const PROD_ORIGINS = [
+  "https://playlumo.net",
+  "https://www.playlumo.net",
+  "https://cabo-game-r5xb.onrender.com",
+];
+function originAllowed(origin: string | undefined): boolean {
+  if (!origin || origin === "null") return true;
+  if (process.env.NODE_ENV !== "production") return true;
+  return PROD_ORIGINS.includes(origin);
+}
 
 const app = express();
-app.use(cors());
+// Render/Fly sit exactly ONE proxy hop in front of us. Trusting that single hop
+// makes Express compute req.ip from X-Forwarded-For correctly, so the auth
+// rate-limiter keys on the real client IP instead of a manually-parsed (spoofable) value.
+app.set("trust proxy", 1);
+app.use(
+  helmet({
+    // The Vite-built SPA uses inline/eval; a full web CSP is a separate later task.
+    contentSecurityPolicy: false,
+    // Don't block the SPA's assets or the socket handshake.
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: false,
+  }),
+);
+app.use(cors({ origin: (origin, cb) => cb(null, originAllowed(origin)) }));
+// Parse JSON bodies for the auth POST routes. Must come BEFORE the static /
+// SPA-fallback middleware so JSON posts are parsed and the catch-all doesn't
+// swallow them. Socket.IO is unaffected (it doesn't use Express body parsing).
+app.use(express.json({ limit: "16kb" }));
 
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: "*" } });
+const io = new Server(server, {
+  cors: { origin: (origin, cb) => cb(null, originAllowed(origin)) },
+});
 
 const rooms = new Rooms();
 
@@ -59,6 +103,12 @@ const strawReadyTimers = new Map<string, ReturnType<typeof setTimeout>>();
 function startRoomGame(roomCode: string) {
   const room = rooms.get(roomCode);
   if (!room || room.game || room.members.length < 2) return;
+  // New match → fresh idempotency identity. Bump the per-room counter (NOT a
+  // timestamp/random) for a stable matchId, and re-arm xpGranted so this match
+  // can grant its own end-of-match XP exactly once.
+  room.matchSeq += 1;
+  room.matchId = `${room.code}-m${room.matchSeq}`;
+  room.xpGranted = false;
   const players = room.members.map((m) => ({ id: m.playerId, name: m.name, isBot: false }));
   room.game = newGame({ players, variant: room.variant });
   const startIdx = Math.floor(Math.random() * players.length);
@@ -150,9 +200,18 @@ function finalizeStrawDraw(roomCode: string) {
 }
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
-app.get("/rooms", (_req, res) =>
-  res.json({ count: rooms.size(), rooms: rooms.list() })
-);
+app.get("/rooms", (_req, res) => res.json({ count: rooms.size() }));
+
+// Accounts auth API (signup / verify / login / password reset). Mounted BEFORE
+// the static + SPA-fallback block so auth POSTs aren't served index.html.
+app.use("/auth", authRouter);
+// Accounts progression API (server-authoritative XP grants). Same ordering
+// reason: must precede the SPA fallback so POST /account/grant-game is handled.
+app.use("/account", accountRouter);
+// Ko-fi donation webhook (server-authoritative token credit for "buy tokens"
+// shop purchases). Same ordering reason: must precede the SPA fallback so
+// POST /webhooks/kofi is handled rather than served index.html.
+app.use("/webhooks", kofiRouter);
 
 // Serve the built client (if present) so the whole game runs from this single
 // port — that means one tunnel / one deploy URL covers the entire app.
@@ -166,6 +225,9 @@ if (hasBuiltClient) {
   app.use((req, res, next) => {
     if (req.method !== "GET" && req.method !== "HEAD") return next();
     if (req.path.startsWith("/socket.io")) return next();
+    if (req.path.startsWith("/auth")) return next();
+    if (req.path.startsWith("/account")) return next();
+    if (req.path.startsWith("/webhooks")) return next();
     if (req.path === "/health" || req.path === "/rooms") return next();
     res.status(200).sendFile(path.join(CLIENT_DIST, "index.html"));
   });
@@ -220,21 +282,6 @@ function activePlayerIds(room: { members: { playerId: string }[]; disconnects: R
   return room.members
     .map((m) => m.playerId)
     .filter((pid) => !room.disconnects[pid]?.forfeited && !room.kickedIds.includes(pid));
-}
-
-/** A player's running MATCH total — round scores + cabo penalties − cabo/snap
- *  bonuses. The bust threshold uses this (NOT the raw round sum) so busting
- *  matches the scoreboard total the players see: a +5 cabo penalty pushes you
- *  toward 60, a low-cabo win / snap bonus pulls you back. MUST stay identical
- *  to the client's matchTotal (cobo/src/state/store.ts) + Scoreboard.tsx. */
-function matchTotal(game: GameState, id: string): number {
-  const sum = (arr?: number[]) => (arr ?? []).reduce((a, b) => a + b, 0);
-  return (
-    sum(game.scores[id]) +
-    sum(game.caboPenalty[id]) -
-    sum(game.caboBonus[id]) -
-    sum(game.snapBonus[id])
-  );
 }
 
 function broadcastRoom(roomCode: string) {
@@ -411,31 +458,94 @@ function applyAction(game: GameState, playerId: string, action: ActionMsg): Game
 io.on("connection", (socket) => {
   let bound: { roomCode: string; playerId: string } | null = null;
 
-  socket.on("room:create", ({ name }, cb) => {
+  // Resolve an optional Supabase access token to a userId and stamp it onto the
+  // member — WITHOUT blocking the join. We run this fire-and-forget AFTER the
+  // synchronous join + cb + broadcast so a guest (or a slow/failed token
+  // verify) never delays or breaks the existing room flow. The userId is only
+  // consumed at match-end (XP grants), long after this resolves. We re-fetch the
+  // member by playerId inside the callback because the socket may have left in
+  // the meantime; if so we simply drop the (now-irrelevant) result.
+  function linkIdentity(roomCode: string, playerId: string, accessToken?: string) {
+    if (typeof accessToken !== "string" || accessToken.trim() === "") return;
+    // Stash the raw token on the member FIRST (in-memory only; never broadcast
+    // or logged) so grantMpRewards can do a best-effort re-link at match-end if
+    // this fire-and-forget verify hasn't resolved yet. On rejoin with a fresh
+    // token we update it; we never clear an existing link on a missing token
+    // (the missing-token early return above guarantees that).
+    {
+      const r = rooms.get(roomCode);
+      const m = r?.members.find((mm) => mm.playerId === playerId);
+      if (m) m.authToken = accessToken;
+    }
+    verifyAccessToken(accessToken)
+      .then(async (userId) => {
+        if (!userId) return; // invalid/expired token → stays a guest
+        const r = rooms.get(roomCode);
+        const m = r?.members.find((mm) => mm.playerId === playerId);
+        if (!m) return;
+        m.userId = userId;
+        // Account holders ALWAYS display their real account username (lobby,
+        // chat, scoreboard) — server-authoritative, so a logged-in client can't
+        // spoof a different name. Best-effort: any lookup failure simply keeps
+        // the client-supplied name (current behaviour), so it can never break
+        // the join. Guests (no userId) never reach here → keep their typed name.
+        try {
+          const { data } = await admin()
+            .from("profiles")
+            .select("username")
+            .eq("id", userId)
+            .maybeSingle();
+          const username =
+            data && typeof data.username === "string" ? data.username.trim() : "";
+          if (username && m.name !== username) {
+            m.name = username;
+            broadcastRoom(roomCode);
+          }
+        } catch {
+          /* keep the client-supplied name on any profiles lookup error */
+        }
+      })
+      .catch(() => {
+        /* verifyAccessToken never rejects, but be defensive — never crash. */
+      });
+  }
+
+  socket.on("room:create", ({ name, accessToken }, cb) => {
+    // Server-side guard: the UI requires a non-empty name, but a raw socket
+    // emit could send "" — reject it so no blank-named member can be created.
+    const display = typeof name === "string" ? name.trim().slice(0, 24) : "";
+    if (!display) return cb({ ok: false, error: "Name required" });
     const room = rooms.create();
     const playerId = `p_${Math.random().toString(36).slice(2, 8)}`;
-    rooms.join(room.code, { socketId: socket.id, playerId, name, connected: true });
+    rooms.join(room.code, { socketId: socket.id, playerId, name: display, connected: true });
     rooms.setHost(room.code, playerId);
     bound = { roomCode: room.code, playerId };
     socket.join(room.code);
     cb({ ok: true, code: room.code, playerId });
     broadcastRoom(room.code);
+    // Non-blocking identity link (guests just get no userId).
+    linkIdentity(room.code, playerId, accessToken);
   });
 
-  socket.on("room:join", ({ code, name }, cb) => {
+  socket.on("room:join", ({ code, name, accessToken }, cb) => {
     const room = rooms.get(code);
     if (!room) return cb({ ok: false, error: "Room not found" });
     if (room.members.length >= 4) return cb({ ok: false, error: "Room full" });
     if (room.game) return cb({ ok: false, error: "Game already started" });
+    // Server-side guard (mirrors the UI check) against a raw blank-name emit.
+    const display = typeof name === "string" ? name.trim().slice(0, 24) : "";
+    if (!display) return cb({ ok: false, error: "Name required" });
     const playerId = `p_${Math.random().toString(36).slice(2, 8)}`;
-    rooms.join(code, { socketId: socket.id, playerId, name, connected: true });
+    rooms.join(code, { socketId: socket.id, playerId, name: display, connected: true });
     bound = { roomCode: code, playerId };
     socket.join(code);
     cb({ ok: true, code, playerId });
     broadcastRoom(code);
+    // Non-blocking identity link (guests just get no userId).
+    linkIdentity(code, playerId, accessToken);
   });
 
-  socket.on("room:rejoin", ({ code, playerId }, cb) => {
+  socket.on("room:rejoin", ({ code, playerId, accessToken }, cb) => {
     const room = rooms.get(code);
     if (!room) return cb({ ok: false, error: "Room not found" });
     const member = room.members.find((m) => m.playerId === playerId);
@@ -451,6 +561,9 @@ io.on("connection", (socket) => {
     socket.join(code);
     cb({ ok: true });
     broadcastRoom(code);
+    // Re-link on reconnect: a player may rejoin with a (re)issued token. Only
+    // sets userId on success; never clears an existing link on a missing token.
+    linkIdentity(code, playerId, accessToken);
   });
 
   socket.on("room:start", (_payload, cb) => {
@@ -476,6 +589,43 @@ io.on("connection", (socket) => {
       return cb?.({ ok: false, error: "Invalid mode" });
     }
     room.variant = variant;
+    cb?.({ ok: true });
+    broadcastRoom(bound.roomCode);
+  });
+
+  // Host-only: remove a player from the lobby BEFORE the game starts. Same
+  // authority posture as room:set_variant. The removed player is evicted from
+  // the roster, blocked from rejoining (kickedIds), detached from the socket
+  // room, and told via a dedicated `room:kicked` event (→ the distinct client
+  // KickedOverlay). In-game removal is intentionally NOT supported here (mid-
+  // match player removal is the forfeit system's job).
+  socket.on("room:kick", ({ targetPlayerId }: { targetPlayerId: string }, cb) => {
+    if (!bound) return cb?.({ ok: false, error: "Not in a room" });
+    const room = rooms.get(bound.roomCode);
+    if (!room) return cb?.({ ok: false, error: "Room not found" });
+    if (room.hostId !== bound.playerId) {
+      return cb?.({ ok: false, error: "Only the host can remove players" });
+    }
+    if (room.game) {
+      return cb?.({ ok: false, error: "Can't remove players after the game has started" });
+    }
+    if (typeof targetPlayerId !== "string" || targetPlayerId === bound.playerId) {
+      return cb?.({ ok: false, error: "Invalid player" });
+    }
+    const target = room.members.find((m) => m.playerId === targetPlayerId);
+    if (!target) return cb?.({ ok: false, error: "Player not found" });
+
+    // Block this id from rejoining, then evict from the roster + any votes.
+    if (!room.kickedIds.includes(targetPlayerId)) room.kickedIds.push(targetPlayerId);
+    const targetSocket = io.sockets.sockets.get(target.socketId);
+    room.members = room.members.filter((m) => m.playerId !== targetPlayerId);
+    room.readyVotes = room.readyVotes.filter((id) => id !== targetPlayerId);
+    delete room.disconnects[targetPlayerId];
+    // Notify the removed player (distinct kicked screen) + detach their socket.
+    if (targetSocket) {
+      targetSocket.emit("room:kicked", {});
+      targetSocket.leave(room.code);
+    }
     cb?.({ ok: true });
     broadcastRoom(bound.roomCode);
   });
@@ -702,6 +852,14 @@ io.on("connection", (socket) => {
         };
       }
       room.playAgainVotes = [];
+      // XP grant (Phase 4): this branch ended the MATCH (≤1 active player left
+      // after busts). Grant end-of-match MP XP. Cause 'bust' — the match reached
+      // a winner through normal play. Fire-and-forget; xpGranted guards dupes.
+      if (room.gloriosVictory) {
+        grantMpRewards(io, room, "bust").catch((err) => {
+          console.error(`[mp:grant] play_again/bust failed: ${err?.message ?? err}`);
+        });
+      }
       cb({ ok: true });
       broadcastRoom(bound.roomCode);
       return;
@@ -717,22 +875,63 @@ io.on("connection", (socket) => {
 
     // Everyone has voted — determine players for next round.
     // Sudden death: only the SD contestants seat. Normal: all non-kicked.
-    const playersForNextRound = isSuddenDeath && room.suddenDeath
-      ? room.game.players.filter((p) => room.suddenDeath!.contestants.includes(p.id))
-      : room.game.players.filter((p) => !room.kickedIds.includes(p.id));
+    //
+    // SUDDEN-DEATH SEATING is delegated to the pure seatSuddenDeathNextRound()
+    // (roundResolve.ts) so the full SD continuation loop is unit-testable. It
+    // performs guard-2 (<=1 contestant → terminal GV) and the newGame() reseat,
+    // mutating room.game/suddenDeath/gloriosVictory/bustedThisRound exactly as
+    // the inline code used to. We keep the NON-SD path inline here.
+    if (isSuddenDeath && room.suddenDeath) {
+      const seat = seatSuddenDeathNextRound(room);
+      if (seat.gameOver) {
+        // Only one contestant left → glorious victory (reason already set).
+        room.playAgainVotes = [];
+        if (room.gloriosVictory) {
+          grantMpRewards(io, room, "bust").catch((err) => {
+            console.error(`[mp:grant] play_again/bust failed: ${err?.message ?? err}`);
+          });
+        }
+        cb({ ok: true });
+        broadcastRoom(bound.roomCode);
+        return;
+      }
+      // Continuation: a fresh SD round was seated. Reset the same per-round
+      // room state the inline continue path cleared (votes, timers, coin/straw,
+      // disconnects). room.game / suddenDeath were updated by the seat fn.
+      room.coinToss = null;
+      room.strawDraw = null;
+      room.playAgainVotes = [];
+      room.readyVotes = [];
+      room.roundReadyVotes = [];
+      room.roundReadyStartedAt = null;
+      room.strawReadyVotes = [];
+      room.strawReadyStartedAt = null;
+      room.disconnects = {};
+      const rrTimerSd = roundReadyTimers.get(bound.roomCode);
+      if (rrTimerSd) clearTimeout(rrTimerSd);
+      roundReadyTimers.delete(bound.roomCode);
+      const srTimerSd = strawReadyTimers.get(bound.roomCode);
+      if (srTimerSd) clearTimeout(srTimerSd);
+      strawReadyTimers.delete(bound.roomCode);
+      cb({ ok: true });
+      broadcastRoom(bound.roomCode);
+      return;
+    }
+
+    const playersForNextRound = room.game.players.filter((p) => !room.kickedIds.includes(p.id));
 
     if (playersForNextRound.length <= 1) {
       // Only one player left — declare glorious victory.
       room.gloriosVictory = playersForNextRound[0]?.id ?? null;
-      room.gloriosVictoryReason = isSuddenDeath ? "sudden_death" : "survivor";
-      if (isSuddenDeath && room.suddenDeath) {
-        room.suddenDeath = {
-          active: false,
-          contestants: room.suddenDeath.contestants,
-          mainRoundsCount: room.suddenDeath.mainRoundsCount,
-        };
-      }
+      room.gloriosVictoryReason = "survivor";
       room.playAgainVotes = [];
+      // XP grant (Phase 4): everyone voted to continue but only one player
+      // remains → match over. Grant end-of-match MP XP. Cause 'bust'.
+      if (room.gloriosVictory) {
+        grantMpRewards(io, room, "bust").catch((err) => {
+          console.error(`[mp:grant] play_again/bust failed: ${err?.message ?? err}`);
+        });
+      }
       cb({ ok: true });
       broadcastRoom(bound.roomCode);
       return;
@@ -844,144 +1043,23 @@ io.on("connection", (socket) => {
 
     // After a round ends: track wins, detect busts, and determine if the game ends.
     if (room.game.phase === "round_over") {
-      // The engine's declared round winner is passed through unchanged, even
-      // if they happen to be on kickedIds. (Winner reassignment was removed
-      // per the updated spec — the win stays with whoever the engine declared.)
-      const winnerId = room.game.winnerId;
+      // Pure resolution (bust detection, round-win credit, GV / sudden-death
+      // tiebreaker) — extracted VERBATIM into resolveRoundOver so it can be
+      // unit-tested with synthetic rooms. It mutates room's bust/GV/SD fields
+      // ONLY; the XP grant + broadcast side effects stay here, AFTER the call.
+      resolveRoundOver(room);
 
-      // ── Sudden-death resolution branch ─────────────────────────────────────
-      // If we're in an active sudden-death round, resolve it by lowest-unique
-      // hand among the locked contestants. Tied hands → another SD round.
-      if (room.suddenDeath?.active) {
-        if (winnerId) {
-          room.roundWins[winnerId] = (room.roundWins[winnerId] ?? 0) + 1;
-        }
-
-        const contestantHands = room.suddenDeath.contestants.map((id) => {
-          const player = room.game!.players.find((p) => p.id === id);
-          return { id, handTotal: player ? handScore(player.hand) : Infinity };
+      // XP grant (Phase 4): if THIS round_over resolution declared a Glorious
+      // Victor (any of the bust / tiebreaker / sudden-death branches above),
+      // grant end-of-match MP XP now. Fire-and-forget — the grant is server-side
+      // and must not delay the client response. The room.xpGranted guard makes
+      // this safe even though several sibling branches could reach here across
+      // calls; only the first declaration actually grants. Cause 'bust' = the
+      // match reached a winner through normal play.
+      if (room.gloriosVictory) {
+        grantMpRewards(io, room, "bust").catch((err) => {
+          console.error(`[mp:grant] action/bust failed: ${err?.message ?? err}`);
         });
-        const minHand = Math.min(...contestantHands.map((c) => c.handTotal));
-        const atMin = contestantHands.filter((c) => c.handTotal === minHand);
-
-        if (atMin.length === 1) {
-          // Unique winner — declare GV, kick the other contestants.
-          const victorId = atMin[0].id;
-          const losers = room.suddenDeath.contestants.filter((id) => id !== victorId);
-          for (const id of losers) {
-            if (!room.kickedIds.includes(id)) room.kickedIds.push(id);
-          }
-          room.gloriosVictory = victorId;
-          room.gloriosVictoryReason = "sudden_death";
-          // Keep the SD record (inactive) so the end-game scoreboard can
-          // still split R/F columns. No further SD logic will fire because
-          // active=false.
-          room.suddenDeath = {
-            active: false,
-            contestants: room.suddenDeath.contestants,
-            mainRoundsCount: room.suddenDeath.mainRoundsCount,
-          };
-        }
-        // else: multiple tied at min — another SD round needed; contestants
-        // remain frozen, gloriosVictory unset, play_again will start the next.
-      } else {
-        // ── Normal path ────────────────────────────────────────────────────────
-        // Track round wins (engine's declared winner, even if kicked — per spec).
-        if (winnerId) {
-          room.roundWins[winnerId] = (room.roundWins[winnerId] ?? 0) + 1;
-        }
-
-        // Compute newly busted players on the FULL match total (round scores +
-        // cabo penalties − cabo/snap bonuses), identical to the scoreboard
-        // total — penalties count toward busting, bonuses count against it.
-        room.bustedThisRound = room.game.players
-          .filter((p) => matchTotal(room.game!, p.id) > 60)
-          .map((p) => p.id);
-
-        if (room.bustedThisRound.length > 0) {
-          const allEliminated = new Set([...room.kickedIds, ...room.bustedThisRound]);
-          const survivors = room.members
-            .map((m) => m.playerId)
-            .filter((pid) => !allEliminated.has(pid) && !room.disconnects[pid]?.forfeited);
-
-          if (survivors.length === 1) {
-            // ── One clear survivor after busts → regular Glorious Victory ────────
-            for (const id of room.bustedThisRound) {
-              if (!room.kickedIds.includes(id)) room.kickedIds.push(id);
-            }
-            room.gloriosVictory = survivors[0];
-            room.gloriosVictoryReason = "survivor";
-
-          } else if (survivors.length === 0) {
-            // ── Everyone busted simultaneously → tiebreaker ──────────────────────
-            // Only consider players who were active in this round (not previously kicked).
-            const contestants = room.bustedThisRound.filter(
-              (pid) => !room.kickedIds.includes(pid),
-            );
-
-            if (contestants.length === 1) {
-              // Only one active buster — they win by default.
-              const gloriousWinnerId = contestants[0];
-              room.bustedThisRound = room.bustedThisRound.filter((id) => id !== gloriousWinnerId);
-              for (const id of room.bustedThisRound) {
-                if (!room.kickedIds.includes(id)) room.kickedIds.push(id);
-              }
-              room.gloriosVictory = gloriousWinnerId;
-              room.gloriosVictoryReason = "survivor";
-            } else if (contestants.length > 1) {
-              // Tiebreaker 1: most round wins accumulated across all previous rounds.
-              const maxWins = Math.max(...contestants.map((pid) => room.roundWins[pid] ?? 0));
-              const topByWins = contestants.filter((pid) => (room.roundWins[pid] ?? 0) === maxWins);
-
-              if (topByWins.length === 1) {
-                const gloriousWinnerId = topByWins[0];
-                room.bustedThisRound = room.bustedThisRound.filter((id) => id !== gloriousWinnerId);
-                for (const id of room.bustedThisRound) {
-                  if (!room.kickedIds.includes(id)) room.kickedIds.push(id);
-                }
-                room.gloriosVictory = gloriousWinnerId;
-                room.gloriosVictoryReason = "more_wins";
-              } else if (winnerId && topByWins.includes(winnerId)) {
-                // Tiebreaker 2: last-round winner is in the tied set → they take it.
-                const gloriousWinnerId = winnerId;
-                room.bustedThisRound = room.bustedThisRound.filter((id) => id !== gloriousWinnerId);
-                for (const id of room.bustedThisRound) {
-                  if (!room.kickedIds.includes(id)) room.kickedIds.push(id);
-                }
-                room.gloriosVictory = gloriousWinnerId;
-                room.gloriosVictoryReason = "final_round";
-              } else {
-                // NEW: Sudden Death trigger. The tied-on-wins set plays
-                // another round. Kick those who busted but lost the wins
-                // tiebreaker outright.
-                const losers = room.bustedThisRound.filter(
-                  (id) => !topByWins.includes(id) && !room.kickedIds.includes(id),
-                );
-                for (const id of losers) {
-                  if (!room.kickedIds.includes(id)) room.kickedIds.push(id);
-                }
-                // Remove SD contestants from bustedThisRound — they're
-                // playing the tiebreaker, not eliminated. Leaving them in
-                // would make the client's BustedOverlay incorrectly show
-                // them the "Busted" splash + "Return to menu" modal.
-                room.bustedThisRound = room.bustedThisRound.filter(
-                  (id) => !topByWins.includes(id),
-                );
-                const anyPlayerId = room.game.players[0]?.id;
-                const mainRoundsCount = anyPlayerId
-                  ? (room.game.scores[anyPlayerId]?.length ?? 0)
-                  : 0;
-                room.suddenDeath = {
-                  active: true,
-                  contestants: topByWins,
-                  mainRoundsCount,
-                };
-              }
-            }
-            // If contestants.length === 0 (edge case: all already kicked), do nothing.
-          }
-          // survivors.length > 1: multiple still active → normal play-again flow.
-        }
       }
     }
 
@@ -1106,6 +1184,13 @@ io.on("connection", (socket) => {
         if (survivors.length === 1 && !r.gloriosVictory) {
           r.gloriosVictory = survivors[0];
           r.gloriosVictoryReason = "survivor";
+          // XP grant (Phase 4): the match ended because an opponent forfeited.
+          // Cause 'forfeit' → the survivor earns OPPONENT_ABANDON (if a round
+          // completed); the forfeiter (already flagged d.forfeited above) earns
+          // ON_LEAVE (0). Fire-and-forget; xpGranted guards dupes.
+          grantMpRewards(io, r, "forfeit").catch((err) => {
+            console.error(`[mp:grant] forfeit failed: ${err?.message ?? err}`);
+          });
         }
 
         broadcastRoom(localBound.roomCode);
@@ -1128,6 +1213,20 @@ io.on("connection", (socket) => {
 
 const PORT = Number(process.env.PORT) || 8787;
 const HOST = process.env.HOST || "0.0.0.0";
-server.listen(PORT, HOST, () =>
-  console.log(`Cobo server listening on ${HOST}:${PORT}`),
-);
+server.listen(PORT, HOST, () => {
+  console.log(`Cobo server listening on ${HOST}:${PORT}`);
+  // Make the dev-code guard observable: if this ever logs "ENABLED" on a
+  // production deploy, NODE_ENV is misconfigured and high-impact dev codes
+  // (DEV-BOOST) are live — fix the env immediately.
+  if (DEV_REDEEM_CODES_ACTIVE) {
+    console.warn(
+      `[startup] ⚠️  DEV REDEEM CODES ACTIVE (NODE_ENV=${process.env.NODE_ENV ?? "(unset)"}). ` +
+        `High-impact codes like DEV-BOOST are LIVE. This MUST read "disabled" in production — ` +
+        `set NODE_ENV=production on the host.`,
+    );
+  } else {
+    console.log(
+      `[startup] NODE_ENV=${process.env.NODE_ENV ?? "(unset)"} — dev redeem codes disabled.`,
+    );
+  }
+});

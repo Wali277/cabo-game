@@ -1,0 +1,14 @@
+-- =============================================================================
+-- seed.sql — Lumo
+-- -----------------------------------------------------------------------------
+-- Intentionally EMPTY (no seed data).
+--
+-- Profiles are 1:1 with auth.users and are created by the trusted server
+-- (service_role) the first time a user authenticates. Seeding fake users here
+-- would either (a) violate the auth.users foreign key, or (b) require inserting
+-- into the auth schema, which we deliberately avoid.
+--
+-- Add development-only fixtures below ONLY if you also create the matching
+-- auth.users rows first (e.g. via `supabase auth` / the admin API), and never
+-- ship them to production.
+-- =============================================================================

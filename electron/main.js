@@ -1,5 +1,5 @@
 /**
- * Electron main process for the Cobo desktop app.
+ * Electron main process for the Lumo desktop app.
  *
  * Loads the Vite-built React frontend (cobo/dist/index.html) via file://.
  * Single-player runs fully offline. Multiplayer connects to the cloud server
@@ -14,7 +14,7 @@ function createWindow() {
     height: 820,
     minWidth: 960,
     minHeight: 640,
-    title: 'Cobo',
+    title: 'Lumo',
     // Window/title-bar icon. Point at a packaged asset (cobo/dist is included
     // in the electron-builder `files`); the old build/icon.png is NOT packaged,
     // so it failed to load at runtime and the window fell back to a generic icon.
@@ -51,7 +51,9 @@ function createWindow() {
           "style-src 'self' 'unsafe-inline'; " +
           "connect-src 'self' wss: ws: https: " +
           "wss://*.onrender.com https://*.onrender.com " +
-          "wss://*.fly.dev https://*.fly.dev; " +
+          "wss://*.fly.dev https://*.fly.dev " +
+          // Supabase auth + Postgres REST/Realtime for the accounts system.
+          "https://*.supabase.co wss://*.supabase.co; " +
           "img-src 'self' file: data: blob:; " +
           "media-src 'self' file: data: blob:; " +
           "font-src 'self' file: data: blob:;"

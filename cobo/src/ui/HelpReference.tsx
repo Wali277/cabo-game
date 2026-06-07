@@ -6,7 +6,7 @@ import { useState, type ReactNode } from "react";
  * quick-reference: pick a compartment (Basics / Action cards / Snap / Scoring /
  * Evolved) and read just what you need. Close with the ✕ at the TOP-LEFT.
  *
- * Content is variant-agnostic (covers both Classic and Cabo Evolved) so it's
+ * Content is variant-agnostic (covers both Classic and Lumo Evolved) so it's
  * correct whether opened from the menu or mid-game. All score-impacting rules
  * live under "Scoring & total". Values mirror the engine (cobo/src/engine):
  * J=11, Q=12, K=13 (0 in Evolved), Joker=0, Dragon=20; snap bonus −5.
@@ -33,18 +33,18 @@ const SECTIONS: Section[] = [
     render: () => (
       <>
         <p>
-          Cabo is a memory game. When a round ends you score the cards still in
+          Lumo is a memory game. When a round ends you score the cards still in
           your hand — <strong>lowest total wins</strong>, so keep your hand small.
         </p>
         <ul className="help-ref-list">
           <li>
             You're dealt <strong>4 cards</strong> face-down (<strong>5</strong> in
-            Cabo Evolved). Peek any <strong>2</strong> at the start — then they
+            Lumo Evolved). Peek any <strong>2</strong> at the start — then they
             flip back.
           </li>
           <li>
             On your turn: <strong>draw</strong> the deck top, <strong>take</strong>{" "}
-            the discard top, or <strong>call CABO!</strong>
+            the discard top, or <strong>call LUMO!</strong>
           </li>
           <li>
             After drawing: <strong>swap</strong> it into a slot (the old card goes
@@ -52,7 +52,7 @@ const SECTIONS: Section[] = [
             discard pile must be swapped.
           </li>
           <li>
-            <strong>Calling CABO</strong> ends the round — everyone else takes one
+            <strong>Calling LUMO</strong> ends the round — everyone else takes one
             last turn, then all hands are revealed.
           </li>
         </ul>
@@ -80,7 +80,7 @@ const SECTIONS: Section[] = [
             </ul>
           </div>
           <div>
-            <div className="help-ref-subhead">Cabo Evolved 🐉</div>
+            <div className="help-ref-subhead">Lumo Evolved 🐉</div>
             <ul className="help-ref-list">
               <li><strong>7 · 8</strong> — peek your own OR spy an opponent</li>
               <li><strong>9 · 10</strong> — peek your own AND spy an opponent</li>
@@ -133,7 +133,7 @@ const SECTIONS: Section[] = [
           <li>
             <span className="help-ref-tag good">−</span>
             <span>
-              <strong>Cabo bonus.</strong> Call Cabo, <strong>win</strong> the
+              <strong>Lumo bonus.</strong> Call Lumo, <strong>win</strong> the
               round, <strong>and</strong> finish <strong>≤ 7</strong> → that round
               scores 0 <em>and</em> your hand value is subtracted from your total.{" "}
               <span className="help-ref-muted">All three are required.</span>
@@ -142,7 +142,7 @@ const SECTIONS: Section[] = [
           <li>
             <span className="help-ref-tag bad">+5</span>
             <span>
-              <strong>Cabo penalty.</strong> Call Cabo but don't win the round.
+              <strong>Lumo penalty.</strong> Call Lumo but don't win the round.
             </span>
           </li>
           <li>
@@ -163,7 +163,7 @@ const SECTIONS: Section[] = [
 
         <div className="help-ref-rule" role="separator" />
 
-        <div className="help-ref-subhead evolved">🐉 Cabo Evolved only</div>
+        <div className="help-ref-subhead evolved">🐉 Lumo Evolved only</div>
         <p className="help-ref-values">
           <span className="help-ref-muted">
             Value changes: K = 0 · Dragon = 20 (if still held at round end).
@@ -190,7 +190,7 @@ const SECTIONS: Section[] = [
   },
   {
     id: "evolved",
-    label: "Cabo Evolved",
+    label: "Lumo Evolved",
     icon: "🐉",
     render: () => (
       <>

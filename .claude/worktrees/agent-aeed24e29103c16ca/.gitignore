@@ -1,9 +1,0 @@
-node_modules/
-cobo/node_modules/
-server/node_modules/
-cobo/dist/
-dist-electron/
-build/icon.png
-.env
-*.local
-.DS_Store

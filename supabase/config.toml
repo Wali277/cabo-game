@@ -1,0 +1,79 @@
+# Supabase project configuration for Lumo.
+# Minimal config focused on the accounts/progression layer. Values mirror a
+# standard Supabase local stack; adjust ports only if they collide locally.
+#
+# Auth is configured for hybrid email/password with confirmation handled by the
+# trusted server, NOT by Supabase:
+#   * signups via email are enabled,
+#   * Supabase's OWN email confirmation is OFF (enable_confirmations = false
+#     below); the server issues + verifies 6-digit email codes instead,
+#   * the fallback email OTP length is 6 digits (only used if a Supabase-native
+#     template is overridden — our codes come from the server via Resend).
+
+project_id = "lumo"
+
+[api]
+enabled = true
+# Schemas exposed over the auto-generated REST/GraphQL API. `public` holds our
+# app objects; `graphql_public` is Supabase's default GraphQL schema.
+schemas = ["public", "graphql_public"]
+# Schemas searched when resolving unqualified names in exposed functions.
+extra_search_path = ["public", "extensions"]
+# Max rows a single REST request may return.
+max_rows = 1000
+
+[db]
+# Postgres major version for the local dev database.
+major_version = 15
+
+[studio]
+enabled = true
+
+[auth]
+# Base URL of the site, used to build links in auth emails and as the default
+# allowed redirect target.
+site_url = "http://localhost:5173"
+# Additional URLs permitted as auth redirect targets. We use SERVER-ISSUED
+# 6-digit CODES entered in-app (not magic links), so redirects matter only for
+# any Supabase-native flow; listed for completeness. The Electron desktop app
+# loads from file:// and enters codes in-app, so it needs no redirect target.
+additional_redirect_urls = [
+  "http://localhost:5173",                 # Vite dev (client)
+  "http://localhost:8787",                 # local game server origin
+  "https://cabo-game-r5xb.onrender.com",   # live deploy (update if the URL changes)
+]
+
+# Session token lifetimes.
+jwt_expiry = 3600                 # access token: 1 hour
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+
+# Allow new users to sign up at all. (Required by spec.)
+enable_signup = true
+
+[auth.email]
+# Email/password (and email-OTP) signups are enabled.
+enable_signup = true
+# IMPORTANT (hybrid auth): Supabase's OWN email confirmation is DISABLED on
+# purpose. We verify emails with our own server-issued 6-digit codes (see
+# server/src/auth). For that flow to work, an UNCONFIRMED user must still be able
+# to sign in so the server can detect `email_confirmed_at == null` and route them
+# to "verify your email" (then the server sets email_confirm=true via the admin
+# API once our code passes). If this were `true`, Supabase would reject the
+# unconfirmed sign-in and that branch would misreport as "invalid credentials".
+# CLOUD PARITY: the project's Auth ▸ Providers ▸ Email ▸ "Confirm email" toggle
+# must likewise be OFF — the server owns verification.
+enable_confirmations = false
+# Don't allow changing the login email without re-confirming via BOTH addresses.
+double_confirm_changes = true
+# NOTE (review H2): Supabase's DEFAULT confirmation email is a magic LINK, and
+# otp_length only governs {{ .Token }} length IF an email template is overridden
+# to emit the token. Our 6-digit verification + password-reset CODES are instead
+# issued by the trusted server via Resend (spec §4: 15-min expiry, 3 sends/15min,
+# 5 verify attempts then lockout — control Supabase-native OTP can't express).
+# These otp_* values are kept only as a sane fallback. Finalised in the auth module.
+otp_length = 6
+# How long an emailed OTP / confirmation code stays valid (1 hour).
+otp_expiry = 3600
+# Throttle: minimum seconds between transactional auth emails to one address.
+max_frequency = "1m"

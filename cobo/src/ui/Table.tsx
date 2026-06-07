@@ -80,10 +80,15 @@ export function Table() {
   const [moreOpen, setMoreOpen] = useState(false);
   const setAudioOpen = useStore((s) => s.setAudioOpen);
   const setThemeOpen = useStore((s) => s.setThemeOpen);
+  // Accounts layer (Phase 2): guests have no customize picker (ThemePicker
+  // renders null for them), so hide the mobile "Theme" overflow item too — it
+  // would otherwise open nothing.
+  const account = useStore((s) => s.account);
+  const devMode = useStore((s) => s.devMode);
   const setHelpOpen = useStore((s) => s.setHelpOpen);
   const setChatOpen = useStore((s) => s.setChatOpen);
 
-  // CABO letter-burst particle anchor — set when a "cabo_called" animation
+  // LUMO letter-burst particle anchor — set when a "cabo_called" animation
   // event lands. Cleared 1.2s later so the burst auto-unmounts.
   const [caboBurst, setCaboBurst] = useState<{ x: number; y: number; key: number } | null>(null);
 
@@ -250,7 +255,7 @@ export function Table() {
     return () => clearTimeout(t);
   }, [transientRevealKey, game.phase]);
 
-  // Spawn the CABO letter-burst particle when a "cabo_called" animation
+  // Spawn the LUMO letter-burst particle when a "cabo_called" animation
   // event arrives. Anchor to the centre of the caller's seat by querying
   // the `.seat-{N}` DOM element — a small concession to running outside
   // React, but lighter than forwarding refs through PlayerSeat for a
@@ -293,7 +298,7 @@ export function Table() {
     let msg: string | null = null;
     switch (latest.kind) {
       case "cabo_called":
-        msg = `${nameById(game, latest.payload.playerId as string)} called CABO — final round!`;
+        msg = `${nameById(game, latest.payload.playerId as string)} called LUMO — final round!`;
         Audio.playSfx("cabo");
         break;
       case "deal":          Audio.playSfx("card_deal"); break;
@@ -464,12 +469,14 @@ export function Table() {
                     aria-hidden="true"
                   />
                   <div className="top-more-menu" role="menu">
-                    <button
-                      role="menuitem"
-                      onClick={() => { Audio.playSfx("click"); setMoreOpen(false); setThemeOpen(true); }}
-                    >
-                      🎨 Theme
-                    </button>
+                    {account && devMode && (
+                      <button
+                        role="menuitem"
+                        onClick={() => { Audio.playSfx("click"); setMoreOpen(false); setThemeOpen(true); }}
+                      >
+                        🎨 Theme
+                      </button>
+                    )}
                     <button
                       role="menuitem"
                       onClick={() => { Audio.playSfx("click"); setMoreOpen(false); setAudioOpen(true); }}

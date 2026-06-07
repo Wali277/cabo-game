@@ -46,10 +46,10 @@ export function Prompt() {
   } else {
     switch (game.phase) {
       case "turn_start":
-        text = "Your turn. Draw a card, or call CABO if you think you're winning.";
+        text = "Your turn. Draw a card, or call LUMO if you think you're winning.";
         extra = (
           <button className="btn danger" onClick={callCaboAction}>
-            Call CABO!
+            Call LUMO!
           </button>
         );
         break;

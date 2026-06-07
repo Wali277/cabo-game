@@ -307,7 +307,7 @@ body.mobile-mode .hand-slot.spy-glow::after {
 /* Lighter card shadow on mobile — one small shadow instead of the 18px-blur +
    inset stack. With up to ~19 cards on a 4-player board the blurred shadow
    repaint was a real paint cost; the look barely changes. (Skins with their
-   own !important shadow, e.g. minimalist, keep theirs via higher specificity.) */
+   own !important shadow, e.g. ivory, keep theirs via higher specificity.) */
 body.mobile-mode .card-face,
 body.mobile-mode .card-back {
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.32) !important;
@@ -338,7 +338,10 @@ body.mobile-mode .action-log {
   width: 46px;
   height: 46px;
   border-radius: 50%;
-  display: flex;
+  /* Desktop hides this top toggle — sound now lives in the Settings button
+     (bottom-right). Phones keep it (they have no Settings FAB) via the
+     mobile-mode override below. */
+  display: none;
   align-items: center;
   justify-content: center;
   font-size: 20px;
@@ -358,6 +361,28 @@ body.mobile-mode .action-log {
 .menu-sound-toggle.is-muted {
   border-color: rgba(255, 120, 120, 0.6);
   background: rgba(46, 18, 26, 0.9);
+}
+/* Phones keep the quick top-right mute toggle (no Settings FAB on mobile). */
+body.mobile-mode .menu .menu-sound-toggle {
+  display: flex;
+}
+
+/* Lobby: pre-room display name. Signed-in users see their account username,
+   guests see the literal "Guest player" label — both rendered as a bolded
+   prominent label (the "Playing as" prefix is gone, so the name carries the
+   line on its own). */
+.lobby-playing-as {
+  font-size: 20px;
+  text-align: center;
+  margin: 6px 0 10px;
+  letter-spacing: 0.2px;
+}
+.lobby-playing-as strong {
+  /* Dark navy ink — matches the .menu-card body text colour so the bolded
+     name reads cleanly against the cream card background (the previous #fff
+     was invisible on cream). */
+  color: oklch(0.18 0.05 280);
+  font-weight: 800;
 }
 
 /* `.menu` scope bumps specificity over `.menu > *:not(.menu-wallpaper)`
@@ -558,6 +583,72 @@ body.standalone .lobby.menu-refresh {
 }
 
 
+/* 8. Lagoon — Lumo live wallpaper. Drifting teal light pools + a slow caustic
+   sheen over a deep teal radial base. Ported verbatim from the Lumo source;
+   `position:relative; overflow:hidden;` dropped (.table-bg is already fixed). */
+.table-bg[data-theme="lagoon"] {
+  background-color: #04181c;
+  background-image:
+    radial-gradient(46% 40% at 30% 24%, rgba(45,212,191,0.20), transparent 70%),
+    radial-gradient(54% 46% at 80% 82%, rgba(34,211,238,0.18), transparent 70%),
+    radial-gradient(135% 120% at 50% 8%, #0b3a40 0%, #073034 46%, #04181c 100%);
+}
+.table-bg[data-theme="lagoon"]::before {        /* drifting light pools */
+  content:""; position:absolute; inset:-30%; pointer-events:none; mix-blend-mode:screen;
+  background:
+    radial-gradient(38% 32% at 32% 30%, rgba(120,235,255,0.18), transparent 70%),
+    radial-gradient(42% 36% at 74% 70%, rgba(60,225,205,0.15), transparent 72%);
+  animation:lagoon-drift 20s ease-in-out infinite alternate;
+}
+.table-bg[data-theme="lagoon"]::after {         /* slow caustic sheen */
+  content:""; position:absolute; inset:0; pointer-events:none; mix-blend-mode:screen;
+  background:linear-gradient(115deg, transparent 32%, rgba(175,245,255,0.10) 50%, transparent 68%);
+  background-size:240% 240%;
+  animation:lagoon-sheen 17s linear infinite;
+}
+@keyframes lagoon-drift{0%{transform:translate(-3%,-2%) scale(1)}100%{transform:translate(4%,3%) scale(1.1)}}
+@keyframes lagoon-sheen{0%{background-position:0% 0%}100%{background-position:100% 100%}}
+
+/* 9. Aurora Indigo — Lumo live wallpaper. Blurred aurora curtains + twinkling
+   stars over an indigo radial base. Ported verbatim from the Lumo source
+   (aurora-drift/aurora-twinkle renamed to auroraindigo-* to avoid collisions). */
+.table-bg[data-theme="auroraindigo"] {
+  background-color: #070a1f;
+  background-image:
+    radial-gradient(85% 55% at 50% 0%, rgba(99,102,241,0.22), transparent 72%),
+    radial-gradient(135% 120% at 50% 0%, #141c46 0%, #0c1030 52%, #070a1f 100%);
+}
+.table-bg[data-theme="auroraindigo"]::before {  /* aurora curtains */
+  content:""; position:absolute; inset:-25% -35%; pointer-events:none; mix-blend-mode:screen;
+  background:
+    linear-gradient(102deg, transparent 24%, rgba(52,211,153,0.20) 42%, transparent 60%),
+    linear-gradient(78deg, transparent 32%, rgba(129,140,248,0.22) 52%, transparent 70%);
+  background-size:220% 100%, 220% 100%;
+  filter:blur(8px);
+  animation:auroraindigo-drift 18s ease-in-out infinite alternate;
+}
+.table-bg[data-theme="auroraindigo"]::after {   /* twinkling stars */
+  content:""; position:absolute; inset:0; pointer-events:none;
+  background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20width%3D'1600'%20height%3D'900'%20viewBox%3D'0%200%201600%20900'%3E%3Ccircle%20cx%3D'1007'%20cy%3D'68'%20r%3D'1.36'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.39'%2F%3E%3Ccircle%20cx%3D'801'%20cy%3D'461'%20r%3D'1.68'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.42'%2F%3E%3Ccircle%20cx%3D'43'%20cy%3D'396'%20r%3D'0.80'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.16'%2F%3E%3Ccircle%20cx%3D'568'%20cy%3D'154'%20r%3D'1.47'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.36'%2F%3E%3Ccircle%20cx%3D'1275'%20cy%3D'191'%20r%3D'1.73'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.44'%2F%3E%3Ccircle%20cx%3D'1273'%20cy%3D'73'%20r%3D'1.48'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.56'%2F%3E%3Ccircle%20cx%3D'1248'%20cy%3D'446'%20r%3D'1.69'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.13'%2F%3E%3Ccircle%20cx%3D'1285'%20cy%3D'700'%20r%3D'0.96'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.14'%2F%3E%3Ccircle%20cx%3D'574'%20cy%3D'100'%20r%3D'0.62'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.28'%2F%3E%3Ccircle%20cx%3D'952'%20cy%3D'144'%20r%3D'1.11'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.40'%2F%3E%3Ccircle%20cx%3D'1065'%20cy%3D'365'%20r%3D'0.77'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.25'%2F%3E%3Ccircle%20cx%3D'321'%20cy%3D'629'%20r%3D'1.14'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.50'%2F%3E%3Ccircle%20cx%3D'457'%20cy%3D'227'%20r%3D'1.99'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.14'%2F%3E%3Ccircle%20cx%3D'1032'%20cy%3D'323'%20r%3D'1.06'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.38'%2F%3E%3Ccircle%20cx%3D'1421'%20cy%3D'654'%20r%3D'1.30'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.53'%2F%3E%3Ccircle%20cx%3D'341'%20cy%3D'27'%20r%3D'0.88'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.14'%2F%3E%3Ccircle%20cx%3D'1087'%20cy%3D'399'%20r%3D'0.85'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.60'%2F%3E%3Ccircle%20cx%3D'453'%20cy%3D'164'%20r%3D'2.15'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.29'%2F%3E%3Ccircle%20cx%3D'1130'%20cy%3D'397'%20r%3D'1.25'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.42'%2F%3E%3Ccircle%20cx%3D'5'%20cy%3D'407'%20r%3D'1.12'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.27'%2F%3E%3Ccircle%20cx%3D'1560'%20cy%3D'146'%20r%3D'2.07'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.30'%2F%3E%3Ccircle%20cx%3D'161'%20cy%3D'34'%20r%3D'2.14'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.14'%2F%3E%3Ccircle%20cx%3D'622'%20cy%3D'335'%20r%3D'1.73'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.30'%2F%3E%3Ccircle%20cx%3D'1048'%20cy%3D'627'%20r%3D'0.82'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.51'%2F%3E%3Ccircle%20cx%3D'1124'%20cy%3D'540'%20r%3D'0.60'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.20'%2F%3E%3Ccircle%20cx%3D'144'%20cy%3D'313'%20r%3D'0.89'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.51'%2F%3E%3Ccircle%20cx%3D'510'%20cy%3D'43'%20r%3D'1.29'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.48'%2F%3E%3Ccircle%20cx%3D'256'%20cy%3D'539'%20r%3D'0.75'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.23'%2F%3E%3Ccircle%20cx%3D'1091'%20cy%3D'624'%20r%3D'1.03'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.15'%2F%3E%3Ccircle%20cx%3D'234'%20cy%3D'179'%20r%3D'2.04'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.48'%2F%3E%3Ccircle%20cx%3D'1557'%20cy%3D'117'%20r%3D'0.62'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.54'%2F%3E%3Ccircle%20cx%3D'473'%20cy%3D'500'%20r%3D'2.16'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.23'%2F%3E%3Ccircle%20cx%3D'508'%20cy%3D'341'%20r%3D'2.13'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.14'%2F%3E%3Ccircle%20cx%3D'874'%20cy%3D'200'%20r%3D'0.94'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.43'%2F%3E%3Ccircle%20cx%3D'1128'%20cy%3D'287'%20r%3D'2.07'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.20'%2F%3E%3Ccircle%20cx%3D'1112'%20cy%3D'242'%20r%3D'1.14'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.21'%2F%3E%3Ccircle%20cx%3D'1568'%20cy%3D'674'%20r%3D'1.34'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.46'%2F%3E%3Ccircle%20cx%3D'1002'%20cy%3D'320'%20r%3D'1.72'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.54'%2F%3E%3Ccircle%20cx%3D'286'%20cy%3D'381'%20r%3D'2.06'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.42'%2F%3E%3Ccircle%20cx%3D'1077'%20cy%3D'464'%20r%3D'0.85'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.26'%2F%3E%3Ccircle%20cx%3D'812'%20cy%3D'452'%20r%3D'0.90'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.15'%2F%3E%3Ccircle%20cx%3D'444'%20cy%3D'222'%20r%3D'1.14'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.43'%2F%3E%3Ccircle%20cx%3D'1365'%20cy%3D'122'%20r%3D'1.45'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.43'%2F%3E%3Ccircle%20cx%3D'10'%20cy%3D'694'%20r%3D'2.14'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.29'%2F%3E%3Ccircle%20cx%3D'193'%20cy%3D'473'%20r%3D'1.62'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.19'%2F%3E%3Ccircle%20cx%3D'1297'%20cy%3D'380'%20r%3D'2.04'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.60'%2F%3E%3Ccircle%20cx%3D'157'%20cy%3D'218'%20r%3D'1.48'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.43'%2F%3E%3Ccircle%20cx%3D'287'%20cy%3D'637'%20r%3D'0.81'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.36'%2F%3E%3Ccircle%20cx%3D'1284'%20cy%3D'431'%20r%3D'1.64'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.34'%2F%3E%3Ccircle%20cx%3D'1022'%20cy%3D'521'%20r%3D'1.86'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.21'%2F%3E%3Ccircle%20cx%3D'329'%20cy%3D'16'%20r%3D'2.11'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.46'%2F%3E%3Ccircle%20cx%3D'1305'%20cy%3D'390'%20r%3D'2.07'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.19'%2F%3E%3Ccircle%20cx%3D'567'%20cy%3D'396'%20r%3D'0.74'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.29'%2F%3E%3Ccircle%20cx%3D'793'%20cy%3D'605'%20r%3D'0.75'%20fill%3D'rgb(255%2C255%2C255)'%20opacity%3D'0.16'%2F%3E%3C%2Fsvg%3E");
+  background-size:cover;
+  animation:auroraindigo-twinkle 5.5s ease-in-out infinite;
+}
+@keyframes auroraindigo-drift{0%{background-position:0% 0%, 100% 0%; transform:translateY(-2.5%)}100%{background-position:45% 0%, 55% 0%; transform:translateY(2.5%)}}
+@keyframes auroraindigo-twinkle{0%,100%{opacity:.45}50%{opacity:1}}
+
+/* Mobile perf: keep the static Lumo composition but stop the per-frame
+   animations on phones (matches the body.mobile-mode convention). Also soften
+   Aurora's curtain blur 8px → 4px, mirroring the existing mobile blur cuts. */
+body.mobile-mode .table-bg[data-theme="lagoon"]::before,
+body.mobile-mode .table-bg[data-theme="lagoon"]::after,
+body.mobile-mode .table-bg[data-theme="auroraindigo"]::before,
+body.mobile-mode .table-bg[data-theme="auroraindigo"]::after {
+  animation: none;
+}
+body.mobile-mode .table-bg[data-theme="auroraindigo"]::before {
+  filter: blur(4px);
+}
+
 
 /* Reduced-motion: only Cosmic still drifts via bgDrift. The two wallpaper
    themes (Aquarium, Northern Lights) honour reduced-motion at the React
@@ -565,6 +656,13 @@ body.standalone .lobby.menu-refresh {
    belt-and-braces fallback. */
 @media (prefers-reduced-motion: reduce) {
   .table-bg[data-theme="cosmic"] {
+    animation: none;
+  }
+  /* Lumo wallpapers: keep the static composition, drop the motion. */
+  .table-bg[data-theme="lagoon"]::before,
+  .table-bg[data-theme="lagoon"]::after,
+  .table-bg[data-theme="auroraindigo"]::before,
+  .table-bg[data-theme="auroraindigo"]::after {
     animation: none;
   }
 }
@@ -580,18 +678,19 @@ body.standalone .lobby.menu-refresh {
    ──────────────────────────────────────────────────────────────────────── */
 .theme-picker {
   position: fixed;
-  bottom: 174px;
+  /* Dev-only override FAB, right-edge column (bottom → up):
+       gear (bottom:18) → chat (bottom:82) → THIS (bottom:146).
+     The .theme-popover anchors off this wrapper (position:absolute), so it
+     rides up with the FAB automatically. */
+  bottom: 146px;
   right: 18px;
   z-index: 250;
-  /* Smoothly slide between MP and SP slots if the user transitions in-game. */
   transition: bottom 220ms ease;
 }
-/* Single-player has no chat FAB (ChatPanel returns null), so the slot at
-   bottom: 96px is empty. We drop the theme FAB into that slot to avoid the
-   78px gap above the audio button. Mirror predicate lives in
-   ThemePicker.tsx (`chatHidden`). */
 .theme-picker.sp {
-  bottom: 96px;
+  /* Single-player: ChatPanel renders null, so there's no chat FAB — drop into
+     the slot directly above the gear (bottom:82). */
+  bottom: 82px;
 }
 .theme-fab {
   width: 52px;
@@ -742,6 +841,23 @@ body.standalone .lobby.menu-refresh {
     radial-gradient(ellipse 70% 60% at 20% 25%, oklch(0.65 0.18 195 / 0.85) 0%, transparent 65%),
     radial-gradient(ellipse 75% 65% at 80% 80%, oklch(0.68 0.20 25 / 0.85) 0%, transparent 65%),
     linear-gradient(180deg, oklch(0.18 0.04 240) 0%, oklch(0.15 0.04 280) 100%);
+}
+/* Lagoon — static teal light-pool gradient (the live ::before/::after motion
+   is dropped in the tiny swatch). Reuses the wallpaper's base background-image. */
+.theme-swatch-preview[data-theme="lagoon"] {
+  background-color: #04181c;
+  background-image:
+    radial-gradient(46% 40% at 30% 24%, rgba(45,212,191,0.20), transparent 70%),
+    radial-gradient(54% 46% at 80% 82%, rgba(34,211,238,0.18), transparent 70%),
+    radial-gradient(135% 120% at 50% 8%, #0b3a40 0%, #073034 46%, #04181c 100%);
+}
+/* Aurora Indigo — static indigo radial base (curtains + stars omitted in the
+   swatch). Reuses the wallpaper's base background-image. */
+.theme-swatch-preview[data-theme="auroraindigo"] {
+  background-color: #070a1f;
+  background-image:
+    radial-gradient(85% 55% at 50% 0%, rgba(99,102,241,0.22), transparent 72%),
+    radial-gradient(135% 120% at 50% 0%, #141c46 0%, #0c1030 52%, #070a1f 100%);
 }
 .theme-swatch-label {
   flex: 1 1 auto;
@@ -1648,6 +1764,24 @@ body.standalone .lobby.menu-refresh {
 .badge.host { background: #ffd86b; color: #1c1d2b; }
 .badge.off { background: #1c1d2b; color: #ff5b6e; }
 .badge.ready { background: #67e0a3; color: #0d1638; }
+/* Host-only "kick" button at the end of a player row. Small + red; the `.mname`
+   flex:1 already pushes it to the row's end. Armed (2nd-click) state is solid. */
+.member-kick {
+  flex: none;
+  border: 1px solid #e0a3aa;
+  background: #fdecee;
+  color: #d6293e;
+  border-radius: 8px;
+  padding: 3px 9px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.3;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.1s;
+}
+.member-kick:hover { background: #f9d9dd; border-color: #d6293e; }
+.member-kick:active { transform: scale(0.94); }
+.member-kick.armed { background: #d6293e; color: #fff; border-color: #d6293e; }
 .divider {
   display: flex;
   align-items: center;
@@ -1684,6 +1818,226 @@ body.standalone .lobby.menu-refresh {
   border-color: #6e4ec9;
   transform: none;
   box-shadow: none;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ACCOUNTS LAYER (Phase 1 — auth screens)
+   Login / Signup / Forgot-password share the menu's `.menu-card` + `.btn` +
+   `.input` language; these `auth-` classes add only what the menu doesn't
+   already provide (form layout, inline field errors, the segmented code box,
+   text links, the support line). Scoped under `.auth-screen` where it matters
+   so nothing bleeds into the menu/lobby.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* Auth screens reuse `.menu` for the wallpaper + centered chrome, but `.menu`
+   is `overflow:hidden; justify-content:center` so a tall card (signup, reset,
+   keyboard open) gets clipped with no way to reach the submit button. Scope an
+   override to `.auth-screen` ONLY (never touch `.menu`/`.lobby`): allow vertical
+   scroll and top-align so tall content flows down instead of being cropped. On
+   tall desktop viewports the short cards still read as centered enough and
+   simply don't trigger a scrollbar. */
+.auth-screen {
+  overflow-y: auto;
+  justify-content: flex-start;
+  padding-top: clamp(24px, 6vh, 56px);
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 32px);
+}
+
+/* The LUMO title's menu size (up to 160px) eats the viewport on auth screens
+   where a full form must also fit; shrink it (and tighten the subtitle gap) so
+   the card is visible without scrolling on common phones. Scoped to auth. */
+.auth-screen .title { font-size: clamp(40px, 9vw, 92px); }
+.auth-screen .subtitle { margin-bottom: 4px; }
+
+/* Visually-hidden utility for screen-reader-only live regions (e.g. the
+   remaining-attempts announcement). Kept here as it's only used by auth. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* The card is a touch wider than the menu's so two-column-feeling forms still
+   breathe; on phones it collapses with the existing menu media query. */
+.auth-card { width: min(92vw, 400px); }
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Sign-up bonus callout — a horizontal pill above the signup form advertising
+   the free Emerald wallpaper. Emerald/teal-tinted so it stands out gently
+   without shouting; wraps gracefully on the narrow card. */
+.signup-bonus {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  border: 1.5px solid oklch(0.62 0.13 162 / 0.5);
+  background:
+    linear-gradient(135deg, oklch(0.97 0.05 165 / 0.85), oklch(0.95 0.04 195 / 0.7));
+  box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.6);
+}
+.signup-bonus-swatch.theme-swatch-preview {
+  flex: 0 0 auto;
+  width: 48px;
+  height: 32px;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px oklch(0.30 0.08 162 / 0.4);
+}
+.signup-bonus-text {
+  flex: 1 1 140px;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: left;
+  color: oklch(0.30 0.06 165);
+}
+.signup-bonus-text strong { font-weight: 900; }
+
+/* A labelled field: tight gap between the label and its input. */
+.auth-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+
+/* The menu's `.input` is monospace-friendly but inherits font from the card;
+   ensure auth inputs use the UI font + full width + a comfortable tap height. */
+.auth-screen .input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 48px;
+  font-family: inherit;
+}
+.auth-screen .input::placeholder { color: #a39db1; font-weight: 500; }
+.auth-screen .input:focus-visible {
+  outline: none;
+  border-color: #6e4ec9;
+  box-shadow: 0 0 0 3px rgba(110, 78, 201, 0.25);
+}
+
+/* Inline per-field error (red, small, left-aligned beneath the input). */
+.auth-field-error {
+  color: #a01f30;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+/* Muted helper / intro copy inside the card. */
+.auth-muted {
+  color: oklch(0.42 0.03 280);
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.4;
+  margin: 0;
+  text-align: center;
+}
+.auth-verify-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: center;
+}
+
+/* Green-tinted positive notice (mirrors `.error` but friendly). */
+.auth-notice {
+  background: #d8f5e6;
+  color: #176844;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 13.5px;
+  text-align: center;
+  margin: 0;
+}
+
+/* Text links (forgot password, resend code, switch flow). Underlined,
+   keyboard-focusable, ≥44px hit area on phones. */
+.auth-link {
+  background: transparent;
+  border: none;
+  color: #6e4ec9;
+  font-weight: 700;
+  font-size: 14px;
+  padding: 6px 4px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  align-self: center;
+}
+.auth-link:hover:not(:disabled) { color: #8a63ff; }
+.auth-link:disabled { color: #b1aabf; cursor: not-allowed; text-decoration: none; }
+.auth-link:focus-visible {
+  outline: 2px solid #6e4ec9;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Support fallback line — small, muted, centered. */
+.auth-support {
+  font-size: 12px;
+  color: oklch(0.46 0.02 280);
+  text-align: center;
+  margin: 2px 0 0;
+  line-height: 1.4;
+}
+
+/* ── Segmented 6-digit code input ───────────────────────────────────────── */
+.auth-code {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+.auth-code-box {
+  width: 44px;
+  height: 54px;
+  border: 3px solid #1c1d2b;
+  border-radius: 12px;
+  background: #fff;
+  text-align: center;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 24px;
+  font-weight: 700;
+  color: #1c1d2b;
+  caret-color: #6e4ec9;
+  transition: border-color 0.14s, box-shadow 0.14s, transform 0.14s;
+}
+.auth-code-box:focus-visible {
+  outline: none;
+  border-color: #6e4ec9;
+  box-shadow: 0 0 0 3px rgba(110, 78, 201, 0.25);
+  transform: translateY(-1px);
+}
+.auth-code-box:disabled { opacity: 0.55; }
+
+/* ── Phone tuning ───────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .auth-card { width: 100%; max-width: 400px; }
+  /* Six boxes must fit a 320px phone: shrink + flex so they never overflow. */
+  .auth-code { gap: 6px; }
+  .auth-code-box {
+    flex: 1;
+    min-width: 0;
+    width: auto;
+    height: 52px;
+    font-size: 22px;
+  }
+  .auth-link { min-height: 44px; display: inline-flex; align-items: center; }
 }
 
 /* ========== Tutorial ========== */
@@ -3394,8 +3748,11 @@ body.mobile-mode .round-start-label {
 /* ========== MP Chat (bottom-right floating button + expanded panel) ========== */
 .chat-toggle {
   position: fixed;
+  /* Sits directly ABOVE the Settings gear in the right-edge column
+     (gear at right:18/bottom:18, 52px tall → 12px gap puts chat at bottom:82).
+     The Donate pill takes the old left-of-gear slot on the bottom row. */
   right: 18px;
-  bottom: 96px; /* clearly above the AudioControls button (18px + 52px fab + 26px gap) */
+  bottom: 82px;
   width: 52px;
   height: 52px;
   border-radius: 50%;
@@ -3439,9 +3796,11 @@ body.mobile-mode .round-start-label {
 .chat-panel {
   position: fixed;
   right: 18px;
-  bottom: 160px; /* sits above the toggle button (96px + 52px + 12px gap) */
+  bottom: 146px; /* floats above the chat toggle (now at bottom:82, 52px tall) */
   width: 320px;
-  height: 380px;
+  /* Cap height on short desktop windows so the panel shrinks instead of clipping
+     off the top of the viewport (it now opens from the higher bottom:146). */
+  height: min(380px, calc(100vh - 170px));
   background: rgba(13, 22, 56, 0.97);
   color: #f4ebff;
   border: 2px solid #a87bff;
@@ -3867,7 +4226,9 @@ body.mobile-mode .round-start-label {
   position: fixed;
   bottom: 18px;
   right: 18px;
-  z-index: 260; /* above chat-toggle(240) and chat-panel(245) */
+  /* 260 sits below the chat toggle (280) + chat panel (285); the FAB mutex
+     guarantees audio and chat are never open at once, so they never overlap. */
+  z-index: 260;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -3876,27 +4237,17 @@ body.mobile-mode .round-start-label {
 }
 .audio-controls > * { pointer-events: auto; }
 
-.audio-fab {
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  border: 3px solid #1c1d2b;
-  background: linear-gradient(135deg, #a87bff, #6e4ec9);
-  color: #fff;
-  font-size: 24px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow:
-    0 8px 20px rgba(0,0,0,0.4),
-    inset 0 -3px 0 rgba(0,0,0,0.2),
-    inset 0 2px 0 rgba(255,255,255,0.2);
-  cursor: pointer;
-  user-select: none;
-}
-.audio-fab:hover { box-shadow: 0 10px 26px rgba(0,0,0,0.5), inset 0 -3px 0 rgba(0,0,0,0.2), inset 0 2px 0 rgba(255,255,255,0.25); }
+/* (Removed dead .audio-fab rules — the audio FAB button no longer exists;
+   AudioControls renders only its panel, opened from the Settings gear / ⋯ menu.) */
 
 .audio-panel {
+  /* The audio FAB was removed (opened from the Settings popover / ⋯ menu now),
+     so anchor the panel just above the bottom-right FAB row instead of stacking
+     on a button. Desktop only — mobile re-pins it under the top bar (below). */
+  position: absolute;
+  bottom: 64px;
+  right: 0;
+  z-index: 270; /* above the gear; mutex keeps it from ever clashing with chat */
   background: rgba(13,22,56,0.95);
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
@@ -4424,6 +4775,11 @@ body:not(.mobile-mode) .card-wrap.layout-glide.hl {
 /* ── Busted overlay ─────────────────────────────────────────────────── */
 .busted-modal .modal-burst { font-size: 72px; }
 .busted-modal h2 { color: #ff5b6e; }
+
+/* ── "Removed from the room" (host kick) — DISTINCT from the red bust modal:
+   an amber heading + door icon so a removed player is never told they busted. */
+.kicked-modal h2 { color: #e08326; }
+.kicked-modal .modal-burst { font-size: 60px; animation: none; }
 
 /* ── Game-Lost overlay (loser sees this when the game ends) ─────────── */
 .game-lost-modal .modal-subtitle { display: none; }
@@ -5149,9 +5505,7 @@ body.mobile-mode .scoreboard .sb-table {
    phones we hide those FABs and surface the same panels from the top-bar
    overflow menu instead, so nothing covers the play area. Panels are pinned
    just beneath the top bar. */
-body.mobile-mode .audio-fab,
 body.mobile-mode .theme-fab,
-body.mobile-mode .help-fab,
 body.mobile-mode .chat-toggle {
   display: none !important;
 }
@@ -5439,7 +5793,7 @@ body.mobile-mode .card-wrap.hl::after {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
-  /* Cap height so the McLaren tiles at the bottom remain reachable on short
+  /* Cap height so the skin tiles at the bottom remain reachable on short
      landscape viewports — internal scroll, picker stays anchored. */
   max-height: min(420px, calc(100vh - 200px));
   overflow-y: auto;
@@ -5535,32 +5889,30 @@ body.mobile-mode .card-wrap.hl::after {
     linear-gradient(135deg, rgba(0, 229, 255, 0.05) 0%, rgba(255, 45, 202, 0.05) 100%),
     rgba(10, 10, 20, 0.4);
 }
-.skin-tile-handdrawn {
+/* Eclipse — graphite hint. */
+.skin-tile-eclipse {
   background:
-    radial-gradient(circle at 30% 30%, rgba(243, 234, 212, 0.08) 0%, transparent 60%),
-    rgba(255, 255, 255, 0.025);
+    radial-gradient(circle at 50% 35%, rgba(231, 224, 209, 0.08) 0%, transparent 60%),
+    rgba(12, 13, 16, 0.45);
 }
-.skin-tile-minimalist {
+/* Ivory — warm-bone hint (Ivory is the light card now). */
+.skin-tile-ivory {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 100%),
-    rgba(255, 255, 255, 0.02);
+    linear-gradient(180deg, rgba(231, 224, 209, 0.10) 0%, transparent 100%),
+    rgba(221, 213, 194, 0.06);
 }
-.skin-tile-mclaren_papaya {
+/* Vesica — plum hint. */
+.skin-tile-vesica {
   background:
-    radial-gradient(circle at 50% 50%, rgba(255, 128, 0, 0.18) 0%, transparent 70%),
-    rgba(255, 128, 0, 0.05);
+    radial-gradient(circle at 50% 35%, rgba(205, 181, 131, 0.10) 0%, transparent 60%),
+    rgba(34, 19, 42, 0.35);
 }
-.skin-tile-mclaren_senna {
+/* Orbit — petrol hint. */
+.skin-tile-orbit {
   background:
-    linear-gradient(180deg,
-      rgba(255, 221, 0, 0.10) 0%,
-      rgba(255, 221, 0, 0.10) 60%,
-      rgba(0, 151, 57, 0.18) 60%,
-      rgba(0, 151, 57, 0.18) 78%,
-      rgba(255, 221, 0, 0.10) 78%,
-      rgba(255, 221, 0, 0.10) 100%);
+    radial-gradient(circle at 50% 35%, rgba(185, 194, 212, 0.10) 0%, transparent 60%),
+    rgba(10, 38, 43, 0.4);
 }
-
 /* ── Per-skin in-game glow (the live card on the table) ────────────────
    Neon's signature outer glow lives here so it tracks the card wrapper
    even during layout transitions. */
@@ -5597,15 +5949,10 @@ body.mobile-mode .card-wrap.hl::after {
   filter: drop-shadow(0 0 6px rgba(212, 175, 55, 0.25));
 }
 
-/* McLaren papaya glow */
-.card-wrap.card-skin-mclaren_papaya {
-  filter: drop-shadow(0 0 6px rgba(255, 128, 0, 0.4));
-}
-
-/* Minimalist gets a subtle edge shadow so the white card stays visible
-   on lighter wallpapers (Aquarium / Northern). */
-.card-wrap.card-skin-minimalist .card-face,
-.card-wrap.card-skin-minimalist .card-back {
+/* Ivory (the light card now) gets a subtle edge shadow so the warm-bone card
+   stays visible on lighter wallpapers (Aquarium / Northern). */
+.card-wrap.card-skin-ivory .card-face,
+.card-wrap.card-skin-ivory .card-back {
   box-shadow:
     0 4px 12px rgba(0, 0, 0, 0.35),
     inset 0 0 0 1px rgba(0, 0, 0, 0.04) !important;
@@ -5628,65 +5975,6 @@ body.mobile-mode .customize-popover {
 body.mobile-mode .skin-grid {
   max-height: min(360px, calc(100vh - 220px));
 }
-
-/* ── v3.1 round-2 polish: McLaren Senna glow + premium card-tile feel ── */
-.card-wrap.card-skin-mclaren_senna {
-  filter: drop-shadow(0 0 6px rgba(0, 39, 118, 0.32));
-}
-
-/* Lift skin tiles a touch on hover so they feel tactile in the picker */
-.skin-tile-mclaren_papaya:hover,
-.skin-tile-mclaren_senna:hover {
-  box-shadow:
-    0 6px 18px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
-}
-
-/* Selected McLaren tiles ring in their livery color, not the generic gold */
-.skin-tile.selected.skin-tile-mclaren_papaya {
-  border-color: #ff8000;
-  box-shadow: 0 0 0 1px rgba(255, 128, 0, 0.35);
-}
-.skin-tile.selected.skin-tile-mclaren_papaya .skin-tile-label {
-  color: #ff8000;
-}
-.skin-tile.selected.skin-tile-mclaren_senna {
-  border-color: #009739;
-  box-shadow: 0 0 0 1px rgba(0, 151, 57, 0.35);
-}
-.skin-tile.selected.skin-tile-mclaren_senna .skin-tile-label {
-  color: #009739;
-}
-
-/* ── v3.1 round-3: McLaren Papaya face detail accents ──────────────────
-   The face was looking too plain after we moved the helmet to the back.
-   ::before draws a 1.5px inset black frame (papaya shows through the
-   4px gap to read as a "double border" — classic racing-livery trim).
-   ::after draws a short black bar at the top centre — a stylised
-   "racing band" without committing to a logo. */
-.card-skin-mclaren_papaya .card-face::before {
-  content: "";
-  position: absolute;
-  inset: 4px;
-  border: 1.5px solid rgba(0, 0, 0, 0.7);
-  border-radius: 7px;
-  pointer-events: none;
-  z-index: 0;
-}
-.card-skin-mclaren_papaya .card-face::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 50%;
-  width: 36%;
-  height: 5px;
-  background: #0a0a0a;
-  transform: translateX(-50%);
-  border-radius: 0 0 3px 3px;
-  z-index: 0;
-}
-
-/* (Inner frame on McLaren backs removed per user — helmet floats clean) */
 
 /* ──────────────────────────────────────────────────────────────────────────
    v3.1 — END-OF-ROUND CINEMATIC
@@ -5876,7 +6164,7 @@ body.mobile-mode .cinematic-winner-stamp {
 /* ──────────────────────────────────────────────────────────────────────────
    v3.1 — Discard pile glow consolidation
 
-   Per-skin glow filters on individual cards (Neon, McLaren) were
+   Per-skin glow filters on individual cards (Neon) were
    compounding across the 5-card visible pile, washing out the table.
    Inside the discard area we suppress the per-card glow entirely and
    add ONE soft uniform glow to the pile container.
@@ -7139,24 +7427,29 @@ body.mobile-mode .snap-btn {
   flex: 0 1 auto;
 }
 
-/* ========== In-game Help button ==========
-   Sits bottom-right, immediately to the LEFT of the audio FAB. Same
-   visual weight as the audio fab so they feel like a pair. */
-.help-fab {
+/* (Removed dead .help-fab rules — the Help action moved into the Settings gear
+   speed-dial; no element renders .help-fab. Its old slot, right:80/bottom:18, is
+   now occupied by the Ko-fi Donate pill.) */
+
+/* ========== Combined Settings FAB (bottom-right; desktop) ==========
+   Replaces the old separate Help + Sound FABs. The gear toggles a tiny
+   speed-dial: the Sound + Help buttons glide upward. Hidden on phones (the
+   in-game ⋯ top-bar menu and the menu's top sound toggle cover the same
+   actions there). The bottom-right slot the audio FAB used to occupy. */
+.settings-fab-wrap {
   position: fixed;
   bottom: 18px;
-  right: 80px;              /* audio fab is 52px wide at right:18px → leave a 10px gap */
+  right: 18px;
   z-index: 260;
+}
+.settings-fab {
   width: 52px;
   height: 52px;
   border-radius: 50%;
   border: 3px solid #1c1d2b;
   background: linear-gradient(135deg, #a87bff, #6e4ec9);
   color: #fff;
-  font-size: 28px;
-  font-weight: 800;
-  font-family: 'Fredoka', system-ui, sans-serif;
-  cursor: pointer;
+  font-size: 24px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -7164,21 +7457,104 @@ body.mobile-mode .snap-btn {
     0 8px 20px rgba(0,0,0,0.4),
     inset 0 -3px 0 rgba(0,0,0,0.2),
     inset 0 2px 0 rgba(255,255,255,0.2);
+  cursor: pointer;
+  user-select: none;
+}
+.settings-fab:hover {
+  box-shadow: 0 10px 26px rgba(0,0,0,0.5), inset 0 -3px 0 rgba(0,0,0,0.2), inset 0 2px 0 rgba(255,255,255,0.25);
+}
+.settings-fab.open {
+  border-color: #ffd86b;
+  box-shadow: 0 10px 26px rgba(0,0,0,0.5), 0 0 16px rgba(255,216,107,0.35), inset 0 2px 0 rgba(255,255,255,0.22);
+}
+.settings-fab-icon { line-height: 1; }
+
+/* The glide-up speed-dial, anchored just above the gear. Explicit z-index keeps
+   it above the gear; the chat toggle (z 280, to the LEFT) deliberately sits in
+   its own column so the two never visually fight. */
+.settings-pop {
+  position: absolute;
+  bottom: 64px;            /* 52 (fab) + 12 (gap) */
+  right: 0;
+  z-index: 270;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.settings-pop-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 3px solid #1c1d2b;
+  background: linear-gradient(135deg, #a87bff, #6e4ec9);
+  color: #fff;
+  font-size: 22px;
+  font-weight: 800;
+  font-family: 'Fredoka', system-ui, sans-serif;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow:
+    0 6px 16px rgba(0,0,0,0.4),
+    inset 0 -2px 0 rgba(0,0,0,0.2),
+    inset 0 2px 0 rgba(255,255,255,0.2);
   line-height: 1;
 }
-.help-fab:hover {
+.settings-pop-btn:hover {
+  box-shadow: 0 8px 20px rgba(0,0,0,0.5), inset 0 -2px 0 rgba(0,0,0,0.2), inset 0 2px 0 rgba(255,255,255,0.25);
+}
+/* Phones hide the whole settings cluster — actions live in the ⋯ menu. */
+body.mobile-mode .settings-fab-wrap { display: none !important; }
+
+/* ========== Ko-fi "Donate" pill (bottom-right, LEFT of the gear) ==========
+   Rendered globally in App.tsx right next to <SettingsFab/>, so it shows on
+   every screen exactly like the gear. Sits on the bottom row to the LEFT of the
+   gear (gear at right:18, 52px wide → its left edge is ~70px; we leave a small
+   gap and start at right:80px), vertically centred against the 52px gear.
+   It's a plain external link — NOT part of the FAB mutex. Hidden on phones to
+   mirror the gear (mobile placement handled later). */
+.kofi-donate {
+  position: fixed;
+  bottom: 18px;
+  right: 80px;              /* gear is 52px wide at right:18px → ~10px gap to its left edge */
+  height: 52px;            /* match the gear so they share a centre line */
+  box-sizing: border-box;
+  z-index: 260;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: #FF5E5B;     /* Ko-fi brand red */
+  color: #fff;
+  font-family: 'Fredoka', system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.2px;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
   box-shadow:
-    0 10px 26px rgba(0,0,0,0.5),
-    inset 0 -3px 0 rgba(0,0,0,0.2),
-    inset 0 2px 0 rgba(255,255,255,0.25);
+    0 8px 20px rgba(0,0,0,0.4),
+    inset 0 -3px 0 rgba(0,0,0,0.18),
+    inset 0 2px 0 rgba(255,255,255,0.22);
+  transition: transform 0.15s ease, box-shadow 0.18s ease, filter 0.15s ease;
 }
-body.mobile-mode .help-fab {
-  width: 44px;
-  height: 44px;
-  font-size: 22px;
-  bottom: 14px;
-  right: 66px;
+.kofi-donate:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.05);
+  box-shadow:
+    0 12px 26px rgba(0,0,0,0.5),
+    inset 0 -3px 0 rgba(0,0,0,0.18),
+    inset 0 2px 0 rgba(255,255,255,0.26);
 }
+.kofi-donate:active { transform: translateY(0) scale(0.97); }
+.kofi-donate .kofi-donate-icon { display: block; flex: 0 0 auto; }
+.kofi-donate .kofi-donate-label { line-height: 1; text-shadow: 0 1px 1px rgba(0, 0, 0, 0.28); }
+/* Phones hide the Donate pill, mirroring the gear (mobile handled later). */
+body.mobile-mode .kofi-donate { display: none !important; }
 
 /* ========== Top-level crash fallback (ErrorBoundary) ==========
    Replaces the blank white screen when React throws during render. */
@@ -7244,3 +7620,1441 @@ body.mobile-mode .error-boundary-card {
   width: calc(100vw - 24px);
   padding: 20px 18px;
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   ACCOUNTS LAYER (Phase 3 — profile menu shell)
+   Bottom-left account tab · large profile modal · bottom-right token counter.
+   Visual language matches the LUMO menu + HelpReference notepad: Fredoka
+   (inherited), the cream card / dark panel surfaces, the teal (hue ~195) +
+   coral (hue ~25-30) accent story, chunky depth lifts, spring motion.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ── Bottom-left account tab (menu only) ──────────────────────────────────
+   A pill anchored bottom-left, mirroring the FAB stack's safe-area handling.
+   Two faces share the base; .account-tab-guest is the sign-in invite,
+   .account-tab-profile is the avatar + username + Lv + 🪙 tokens + slim XP bar. */
+.account-tab {
+  position: fixed;
+  left: 18px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 18px);
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-height: 80px;
+  max-width: min(400px, calc(100vw - 36px));
+  padding: 14px 22px 14px 14px;
+  border: 2.5px solid oklch(0.30 0.08 270);
+  border-radius: 20px;
+  /* Defensive clip — keeps the row (name · Lv · 🪙 tokens) from spilling out of
+     the pill if the chip ever exceeds the available text-column on a narrow
+     phone. The tokensLabel cap above is the primary defense; this is the net. */
+  overflow: hidden;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  color: oklch(0.97 0.01 250);
+  /* Deep night-violet pill with a coral top-kiss + teal bottom-kiss so it
+     belongs to the same two-tone story as the .menu-card. */
+  background: linear-gradient(
+    180deg,
+    oklch(0.32 0.06 275) 0%,
+    oklch(0.24 0.06 272) 100%
+  );
+  box-shadow:
+    0 4px 0 oklch(0.16 0.05 272),
+    inset 0 2px 0 oklch(0.50 0.10 30 / 0.55),
+    inset 0 -2px 0 oklch(0.55 0.10 195 / 0.45),
+    0 14px 30px oklch(0.16 0.05 272 / 0.45);
+  transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 0.16s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.account-tab:hover {
+  box-shadow:
+    0 6px 0 oklch(0.16 0.05 272),
+    inset 0 2px 0 oklch(0.55 0.10 30 / 0.6),
+    inset 0 -2px 0 oklch(0.60 0.10 195 / 0.5),
+    0 18px 36px oklch(0.16 0.05 272 / 0.55);
+}
+.account-tab:active {
+  box-shadow:
+    0 1px 0 oklch(0.16 0.05 272),
+    inset 0 2px 0 oklch(0.50 0.10 30 / 0.55),
+    0 8px 16px oklch(0.16 0.05 272 / 0.4);
+}
+.account-tab-avatar {
+  flex: none;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  background: linear-gradient(135deg, oklch(0.74 0.14 195), oklch(0.62 0.18 25));
+  box-shadow: inset 0 2px 0 oklch(0.95 0.06 195 / 0.6),
+              inset 0 -2px 0 oklch(0.20 0.06 272 / 0.4);
+}
+.account-tab-text {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  flex: 1;
+}
+.account-tab-title {
+  font-weight: 800;
+  font-size: 17px;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.account-tab-sub {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: oklch(0.80 0.03 250);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.account-tab-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.account-tab-name {
+  font-weight: 800;
+  font-size: 20px;
+  line-height: 1.1;
+  min-width: 0;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.account-tab-level {
+  flex: none;
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0.4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  color: oklch(0.20 0.06 272);
+  background: linear-gradient(180deg, oklch(0.88 0.14 90), oklch(0.80 0.15 75));
+  box-shadow: inset 0 1px 0 oklch(0.97 0.06 90 / 0.8);
+}
+/* Token-balance chip — sits next to the level badge in the account pill so the
+   player can see their token count without opening the profile panel. Same
+   compact shape as the level chip but in the existing amber/gold token palette
+   so it reads as "tokens", not as another level badge. The whole pill remains
+   a single button → opening the profile panel (where tokens are spent). */
+.account-tab-tokens {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0.3px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  color: oklch(0.22 0.06 80);
+  background: linear-gradient(180deg, oklch(0.92 0.14 92), oklch(0.84 0.15 78));
+  box-shadow: inset 0 1px 0 oklch(0.97 0.06 95 / 0.85);
+}
+.account-tab-tokens-coin {
+  font-size: 17px;
+  line-height: 1;
+}
+.account-tab-xp {
+  display: block;
+  width: 100%;
+  height: 9px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: oklch(0.18 0.04 272);
+  box-shadow: inset 0 1px 2px oklch(0.10 0.03 272 / 0.8);
+}
+.account-tab-xp-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, oklch(0.74 0.14 195), oklch(0.70 0.18 30));
+  box-shadow: 0 0 8px oklch(0.74 0.14 195 / 0.5);
+  transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ── Profile modal (Account · Styles · Settings) ──────────────────────────
+   Structure + motion mirror .help-ref. Cream card, top-left close, left tab
+   rail (folds to a top row on phones), animated content pane. */
+.profile-overlay { z-index: 245; }
+.profile-panel {
+  background: #fff;
+  color: #0d1638;
+  border-radius: 24px;
+  border: 4px solid #a87bff;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  width: min(760px, calc(100vw - 24px));
+  max-height: calc(100vh - 28px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+.profile-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1.5px solid #c9b8f0;
+  background: #f1ecff;
+  color: #4a2f8f;
+  font-size: 18px;
+  font-weight: 900;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 140ms ease, transform 140ms ease;
+  z-index: 3;
+}
+.profile-close:hover { background: #e3d8ff; transform: scale(1.08); }
+.profile-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 20px 72px 16px 24px; /* room for the top-right close button */
+  border-bottom: 2px solid #efeaff;
+}
+.profile-head-avatar {
+  flex: none;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  background: linear-gradient(135deg, oklch(0.74 0.14 195), oklch(0.62 0.18 25));
+  box-shadow: inset 0 2px 0 oklch(0.95 0.06 195 / 0.6);
+}
+.profile-head-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.profile-head-name {
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.profile-head-sub {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: #8a7fb0;
+  font-weight: 800;
+}
+.profile-body { display: flex; min-height: 0; flex: 1; }
+.profile-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+  border-right: 2px solid #efeaff;
+  background: #faf8ff;
+  flex: 0 0 188px;
+  overflow-y: auto;
+}
+.profile-tab {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  text-align: left;
+  padding: 13px 15px;
+  min-height: 48px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: #3a3450;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 130ms ease, color 130ms ease;
+}
+.profile-tab:hover { background: #efe8ff; }
+.profile-tab.active { background: #6e4ec9; color: #fff; box-shadow: 0 3px 0 #1a1a4a; }
+.profile-tab-icon { font-size: 20px; }
+.profile-content-vp {
+  flex: 1;
+  min-width: 0;
+  /* Cap so a tall tab can't push the modal past the viewport; the JS clamps the
+     animated height to this (read via getComputedStyle), and scrolls beyond it.
+     Tuned to leave room for the panel margin (28px) + header (~75px). */
+  max-height: calc(100dvh - 116px);
+  /* overflow-y is set inline (hidden during the height tween, auto once settled). */
+  /* Reserve gutter so toggling overflow-y (hidden↔auto) never changes content
+     width — otherwise the width reflow would retrigger the ResizeObserver and
+     oscillate the height re-measure. With the <1px delta guard, no oscillation. */
+  scrollbar-gutter: stable;
+}
+.profile-content-measure { min-width: 0; }
+.profile-content {
+  min-width: 0;
+  padding: 24px 30px 28px;
+  text-align: left;
+}
+
+/* ── Account tab content ──────────────────────────────────────────────── */
+.profile-account { display: flex; flex-direction: column; gap: 22px; }
+.profile-account-top { display: flex; align-items: center; gap: 16px; }
+.profile-level-badge {
+  flex: none;
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: linear-gradient(160deg, oklch(0.62 0.20 30), oklch(0.50 0.20 25));
+  border: 2.5px solid oklch(0.30 0.16 25);
+  box-shadow:
+    0 4px 0 oklch(0.30 0.16 25),
+    inset 0 2px 0 oklch(0.90 0.10 30 / 0.7);
+}
+.profile-level-badge-num { font-size: 28px; font-weight: 900; line-height: 1; }
+.profile-level-badge-label {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  opacity: 0.85;
+  margin-top: 2px;
+}
+.profile-account-id { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.profile-account-name {
+  font-size: 24px;
+  font-weight: 900;
+  color: #0d1638;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.profile-account-level {
+  font-size: 14px;
+  font-weight: 800;
+  color: #6e4ec9;
+  letter-spacing: 0.3px;
+}
+.profile-xp-block { display: flex; flex-direction: column; gap: 9px; }
+.profile-xp-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.profile-xp-caption {
+  font-size: 12.5px;
+  font-weight: 900;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: #6e4ec9;
+}
+.profile-xp-value { font-size: 15px; font-weight: 800; color: #2a2640; }
+.profile-xp-track {
+  height: 18px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: oklch(0.93 0.02 270);
+  box-shadow: inset 0 2px 4px oklch(0.55 0.05 270 / 0.35),
+              inset 0 0 0 1.5px oklch(0.86 0.03 270);
+}
+.profile-xp-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, oklch(0.74 0.14 195), oklch(0.70 0.18 30));
+  box-shadow: inset 0 2px 0 oklch(0.92 0.08 195 / 0.7),
+              0 0 12px oklch(0.72 0.16 60 / 0.4);
+}
+.profile-stats { display: flex; gap: 12px; flex-wrap: wrap; }
+.profile-stat {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 18px;
+  border-radius: 14px;
+  background: oklch(0.97 0.015 90);
+  box-shadow: inset 0 0 0 2px oklch(0.90 0.04 90);
+}
+.profile-stat-icon { font-size: 24px; line-height: 1; }
+.profile-stat-value { font-size: 24px; font-weight: 900; color: #0d1638; }
+.profile-stat-label {
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #8a82a0;
+}
+.profile-token-marker {
+  margin: 0;
+  padding: 13px 16px;
+  border-radius: 14px;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: #2a2640;
+  background: oklch(0.96 0.03 195);
+  border-left: 4px solid oklch(0.66 0.14 195);
+}
+
+/* ── Shell / empty states (Styles tab + shared) ───────────────────────── */
+.profile-shell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  padding: 28px 16px 24px;
+}
+.profile-shell-icon {
+  font-size: 52px;
+  line-height: 1;
+  filter: drop-shadow(0 6px 10px rgba(13, 22, 56, 0.2));
+}
+.profile-shell-title {
+  margin: 6px 0 0;
+  font-size: 21px;
+  font-weight: 900;
+  color: #0d1638;
+}
+.profile-shell-note {
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #fff;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, oklch(0.66 0.14 195), oklch(0.56 0.16 200));
+  box-shadow: 0 3px 0 oklch(0.34 0.10 200);
+}
+.profile-shell-body {
+  margin: 6px 0 0;
+  max-width: 360px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: #6a6480;
+}
+
+/* ── Styles tab — the token store (Phase 6) ────────────────────────────────
+   Lives inside .profile-content (which already scrolls), so the store just
+   stacks its header + two sections and lets the content area handle overflow.
+   Light surface to match the profile modal's design system. */
+.styles-store {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* Token-balance header */
+.styles-store-head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.styles-store-balance {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  padding: 9px 16px 9px 13px;
+  border-radius: 999px;
+  border: 2.5px solid oklch(0.30 0.10 90);
+  color: oklch(0.22 0.06 80);
+  background: linear-gradient(180deg, oklch(0.90 0.14 92), oklch(0.82 0.15 78));
+  box-shadow:
+    0 3px 0 oklch(0.45 0.12 75),
+    inset 0 2px 0 oklch(0.97 0.06 95 / 0.85);
+}
+.styles-store-balance-coin { font-size: 20px; line-height: 1; }
+.styles-store-balance-value { font-size: 20px; font-weight: 900; line-height: 1; }
+.styles-store-balance-label {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  opacity: 0.8;
+}
+.styles-store-intro {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: #6a6480;
+  font-weight: 600;
+}
+
+/* Section (Card Skins / Table Wallpapers) */
+.styles-store-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.styles-store-section-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: #6e4ec9;
+}
+.styles-store-section-icon { font-size: 17px; }
+
+.styles-store-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 12px;
+}
+
+/* A single store item */
+.store-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 10px 12px;
+  border-radius: 16px;
+  border: 2px solid oklch(0.90 0.02 270);
+  background: oklch(0.985 0.005 270);
+  box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.6);
+  text-align: center;
+}
+.store-item.store-item-equipped {
+  border-color: oklch(0.70 0.14 160);
+  background: oklch(0.97 0.04 160);
+  box-shadow:
+    0 0 0 1px oklch(0.70 0.14 160 / 0.35),
+    inset 0 1px 0 oklch(1 0 0 / 0.6);
+}
+/* Locked items read dimmer until owned. */
+.store-item.is-locked .store-item-preview { opacity: 0.78; }
+
+.store-item-preview {
+  position: relative;
+  width: 100%;
+  height: 78px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.store-item-lock {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 15px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
+}
+/* ── Unlock celebration (fires once on a successful buy) ─────────────────────
+   All pieces are absolutely positioned within `.store-item-preview`, are
+   `pointer-events:none`, and cause no layout shift. */
+
+/* Expanding glow ring over the preview — gold core, soft teal halo. */
+.store-item-unlock-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 84px;
+  height: 84px;
+  margin: -42px 0 0 -42px;
+  border-radius: 999px;
+  border: 3px solid oklch(0.88 0.15 92);
+  box-shadow:
+    0 0 12px 3px oklch(0.88 0.15 92 / 0.6),
+    0 0 18px 6px oklch(0.72 0.14 195 / 0.45);
+  pointer-events: none;
+}
+
+/* A single radiating sparkle. */
+.store-item-unlock-spark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin: -8px 0 0 -8px;
+  font-size: 15px;
+  line-height: 1;
+  color: oklch(0.85 0.16 92);
+  text-shadow: 0 0 6px oklch(0.88 0.15 92 / 0.8);
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+/* The "Unlocked!" pill — gold→teal gradient, centred over the tile. */
+.store-item-unlock-badge {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.2px;
+  color: oklch(0.22 0.06 80);
+  background: linear-gradient(135deg, oklch(0.90 0.14 92), oklch(0.78 0.13 168));
+  box-shadow:
+    0 4px 12px oklch(0.45 0.12 75 / 0.45),
+    inset 0 1px 0 oklch(0.98 0.06 95 / 0.85);
+  pointer-events: none;
+}
+
+/* Skin preview — two fanned cards (mirrors the in-game picker tile). */
+.store-skin-preview {
+  position: relative;
+  width: 90px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.store-skin-card { position: absolute; transform-origin: center bottom; }
+.store-skin-card-back {
+  transform: translateX(-12px) rotate(-9deg);
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+}
+.store-skin-card-front {
+  transform: translateX(12px) rotate(8deg);
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+  z-index: 1;
+}
+/* The preview cards are decorative — kill their pointer hover/cursor. */
+.store-skin-preview .card-wrap { cursor: default !important; }
+
+/* Wallpaper preview — the real theme swatch, sized up for the tile. */
+.store-wallpaper-preview.theme-swatch-preview {
+  width: 100%;
+  max-width: 116px;
+  height: 64px;
+  border-radius: 10px;
+}
+
+.store-item-label {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  color: #2a2640;
+  line-height: 1.2;
+}
+
+/* The single state-driven control */
+.store-item-btn {
+  min-height: 38px;
+  min-width: 92px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 11px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: transform 130ms ease, box-shadow 130ms ease, filter 130ms ease;
+}
+.store-item-btn:disabled { cursor: default; }
+.store-item-btn.buy {
+  color: oklch(0.22 0.06 80);
+  background: linear-gradient(180deg, oklch(0.90 0.14 92), oklch(0.82 0.15 78));
+  box-shadow: 0 3px 0 oklch(0.45 0.12 75), inset 0 1px 0 oklch(0.97 0.06 95 / 0.8);
+}
+.store-item-btn.buy:not(:disabled):hover { transform: translateY(-1px); }
+.store-item-btn.buy:not(:disabled):active { transform: translateY(1px); box-shadow: 0 1px 0 oklch(0.45 0.12 75); }
+.store-item-btn.equip {
+  color: #fff;
+  background: linear-gradient(180deg, #7a59d6, #6e4ec9);
+  box-shadow: 0 3px 0 #1a1a4a, inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+.store-item-btn.equip:not(:disabled):hover { transform: translateY(-1px); }
+.store-item-btn.equip:not(:disabled):active { transform: translateY(1px); box-shadow: 0 1px 0 #1a1a4a; }
+.store-item-btn.locked {
+  color: #8a82a0;
+  background: oklch(0.94 0.01 270);
+  box-shadow: inset 0 0 0 2px oklch(0.88 0.02 270);
+}
+.store-item-price { font-weight: 900; white-space: nowrap; }
+
+.store-item-badge.equipped {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 38px;
+  padding: 8px 16px;
+  border-radius: 11px;
+  font-size: 13.5px;
+  font-weight: 900;
+  letter-spacing: 0.3px;
+  color: #fff;
+  background: linear-gradient(180deg, oklch(0.68 0.15 160), oklch(0.58 0.16 162));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.store-item-locked-control {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.store-item-need {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  color: #a89fc0;
+}
+
+.store-item-error {
+  margin: 0;
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #b3306a;
+  background: oklch(0.96 0.04 10);
+  border-radius: 8px;
+  padding: 5px 8px;
+}
+
+/* In-flight spinner inside a button */
+.store-spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2.5px solid currentColor;
+  border-top-color: transparent;
+  opacity: 0.85;
+}
+
+/* ── Custom (Recolor) tile — two colour pickers + live preview ─────────────── */
+.store-item-custom { gap: 8px; }
+.store-custom-pickers {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  justify-content: center;
+}
+.store-custom-picker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  width: 66px; /* uniform columns so both align */
+}
+.store-custom-picker-label {
+  font-size: 10.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #6e4ec9;
+}
+/* Native colour input restyled as a round swatch chip. */
+.store-custom-swatch {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 2.5px solid oklch(0.90 0.02 270);
+  border-radius: 11px;
+  background: none;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.6), 0 1px 2px rgba(0, 0, 0, 0.12);
+  transition: transform 130ms ease, box-shadow 130ms ease;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.store-custom-swatch:hover { transform: translateY(-1px); }
+.store-custom-swatch:focus-visible {
+  outline: 2px solid #7a59d6;
+  outline-offset: 2px;
+}
+.store-custom-swatch::-webkit-color-swatch-wrapper { padding: 0; }
+.store-custom-swatch::-webkit-color-swatch { border: none; border-radius: 8px; }
+.store-custom-swatch::-moz-color-swatch { border: none; border-radius: 8px; }
+.store-custom-status {
+  min-height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.store-custom-saving {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  color: #8a82a0;
+}
+.store-custom-saving .store-spinner {
+  width: 12px;
+  height: 12px;
+  border-width: 2px;
+  color: #8a82a0;
+}
+
+/* Mobile / phone layout — slightly tighter grid so two tiles fit a phone. */
+@media (max-width: 760px) {
+  .styles-store-grid {
+    grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+    gap: 10px;
+  }
+}
+body.mobile-mode .styles-store-grid {
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+}
+
+/* Reduced motion: the spinner shouldn't spin; the unlock pulse is gated in JS. */
+@media (prefers-reduced-motion: reduce) {
+  .store-spinner { border-top-color: currentColor; opacity: 0.6; }
+}
+
+/* ── Settings tab ─────────────────────────────────────────────────────── */
+.profile-settings { display: flex; flex-direction: column; gap: 18px; }
+.profile-logout-btn { align-self: flex-start; min-height: 46px; }
+
+/* Each settings action lives in its own bordered card. The danger zone (delete)
+   gets a red-tinted border + heading so accidental destruction reads clearly. */
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 2px solid oklch(0.90 0.02 270);
+  border-radius: 16px;
+  background: oklch(0.985 0.004 270);
+}
+.settings-section.danger {
+  border-color: oklch(0.84 0.07 18);
+  background: oklch(0.98 0.012 18);
+}
+.settings-section-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 900;
+  color: #2a2440;
+}
+.settings-section.danger .settings-section-title { color: #b3306a; }
+.settings-section-icon { font-size: 19px; line-height: 1; flex: none; }
+
+.settings-form { display: flex; flex-direction: column; gap: 12px; }
+.settings-field { display: flex; flex-direction: column; gap: 6px; text-align: left; }
+.settings-field .input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 46px;
+  font-family: inherit;
+}
+.settings-field .input:focus-visible {
+  outline: none;
+  border-color: #6e4ec9;
+  box-shadow: 0 0 0 3px rgba(110, 78, 201, 0.25);
+}
+
+/* Action row: the submit button + a text-link cancel/secondary action. */
+.settings-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.settings-submit { align-self: flex-start; min-height: 44px; }
+.settings-actions .settings-submit { align-self: auto; }
+
+/* In-flight label with the shared store spinner. */
+.settings-busy { display: inline-flex; align-items: center; gap: 8px; }
+.settings-busy .store-spinner { width: 16px; height: 16px; }
+
+.settings-current-email {
+  margin: 0;
+  font-size: 14px;
+  color: #4a4360;
+  word-break: break-all;
+}
+.settings-current-email strong { color: #1c1733; }
+.settings-confirm-intro { text-align: left; }
+
+/* Delete: explanatory copy + a clearly destructive confirm button. The trigger
+   is a neutral outline button; the final confirm is solid red so the last step
+   is unmistakable. */
+.settings-danger-copy {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: #7a4358;
+  font-weight: 600;
+}
+.settings-danger-trigger {
+  align-self: flex-start;
+  min-height: 44px;
+  background: transparent;
+  border: 2px solid oklch(0.78 0.10 18);
+  box-shadow: none;
+  color: #b3306a;
+}
+.settings-danger-trigger:hover:not(:disabled) {
+  background: oklch(0.96 0.03 18);
+  transform: none;
+  box-shadow: none;
+}
+.settings-danger-confirm {
+  align-self: auto;
+  min-height: 44px;
+  color: #fff;
+  background: linear-gradient(180deg, oklch(0.60 0.21 18), oklch(0.52 0.21 16));
+  border: 2px solid oklch(0.40 0.18 18);
+}
+.settings-danger-confirm:hover:not(:disabled) {
+  background: linear-gradient(180deg, oklch(0.64 0.22 18), oklch(0.56 0.22 16));
+}
+.settings-danger-confirm:disabled { opacity: 0.5; cursor: not-allowed; }
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-busy .store-spinner { animation: none; border-top-color: currentColor; opacity: 0.6; }
+}
+
+/* ── Bottom-right token counter (IN-GAME ONLY) ────────────────────────────
+   Parked ABOVE the in-game FAB stack (audio 18 / chat 96 / theme 96-174) so it
+   never overlaps a floating button. The on-menu token display now lives inside
+   the bottom-left <AccountMenuTab/> pill itself (see .account-tab-tokens). The
+   component is not currently mounted in-game, but the base rule stays in case
+   it's ever brought back for a different screen. */
+.token-counter {
+  position: fixed;
+  right: 18px;
+  bottom: 238px; /* clears the in-game theme FAB top (~174 + 52) with a gap */
+  z-index: 120;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 7px 14px 7px 11px;
+  border: 2.5px solid oklch(0.30 0.10 90);
+  border-radius: 999px;
+  font-family: inherit;
+  color: oklch(0.22 0.06 80);
+  background: linear-gradient(180deg, oklch(0.90 0.14 92), oklch(0.82 0.15 78));
+  box-shadow:
+    0 4px 0 oklch(0.45 0.12 75),
+    inset 0 2px 0 oklch(0.97 0.06 95 / 0.85),
+    0 10px 22px oklch(0.45 0.12 75 / 0.4);
+}
+button.token-counter { cursor: pointer; transition: transform 0.16s cubic-bezier(0.22,1,0.36,1), box-shadow 0.16s; }
+button.token-counter:hover {
+  box-shadow:
+    0 6px 0 oklch(0.45 0.12 75),
+    inset 0 2px 0 oklch(0.98 0.06 95 / 0.9),
+    0 14px 28px oklch(0.45 0.12 75 / 0.5);
+}
+button.token-counter:active {
+  box-shadow:
+    0 1px 0 oklch(0.45 0.12 75),
+    inset 0 2px 0 oklch(0.95 0.06 95 / 0.8);
+}
+.token-counter-coin { font-size: 19px; line-height: 1; }
+.token-counter-value { font-size: 17px; font-weight: 900; }
+
+/* ── Responsive: phones / 375px ───────────────────────────────────────── */
+@media (max-width: 760px) {
+  .profile-panel { width: calc(100vw - 16px); }
+  .profile-body { flex-direction: column; }
+  .profile-close { width: 44px; height: 44px; } /* >=44px touch target (review #5) */
+  .profile-tabs {
+    flex: 0 0 auto;
+    flex-direction: row;
+    overflow-x: auto;
+    border-right: none;
+    border-bottom: 2px solid #efeaff;
+    padding: 10px;
+  }
+  .profile-tab { flex: 0 0 auto; }
+  .profile-tab-label { white-space: nowrap; }
+  .profile-content { padding: 20px 18px 24px; }
+  .profile-account-name { font-size: 21px; }
+  .profile-account { gap: 18px; }
+}
+
+/* Phone-mode (the explicit mobile layout): keep the account tab + token
+   counter clear of the top-bar overflow panels and comfortable to tap.
+   The token counter sheds the tall in-game offset since phone-mode hides the
+   floating FAB stack entirely (those fold into the top-bar ⋯ menu). */
+body.mobile-mode .account-tab {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
+  left: 14px;
+  /* Slightly wider on phones so the username · Lv · 🪙 tokens row has room
+     without the username being aggressively ellipsed. */
+  max-width: min(290px, 75vw);
+}
+body.mobile-mode .token-counter {
+  top: auto; /* Phone-mode: snug to the safe-area at bottom-right (mobile hides the FAB stack, so the corner is clear). */
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
+  right: 14px;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Accounts layer (Phase 4 — XP reward celebration overlay)
+   The end-of-game "+N XP" card + animated bar. Sits ABOVE the game-over
+   overlays (Busted z300 / Glory z400) so the reward reads AFTER the result.
+   The bar matches the .profile-xp-track / .profile-xp-fill language exactly
+   (teal→coral gradient, rounded 999px track) on the LUMO card / Fredoka type.
+   ────────────────────────────────────────────────────────────────────────── */
+.xp-reward-overlay {
+  z-index: 460;
+  padding: 16px;
+}
+.xp-reward-card {
+  position: relative;
+  z-index: 1; /* above the major-tier .xp-reward-screenfx (z-index: 0) */
+  width: min(440px, calc(100vw - 28px));
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 30px 30px 26px;
+  background: #fff;
+  color: #0d1638;
+  border-radius: 26px;
+  border: 4px solid #a87bff;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  text-align: center;
+  overflow: hidden;
+}
+/* Soft celebratory glow bleeding from the top of the card. */
+.xp-reward-card::before {
+  content: "";
+  position: absolute;
+  inset: -40% 0 auto 0;
+  height: 200px;
+  background: radial-gradient(
+    closest-side,
+    oklch(0.78 0.16 60 / 0.35),
+    transparent 70%
+  );
+  pointer-events: none;
+}
+.xp-reward-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  background: oklch(0.95 0.01 270);
+  color: #6a6480;
+  font-size: 18px;
+  font-weight: 900;
+  cursor: pointer;
+  z-index: 2;
+  transition: background 0.15s, transform 0.15s;
+}
+.xp-reward-close:hover { background: oklch(0.90 0.03 270); transform: scale(1.06); }
+.xp-reward-kicker {
+  position: relative;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #fff;
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, oklch(0.66 0.14 195), oklch(0.56 0.16 200));
+  box-shadow: 0 3px 0 oklch(0.34 0.10 200);
+}
+.xp-reward-gain {
+  position: relative;
+  font-family: 'Fredoka', system-ui, sans-serif;
+  font-size: 46px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0.5px;
+  background: linear-gradient(180deg, oklch(0.78 0.16 60), oklch(0.66 0.19 35));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 4px 10px oklch(0.66 0.19 40 / 0.35));
+}
+.xp-reward-levelrow {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  justify-content: center;
+}
+.xp-reward-badge {
+  flex: none;
+  width: 58px;
+  height: 58px;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: linear-gradient(160deg, oklch(0.62 0.20 30), oklch(0.50 0.20 25));
+  box-shadow:
+    0 6px 0 oklch(0.40 0.16 28),
+    inset 0 2px 0 oklch(0.90 0.10 30 / 0.7);
+}
+.xp-reward-badge-num { font-size: 26px; font-weight: 900; line-height: 1; }
+.xp-reward-badge-label {
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  opacity: 0.85;
+  margin-top: 2px;
+}
+.xp-reward-levelmeta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
+}
+.xp-reward-levelname { font-size: 18px; font-weight: 900; color: #0d1638; }
+.xp-reward-levelsub { font-size: 13px; font-weight: 800; color: #6a6480; }
+
+/* The animated track + fill — identical visual language to .profile-xp-*. */
+.xp-reward-track {
+  position: relative;
+  width: 100%;
+  height: 20px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: oklch(0.93 0.02 270);
+  box-shadow: inset 0 2px 4px oklch(0.55 0.05 270 / 0.35),
+              inset 0 0 0 1.5px oklch(0.86 0.03 270);
+}
+.xp-reward-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, oklch(0.74 0.14 195), oklch(0.70 0.18 30));
+  box-shadow: inset 0 2px 0 oklch(0.92 0.08 195 / 0.7),
+              0 0 12px oklch(0.72 0.16 60 / 0.4);
+}
+/* A diagonal sheen that travels across the bar while it fills. */
+.xp-reward-sheen {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 45%;
+  height: 100%;
+  background: linear-gradient(
+    100deg,
+    transparent,
+    rgba(255, 255, 255, 0.55),
+    transparent
+  );
+  pointer-events: none;
+}
+.xp-reward-levelup {
+  position: relative;
+  font-family: 'Fredoka', system-ui, sans-serif;
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  color: oklch(0.62 0.20 30);
+  text-shadow: 0 3px 0 oklch(0.84 0.10 60 / 0.6);
+}
+.xp-reward-continue {
+  margin-top: 4px;
+  min-height: 46px;
+  padding-inline: 30px;
+  align-self: stretch;
+}
+
+@media (max-width: 760px) {
+  .xp-reward-card { padding: 26px 20px 22px; gap: 12px; }
+  .xp-reward-gain { font-size: 40px; }
+  .xp-reward-levelup { font-size: 24px; }
+}
+
+/* Reduced motion: kill the travelling sheen (the bar itself already snaps to
+   its final fill in the component under prefers-reduced-motion). */
+@media (prefers-reduced-motion: reduce) {
+  .xp-reward-sheen { display: none; }
+}
+
+/* ── MAJOR reward cinematic (token milestone / Level-2 Custom-skin unlock) ────
+   Ordinary level-ups keep the plain card + flourish. MAJOR rewards add a
+   full-screen golden bloom + slow light rays behind the card, a gold-accented
+   card, and a prominent reward reveal. Confetti (canvas-confetti, its own top
+   canvas) fills the rest of the screen. */
+.xp-reward-overlay.major { background: rgba(0, 0, 0, 0.72); }
+
+.xp-reward-screenfx {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  z-index: 0; /* behind the card (a later, positioned sibling paints on top) */
+}
+.xp-reward-screen-glow {
+  width: min(150vw, 1100px);
+  height: min(150vw, 1100px);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    oklch(0.86 0.16 85 / 0.55) 0%,
+    oklch(0.80 0.17 70 / 0.26) 32%,
+    transparent 62%
+  );
+  filter: blur(6px);
+}
+.xp-reward-screen-rays {
+  position: absolute;
+  width: min(180vw, 1500px);
+  height: min(180vw, 1500px);
+  border-radius: 50%;
+  background: repeating-conic-gradient(
+    from 0deg,
+    oklch(0.90 0.14 88 / 0.13) 0deg 7deg,
+    transparent 7deg 22deg
+  );
+  -webkit-mask-image: radial-gradient(circle, #000 10%, transparent 58%);
+          mask-image: radial-gradient(circle, #000 10%, transparent 58%);
+  animation: xpRayRotate 20s linear infinite;
+  opacity: 0.85;
+}
+@keyframes xpRayRotate { to { transform: rotate(360deg); } }
+
+/* Gold-accented card for the major tier. */
+.xp-reward-card.major {
+  border-color: #f0b94a;
+  box-shadow:
+    0 0 0 1px oklch(0.82 0.15 85 / 0.6),
+    0 18px 50px oklch(0.55 0.16 70 / 0.45),
+    0 24px 70px rgba(0, 0, 0, 0.6);
+}
+.xp-reward-card.major::before {
+  background: radial-gradient(
+    closest-side,
+    oklch(0.84 0.17 78 / 0.55),
+    transparent 72%
+  );
+  height: 240px;
+}
+
+/* The reward reveal — the centrepiece of the major cinematic. */
+.xp-reward-bigreward {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.xp-reward-reward-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, oklch(0.95 0.07 92), oklch(0.90 0.12 82));
+  border: 2px solid oklch(0.80 0.14 80 / 0.7);
+  box-shadow: inset 0 2px 0 oklch(0.98 0.04 95 / 0.9), 0 4px 0 oklch(0.62 0.13 72);
+  text-align: left;
+}
+.xp-reward-reward-icon {
+  flex: none;
+  font-size: 40px;
+  line-height: 1;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.3));
+  transform-style: preserve-3d;
+}
+.xp-reward-reward-icon.skin { font-size: 36px; }
+.xp-reward-reward-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.xp-reward-reward-amount {
+  font-family: 'Fredoka', system-ui, sans-serif;
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1.1;
+  color: oklch(0.34 0.12 72);
+}
+.xp-reward-reward-sub { font-size: 12.5px; font-weight: 800; color: oklch(0.45 0.07 75); }
+
+@media (max-width: 760px) {
+  .xp-reward-reward-amount { font-size: 19px; }
+  .xp-reward-reward-icon { font-size: 34px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .xp-reward-screen-rays { animation: none; }
+}
+
+/* ── Password field with reveal toggle ──────────────────────────────────── */
+.password-input-wrap { position: relative; width: 100%; }
+/* Reserve room on the right so the dots/text never slide under the eye button.
+   Scoped to inputs inside the wrap so non-password .input fields are unaffected. */
+.password-input-wrap > .input { width: 100%; padding-right: 44px; box-sizing: border-box; }
+.password-reveal-btn {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #6b7280;            /* muted gray — visible on the white .input on the cream card */
+  cursor: pointer;
+  border-radius: 7px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.password-reveal-btn:hover { color: #1c1d2b; background: rgba(0,0,0,0.06); }
+.password-reveal-btn:focus-visible { outline: 2px solid #6d5cf5; outline-offset: 1px; color: #1c1d2b; }
+.password-reveal-btn svg { width: 20px; height: 20px; display: block; }
+
+/* ── Token-purchase celebration (TokenPurchaseOverlay) ──────────────────────
+   Self-gating "you got N tokens" reveal that FALLS in from above with a coin,
+   gold burst, shine sweep + confetti. Sits just under the XP-reward overlay
+   (z-index 460) so the two never fight (checkTokenGrant() also suppresses a
+   token reveal while an xpReward is showing). Premium gold/obsidian palette. */
+.token-grant-overlay {
+  z-index: 458;
+  padding: 16px;
+}
+.token-grant-card {
+  position: relative;
+  z-index: 1;
+  box-sizing: border-box;
+  width: min(420px, calc(100vw - 28px));
+  padding: 30px 28px 26px;
+  text-align: center;
+  border-radius: 24px;
+  border: 2px solid #caa85a;
+  color: #f3ecdd;
+  background:
+    radial-gradient(120% 90% at 50% -10%, rgba(202,168,90,0.20) 0%, transparent 55%),
+    linear-gradient(168deg, #241b35 0%, #17121f 60%, #100c16 100%);
+  box-shadow: 0 24px 64px rgba(0,0,0,0.62), inset 0 1px 0 rgba(255,255,255,0.06);
+  overflow: hidden;
+}
+.token-grant-close {
+  position: absolute;
+  top: 12px; right: 12px;
+  width: 34px; height: 34px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.06);
+  color: #cdc6b6;
+  font-size: 14px;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.token-grant-close:hover { background: rgba(255,255,255,0.12); transform: scale(1.08); }
+.token-grant-kicker {
+  display: inline-block;
+  font-family: 'Fredoka', system-ui, sans-serif;
+  font-size: 11px; font-weight: 700;
+  letter-spacing: 0.28em; text-transform: uppercase;
+  color: #caa85a;
+  margin-bottom: 4px;
+}
+.token-grant-coin {
+  position: relative;
+  width: 110px; height: 110px;
+  margin: 8px auto 2px;
+  display: flex; align-items: center; justify-content: center;
+}
+.token-grant-burst {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 240px; height: 240px;
+  transform: translate(-50%, -50%) scale(0.4);
+  pointer-events: none;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(240,216,156,0.40) 0%, rgba(202,168,90,0.14) 36%, transparent 68%);
+  animation: token-grant-burst 1.4s ease-out forwards;
+}
+@keyframes token-grant-burst {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
+  45%  { opacity: 1; }
+  100% { opacity: 0.55; transform: translate(-50%, -50%) scale(1); }
+}
+.token-grant-coin-face {
+  position: relative;
+  display: inline-flex;
+  align-items: center; justify-content: center;
+  font-size: 78px; line-height: 1;
+  filter: drop-shadow(0 6px 16px rgba(202,168,90,0.55));
+}
+.token-grant-coin-spin { display: inline-block; transform-style: preserve-3d; }
+.token-grant-coin-shine {
+  position: absolute;
+  inset: -6%;
+  pointer-events: none;
+  border-radius: 50%;
+  background: linear-gradient(115deg, transparent 38%, rgba(255,255,255,0.55) 50%, transparent 62%);
+  mix-blend-mode: screen;
+  animation: token-grant-shine 2s ease-in-out 0.7s infinite;
+}
+@keyframes token-grant-shine {
+  0%        { transform: translateX(-130%); opacity: 0; }
+  20%       { opacity: 1; }
+  60%, 100% { transform: translateX(130%); opacity: 0; }
+}
+.token-grant-amount {
+  font-family: 'Fredoka', system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 44px; line-height: 1;
+  color: #f0d89c;
+  text-shadow: 0 2px 12px rgba(202,168,90,0.45);
+  margin-top: 2px;
+}
+.token-grant-amount-unit { font-size: 22px; font-weight: 600; color: #cdb583; }
+.token-grant-title {
+  font-family: 'Fredoka', system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 22px;
+  margin: 10px 0 4px;
+  color: #f6efe1;
+}
+.token-grant-sub {
+  font-size: 13.5px; line-height: 1.5;
+  color: #a99f8c;
+  margin: 0 auto 18px;
+  max-width: 300px;
+}
+/* Gold Claim button — keeps the .btn shape, swaps to the token palette. */
+.token-grant-card .token-grant-claim {
+  min-width: 168px;
+  background: linear-gradient(180deg, #f0d89c 0%, #caa85a 100%);
+  color: #2a1c08;
+  border: none;
+  box-shadow: 0 6px 18px rgba(202,168,90,0.40);
+}
+.token-grant-card .token-grant-claim:hover { filter: brightness(1.06); }
+
+/* Reduced-motion + mobile: drop the looping/decorative animations. */
+@media (prefers-reduced-motion: reduce) {
+  .token-grant-burst, .token-grant-coin-shine { animation: none; }
+}
+body.mobile-mode .token-grant-coin-shine { animation: none; }
+body.mobile-mode .token-grant-burst { animation-duration: 0.8s; }
