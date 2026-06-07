@@ -36,6 +36,13 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
   // Your hand shrinks as snap penalties push it past 4 cards so the row keeps
   // fitting the screen width instead of overflowing the edges.
   const handLen = player.hand.length;
+  // Side seats (left/right) render in a 90°-rotated rail whose wrapper
+  // (.hand-row-side-wrap = 128×362) and overflow placeholders (80×116) are
+  // sized for `md` (80px). They must use `md`, NOT `lg`: `lg` (110px → ~160px
+  // tall after rotation) overflows the rail, so the side hands rendered
+  // oversized and crowded the centre deck. Top opponent keeps `lg` to match
+  // the human's hand; the human keeps `lg` (desktop).
+  const isSideSeat = tablePos === "left" || tablePos === "right";
   const cardSize: "xs" | "sm" | "md" | "lg" = isHuman
     ? !isMobile
       ? "lg"
@@ -45,7 +52,9 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
       ? "md"
       : "lg"
     : !isMobile
-    ? "lg" // opponents match the human's hand size (desktop)
+    ? isSideSeat
+      ? "md" // side rails are sized for md — see .hand-row-side-wrap in App.css
+      : "lg" // top opponent matches the human's hand size (desktop)
     // Mobile: all opponents — top AND left/right — use sm (48), so the side
     // players match the top player's card size. Side players render in the
     // rotated vertical rail (below), same placement as the top row reads.
@@ -247,7 +256,7 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
   // it reads as a vertical column on the rail (matching the desktop/web look),
   // with snap-penalty overflow cards tucked behind the 2nd/3rd cards. Enabled
   // on mobile too — the wrapper is sized down for the small xs cards in CSS.
-  const isSide = tablePos === "left" || tablePos === "right";
+  const isSide = isSideSeat;
   const sideRotateDeg = tablePos === "right" ? -90 : 90;
 
   const cardSlots = player.hand.map((c, idx) => {
