@@ -42,6 +42,9 @@ import { XpRewardOverlay } from "./ui/account/XpRewardOverlay";
 // "balance rose" watcher + the global reveal overlay (self-gates on tokenGrant).
 import { useTokenGrantWatch } from "./state/useTokenGrantWatch";
 import { TokenPurchaseOverlay } from "./ui/account/TokenPurchaseOverlay";
+// "Report a bug" form — opened from the Settings speed-dial; self-gates on the
+// store's `reportBugOpen`.
+import { ReportBugModal } from "./ui/ReportBugModal";
 
 function getRoomFromPath(): string | null {
   const m = window.location.pathname.match(/\/room\/([A-Za-z0-9]{4,8})/);
@@ -221,6 +224,10 @@ function App() {
           when the balance rises (Ko-fi purchase). Tokens are already credited —
           Claim just acknowledges. Sits just under the XP reward (z-index 458). */}
       <TokenPurchaseOverlay />
+
+      {/* "Report a bug" form — global, self-gates on `reportBugOpen`. Opened
+          from the Settings speed-dial 🐛 button. */}
+      <ReportBugModal />
     </>
   );
 }

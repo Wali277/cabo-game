@@ -201,6 +201,10 @@ interface StoreState {
    *  floating in-game button. */
   helpOpen: boolean;
   setHelpOpen: (open: boolean) => void;
+  /** Toggle for the "Report a bug" modal, opened from the Settings speed-dial.
+   *  A simple self-gating overlay (like helpOpen) — not part of the FAB mutex. */
+  reportBugOpen: boolean;
+  setReportBugOpen: (open: boolean) => void;
   /** Developer mode. Persisted client flag, switched on when the DEV-BOOST dev
    *  code is redeemed (see ProfilePanel). It re-enables the in-game Theme/skin
    *  override FAB — hidden for normal players, who pick cosmetics they actually
@@ -483,6 +487,8 @@ export const useStore = create<StoreState>((set, get) => ({
   settingsOpen: false,
   helpOpen: false,
   setHelpOpen(open) { set({ helpOpen: open }); },
+  reportBugOpen: false,
+  setReportBugOpen(open) { set({ reportBugOpen: open }); },
   devMode: (() => {
     try { return localStorage.getItem("cobo.devMode") === "1"; }
     catch { return false; }

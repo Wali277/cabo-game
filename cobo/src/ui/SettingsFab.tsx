@@ -21,6 +21,7 @@ export function SettingsFab() {
   const setSettingsOpen = useStore((s) => s.setSettingsOpen);
   const setHelpOpen = useStore((s) => s.setHelpOpen);
   const setAudioOpen = useStore((s) => s.setAudioOpen);
+  const setReportBugOpen = useStore((s) => s.setReportBugOpen);
   const reduce = useReducedMotion();
   const rootRef = useRef<HTMLDivElement>(null);
   const [, force] = useState(0);
@@ -71,10 +72,17 @@ export function SettingsFab() {
     setSettingsOpen(false);
     setHelpOpen(true);
   }
+  function openReportBug() {
+    Audio.playSfx("click");
+    setSettingsOpen(false);
+    setReportBugOpen(true);
+  }
 
-  // Top → bottom in the column: Help (farthest from the gear), then Sound
-  // (nearest). They glide up with a small stagger when the gear is tapped.
+  // Top → bottom in the column: Report Bug (farthest from the gear), then Help,
+  // then Sound (nearest). They glide up with a small stagger when the gear is
+  // tapped.
   const items = [
+    { key: "report", icon: "🐛", label: "Report a bug", onClick: openReportBug, cls: "settings-pop-report" },
     { key: "help", icon: "?", label: "Help", onClick: openHelp, cls: "settings-pop-help" },
     { key: "sound", icon: soundIcon, label: "Sound", onClick: openSound, cls: "settings-pop-sound" },
   ];

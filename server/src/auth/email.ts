@@ -175,3 +175,77 @@ export async function sendCode(
     throw new Error(`sendCode: Resend failed to send: ${error.message}`);
   }
 }
+
+/** Small HTML-escape so a reporter's text can't inject markup into the digest. */
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/**
+ * Notify the owner that the bug-report backlog has grown. Called by the
+ * bug-report endpoint every Nth unresolved report (see BUG_REPORT_BATCH), NOT on
+ * every report — so the inbox stays quiet. Best-effort: the caller wraps this in
+ * try/catch and never fails the user's submission over a digest send.
+ *
+ *   * Recipient: BUG_REPORT_TO if set, else falls back to RESEND_FROM (send to
+ *     self) so a misconfigured recipient never silently drops the alert.
+ *   * `latest` is a SHORT, already-trimmed snippet of the newest report so the
+ *     email is glanceable; the full reports live in the Supabase bug_reports
+ *     table (this email is only a nudge to go look).
+ */
+export async function sendBugDigest(unresolved: number, latest: string): Promise<void> {
+  const resend = resendClient();
+  const from = requireEnv("RESEND_FROM");
+  // Fall back to RESEND_FROM (self) rather than throwing if BUG_REPORT_TO is
+  // unset — a delivered-to-self alert beats a dropped one.
+  const to = (process.env.BUG_REPORT_TO || "").trim() || from;
+
+  const snippet = latest ? escapeHtml(latest.slice(0, 280)) : "(no description)";
+  const subject = `🐛 LUMO bug reports — ${unresolved} waiting`;
+  const html = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <title>${subject}</title>
+  </head>
+  <body style="margin:0;padding:0;background:#eef0f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#eef0f6;padding:32px 12px;">
+      <tr><td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:480px;width:100%;background:#ffffff;border:1px solid #e6e8f0;border-radius:18px;overflow:hidden;">
+          <tr><td style="height:5px;background:#6d5cf5;font-size:0;line-height:0;">&nbsp;</td></tr>
+          <tr><td style="padding:28px 32px 0 32px;text-align:center;">
+            <div style="font-size:24px;font-weight:800;letter-spacing:7px;color:#b8860b;">LUMO</div>
+          </td></tr>
+          <tr><td style="padding:14px 34px 0 34px;text-align:center;">
+            <h1 style="margin:0 0 6px 0;font-size:20px;font-weight:700;color:#1b1d29;">🐛 ${unresolved} bug report${unresolved === 1 ? "" : "s"} waiting</h1>
+            <p style="margin:0;font-size:15px;line-height:1.6;color:#5b6175;">There ${unresolved === 1 ? "is" : "are"} now <strong>${unresolved}</strong> unresolved report${unresolved === 1 ? "" : "s"} in your Supabase <code>bug_reports</code> table. Open the table to read the details and mark them <code>triaged</code> / <code>fixed</code>.</p>
+          </td></tr>
+          <tr><td style="padding:18px 34px 0 34px;">
+            <div style="background:#f5f6fb;border:1px solid #e0e3ef;border-radius:12px;padding:14px 16px;font-size:14px;line-height:1.6;color:#3a3f52;">
+              <div style="font-size:12px;font-weight:700;letter-spacing:0.5px;color:#8a90a2;text-transform:uppercase;margin-bottom:6px;">Latest report</div>
+              ${snippet}
+            </div>
+          </td></tr>
+          <tr><td style="padding:22px 34px 28px 34px;">
+            <div style="border-top:1px solid #eceef4;line-height:0;font-size:0;">&nbsp;</div>
+            <p style="margin:16px 0 0 0;font-size:12px;line-height:1.6;color:#9aa0b0;text-align:center;">Automated nudge — sent as the unresolved backlog grows. © LUMO</p>
+          </td></tr>
+        </table>
+      </td></tr>
+    </table>
+  </body>
+</html>`;
+  const text = `LUMO — ${unresolved} bug report(s) waiting.\n\nThere are ${unresolved} unresolved reports in your Supabase bug_reports table. Open it to read details and mark them triaged/fixed.\n\nLatest report:\n${latest ? latest.slice(0, 280) : "(no description)"}\n`;
+
+  const { error } = await resend.emails.send({ from, to, subject, html, text });
+  if (error) {
+    throw new Error(`sendBugDigest: Resend failed to send: ${error.message}`);
+  }
+}

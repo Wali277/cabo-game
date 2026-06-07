@@ -43,6 +43,7 @@ import { admin } from "./auth/supabaseClients.js";
 import { DEV_REDEEM_CODES_ACTIVE } from "./auth/redeemCodes.js";
 import { grantMpRewards } from "./mpGrants.js";
 import { kofiRouter } from "./webhooks/kofi.js";
+import { bugReportRouter } from "./api/bugReport.js";
 
 /**
  * Allowed CORS origins. Production locks to the known LUMO domains; dev stays
@@ -212,6 +213,9 @@ app.use("/account", accountRouter);
 // shop purchases). Same ordering reason: must precede the SPA fallback so
 // POST /webhooks/kofi is handled rather than served index.html.
 app.use("/webhooks", kofiRouter);
+// In-app bug reports (POST /api/report-bug). Same ordering reason: must precede
+// the SPA fallback so the POST is handled rather than served index.html.
+app.use("/api", bugReportRouter);
 
 // Serve the built client (if present) so the whole game runs from this single
 // port — that means one tunnel / one deploy URL covers the entire app.
@@ -228,6 +232,7 @@ if (hasBuiltClient) {
     if (req.path.startsWith("/auth")) return next();
     if (req.path.startsWith("/account")) return next();
     if (req.path.startsWith("/webhooks")) return next();
+    if (req.path.startsWith("/api")) return next();
     if (req.path === "/health" || req.path === "/rooms") return next();
     res.status(200).sendFile(path.join(CLIENT_DIST, "index.html"));
   });

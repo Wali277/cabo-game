@@ -87,6 +87,7 @@ export function Table() {
   const devMode = useStore((s) => s.devMode);
   const setHelpOpen = useStore((s) => s.setHelpOpen);
   const setChatOpen = useStore((s) => s.setChatOpen);
+  const setReportBugOpen = useStore((s) => s.setReportBugOpen);
 
   // LUMO letter-burst particle anchor — set when a "cabo_called" animation
   // event lands. Cleared 1.2s later so the burst auto-unmounts.
@@ -488,6 +489,12 @@ export function Table() {
                       onClick={() => { Audio.playSfx("click"); setMoreOpen(false); setHelpOpen(true); }}
                     >
                       ❓ Help
+                    </button>
+                    <button
+                      role="menuitem"
+                      onClick={() => { Audio.playSfx("click"); setMoreOpen(false); setReportBugOpen(true); }}
+                    >
+                      🐛 Report a bug
                     </button>
                     {mode === "mp" && (
                       <button
