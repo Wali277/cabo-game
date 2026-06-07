@@ -1,11 +1,11 @@
 import { motion, useReducedMotion } from "framer-motion";
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import type React from "react";
 import type { Card as CardT } from "../engine/types";
 import { useViewMode } from "../state/viewmode";
-import { useCardSkin, type CardSkin } from "../state/cardskin";
+import { useCardSkin, CUSTOM_SKIN_DEFAULTS, type CardSkin } from "../state/cardskin";
 import { useStore } from "../state/store";
-import { SKIN_STYLES, HelmetIcon, HandDrawnBack, RoyalBack, NeonBack, MinimalistBack, EvolvedBack, DragonFace } from "./cardSkins";
+import { SKIN_STYLES, HelmetIcon, RoyalBack, NeonBack, IvoryBack, EclipseBack, VesicaBack, OrbitBack, EvolvedBack, DragonFace } from "./cardSkins";
 import {
   cardLayoutTransition,
   isActionSwapKind,
@@ -26,6 +26,32 @@ interface Props {
 }
 
 const SUIT_GLYPH: Record<string, string> = { S: "♠", H: "♥", D: "♦", C: "♣" };
+
+const HEX6 = /^#[0-9a-fA-F]{6}$/;
+
+/** Read a single well-formed `#RRGGBB` field out of the loose
+ *  `custom_card_colors` JSON map (server-validated, but typed loose). Returns
+ *  `null` for a missing / malformed value so the caller falls back to a default. */
+function readHexField(
+  colors: Record<string, unknown> | null | undefined,
+  key: "body" | "border",
+): string | null {
+  const v = colors?.[key];
+  return typeof v === "string" && HEX6.test(v) ? v : null;
+}
+
+/** The player's effective Custom tint (body + border), each falling back to the
+ *  shared `CUSTOM_SKIN_DEFAULTS` when unset/malformed. Pure — Card passes the
+ *  store value in so the subscription, not this helper, drives re-renders. */
+function customTint(colors: Record<string, unknown> | null | undefined): {
+  body: string;
+  border: string;
+} {
+  return {
+    body: readHexField(colors, "body") ?? CUSTOM_SKIN_DEFAULTS.body,
+    border: readHexField(colors, "border") ?? CUSTOM_SKIN_DEFAULTS.border,
+  };
+}
 
 const SIZE_PX: Record<"desktop" | "mobile", Record<"xs" | "sm" | "md" | "lg", number>> = {
   desktop: { xs: 44, sm: 56, md: 80, lg: 110 },
@@ -57,12 +83,44 @@ function CardViewImpl({
   const w = SIZE_PX[viewMode][size];
   const h = Math.round(w * 1.45);
   const currentSkin = useCardSkin();
-  // Cabo Evolved locks every card to its dedicated purple/orange skin. A
+  // Lumo Evolved locks every card to its dedicated purple/orange skin. A
   // skinOverride (the picker's preview tiles) still wins, so previews render
   // their own style regardless of the active game's variant.
   const evolvedLock = useStore((s) => s.game?.variant === "evolved");
   const skinId: CardSkin = skinOverride ?? (evolvedLock ? "evolved" : currentSkin);
-  const skin = SKIN_STYLES[skinId];
+
+  // The FREE "Custom" recolor: the BASE lives in SKIN_STYLES, but the player's
+  // chosen body/border tint is layered here at render time from the signed-in
+  // profile. We subscribe to a stable `body|border` STRING (a primitive) so the
+  // component repaints the moment the saved tint changes (the store returns a
+  // fresh profile after /account/card-colors), without re-rendering on unrelated
+  // profile churn. Guests / signed-out have no profile → the helper falls back
+  // to CUSTOM_SKIN_DEFAULTS, so this can never crash.
+  const customColorsKey = useStore((s) => {
+    if (skinId !== "custom") return null;
+    const c = s.account?.profile?.custom_card_colors ?? null;
+    const { body, border } = customTint(c);
+    return `${body}|${border}`;
+  });
+  const skin = useMemo<import("./cardSkins").SkinStyle>(() => {
+    const base = SKIN_STYLES[skinId];
+    if (skinId !== "custom" || !customColorsKey) return base;
+    const [body, border] = customColorsKey.split("|");
+    // Override the face (the visible tint) plus the tokens that MIRROR the face
+    // in the base (jester cutout follows the body; the LUMO pill back follows
+    // the two-tone) so a tinted Custom card stays internally consistent. The
+    // suits keep the skin's default red/black (no suitColor override).
+    return {
+      ...base,
+      faceBg: body,
+      faceBorder: border,
+      jesterBg: body,
+      backBg: border,
+      backBorder: body,
+      caboColor: border,
+      caboPillBg: body,
+    };
+  }, [skinId, customColorsKey]);
   const reduced = useReducedMotion() ?? false;
 
   // Subscribe ONLY to the kind of the most-recent animation event. The
@@ -315,7 +373,7 @@ function CardFace({
     );
   }
 
-  // Cabo Evolved Dragon (rank "D") — the approved filled dragon art with "D"
+  // Lumo Evolved Dragon (rank "D") — the approved filled dragon art with "D"
   // corners on the skin's black field. Special-cased like the Joker so it never
   // falls through to the generic rank-text + suit-glyph face.
   if (card.rank === "Dragon") {
@@ -489,18 +547,25 @@ function CardBack({
     center = (
       <HelmetIcon size={w * 0.78} shellColor="#0a0a0a" />
     );
-  } else if (skin.backCenter === "handdrawn") {
-    center = <HandDrawnBack w={w} />;
   } else if (skin.backCenter === "royal") {
-    center = <RoyalBack w={w} />;
+    center = <RoyalBack />;
   } else if (skin.backCenter === "neon") {
-    center = <NeonBack w={w} />;
-  } else if (skin.backCenter === "minimalist") {
-    center = <MinimalistBack w={w} />;
+    center = <NeonBack />;
+  } else if (skin.backCenter === "ivory") {
+    center = <IvoryBack />;
+  } else if (skin.backCenter === "eclipse") {
+    center = <EclipseBack />;
+  } else if (skin.backCenter === "vesica") {
+    center = <VesicaBack />;
+  } else if (skin.backCenter === "orbit") {
+    center = <OrbitBack />;
   } else if (skin.backCenter === "evolved") {
     center = <EvolvedBack w={w} />;
+  } else if (skin.backCenter === "deco") {
+    // The deco artwork IS the whole back (backBg SVG) — no center overlay.
+    center = null;
   } else {
-    // Default "CABO" pill
+    // Default "LUMO" pill
     center = (
       <div
         style={{
@@ -516,7 +581,7 @@ function CardBack({
           fontFamily: font,
         }}
       >
-        CABO
+        LUMO
       </div>
     );
   }

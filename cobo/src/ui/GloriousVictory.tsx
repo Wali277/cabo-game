@@ -26,11 +26,30 @@ export function GloriousVictory() {
   const game = useStore((s) => s.game);
   const reduced = useReducedMotion() ?? false;
   const mobile = useViewMode() === "mobile";
+  // End-of-game sequencing inputs (see deferForReward below).
+  const mode = useStore((s) => s.mode);
+  const account = useStore((s) => s.account);
+  const spGameKey = useStore((s) => s.spGameKey);
+  const rewardResolvedKey = useStore((s) => s.rewardResolvedKey);
 
   // Mode-agnostic GV — `elim` is mirrored from MP / computed locally in SP.
   const victorId = elim.gloriosVictory;
   const reason = elim.gloriosVictoryReason;
-  const show = !!victorId && victorId === humanId;
+
+  // End-of-game SEQUENCING (see GameLostOverlay for the full rationale): in
+  // SINGLE-PLAYER, defer the winner's cinematic + scoreboard until this match's
+  // XP "experience" has played and been dismissed. The human winning IS the SP
+  // grant condition (gloriosVictory === humanId), so this mirrors useSpXpGrant.
+  // Computed synchronously → the deferral holds from the first render (the
+  // victory splash never half-plays then re-mounts). MP/guests/training: no
+  // change.
+  const deferForReward =
+    mode === "sp" &&
+    !!account &&
+    !!spGameKey &&
+    victorId === humanId &&
+    rewardResolvedKey !== spGameKey;
+  const show = !!victorId && victorId === humanId && !deferForReward;
 
   const [stage, setStage] = useState<"splash" | "modal">("splash");
   useEffect(() => {

@@ -100,7 +100,7 @@ export function EvolvedOutcomeCinematic() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.05, duration: 0.3 }}
           >
-            {isKam ? "💥 Cabo Evolved" : "♦ Cabo Evolved"}
+            {isKam ? "💥 Lumo Evolved" : "♦ Lumo Evolved"}
           </motion.div>
           <motion.div
             className="evolved-outcome-title"

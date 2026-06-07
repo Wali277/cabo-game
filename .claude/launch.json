@@ -12,6 +12,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "server", "run", "serve"],
       "port": 8787
+    },
+    {
+      "name": "cobo-server-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "server", "run", "dev"],
+      "port": 8787
     }
   ]
 }

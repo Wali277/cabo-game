@@ -31,14 +31,14 @@ export const BOT_PROFILES: Record<BotDifficulty, BotProfile> = {
     difficultyClass: "easy",
     tagline: "Sweet kid. Bad at cards.",
     description:
-      "Billy means well, but he doesn't really get it. Draws from the discard for no reason, calls Cabo at random, and forgets which cards he peeked. Great for warm-ups.",
+      "Billy means well, but he doesn't really get it. Draws from the discard for no reason, calls Lumo at random, and forgets which cards he peeked. Great for warm-ups.",
     accent: "#ffd86b",
     Portrait: BillyPortrait,
     chat: {
       callCabo: [
-        "Cabo? Is that what I say?",
-        "Caaaboooo! I think!",
-        "Uhh, cabo!",
+        "Lumo? Is that what I say?",
+        "Luuumooo! I think!",
+        "Uhh, lumo!",
         "I wanna stop now!",
       ],
       roundWin: ["I won?! Yay!", "Did I do that?", "Lucky me!", "Wait, really?"],
@@ -71,15 +71,15 @@ export const BOT_PROFILES: Record<BotDifficulty, BotProfile> = {
     difficultyClass: "medium",
     tagline: "Calculated. Composed. A little smug.",
     description:
-      "Marcy plays a textbook hand: tracks reveals, calls Cabo when the numbers favor her, and rarely wastes an action. Beatable if you outplay her — not if you just out-luck her.",
+      "Marcy plays a textbook hand: tracks reveals, calls Lumo when the numbers favor her, and rarely wastes an action. Beatable if you outplay her — not if you just out-luck her.",
     accent: "#67e0a3",
     Portrait: MarcyPortrait,
     chat: {
       callCabo: [
-        "Tactical retreat. Cabo.",
-        "Engaging endgame. Cabo.",
-        "And that's the play. Cabo.",
-        "Cabo. Sit down.",
+        "Tactical retreat. Lumo.",
+        "Engaging endgame. Lumo.",
+        "And that's the play. Lumo.",
+        "Lumo. Sit down.",
       ],
       roundWin: ["Textbook.", "As predicted.", "Outmaneuvered.", "Did you expect different?"],
       roundHighHand: ["Tactical setback.", "Regrouping.", "Recalibrating.", "Noted."],
@@ -111,15 +111,15 @@ export const BOT_PROFILES: Record<BotDifficulty, BotProfile> = {
     difficultyClass: "extreme",
     tagline: "He doesn't lose. He just hasn't bothered yet.",
     description:
-      "Bob reads you. He tracks every card you've peeked, swaps into the slots you trust, and races you to Cabo the moment you look comfortable. You will lose more than you win.",
+      "Bob reads you. He tracks every card you've peeked, swaps into the slots you trust, and races you to Lumo the moment you look comfortable. You will lose more than you win.",
     accent: "#ff5b6e",
     Portrait: BobPortrait,
     chat: {
       callCabo: [
-        "Cabo. Sit down.",
-        "Cabo. You're done.",
-        "Game over. Cabo.",
-        "Don't bother. Cabo.",
+        "Lumo. Sit down.",
+        "Lumo. You're done.",
+        "Game over. Lumo.",
+        "Don't bother. Lumo.",
       ],
       roundWin: [
         "Embarrassing.",

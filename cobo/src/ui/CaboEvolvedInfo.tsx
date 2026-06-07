@@ -2,7 +2,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Audio } from "../audio/sounds";
 
 /**
- * CaboEvolvedInfo — the "how to play" modal for the Cabo Evolved variant,
+ * CaboEvolvedInfo — the "how to play" modal for the Lumo Evolved variant,
  * opened from the ℹ️ button beside the game-mode selector on the bot picker.
  * Pure presentational: visibility is controlled by the parent via `open`.
  */
@@ -66,7 +66,7 @@ export function CaboEvolvedInfo({ open, onClose }: Props) {
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
-            aria-label="How to play Cabo Evolved"
+            aria-label="How to play Lumo Evolved"
           >
             <button className="evolved-info-close" onClick={close} aria-label="Close">
               ✕
@@ -74,7 +74,7 @@ export function CaboEvolvedInfo({ open, onClose }: Props) {
 
             <div className="evolved-info-head">
               <div className="evolved-info-kicker">How to play</div>
-              <h2 className="evolved-info-title">Cabo Evolved</h2>
+              <h2 className="evolved-info-title">Lumo Evolved</h2>
               <p className="evolved-info-sub">
                 The classic game with a bolder ruleset. Lowest score still wins —
                 but the cards bite harder and two special outcomes can swing a round.
@@ -142,10 +142,10 @@ export function CaboEvolvedInfo({ open, onClose }: Props) {
               </section>
 
               <section className="evolved-info-section">
-                <h3 className="evolved-info-h3">Snap & Cabo</h3>
+                <h3 className="evolved-info-h3">Snap & Lumo</h3>
                 <ul className="evolved-info-list">
                   <li><span className="evolved-info-dot" /><strong>Snap</strong> (unchanged): slap a face-down card you think matches the discard top — once on a rival, once on yourself, per round. Wrong snap = a penalty card.</li>
-                  <li><span className="evolved-info-dot" /><strong>Call Cabo</strong> to lock the round: everyone else gets one final turn, then all hands reveal. Lowest total wins — the caller wins ties.</li>
+                  <li><span className="evolved-info-dot" /><strong>Call Lumo</strong> to lock the round: everyone else gets one final turn, then all hands reveal. Lowest total wins — the caller wins ties.</li>
                 </ul>
               </section>
             </div>

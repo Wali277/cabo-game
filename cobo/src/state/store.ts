@@ -1,6 +1,15 @@
 import { create } from "zustand";
 import type { GameState, GameVariant } from "../engine/types";
 import type { Card, Rank } from "../engine/types";
+// SP round-end bust / glorious-victory resolution lives in a PURE module so it
+// stays unit-testable in isolation (this store pulls in browser-only globals).
+// We re-export the ElimState type below for existing consumers.
+import {
+  computeSpBust,
+  computeSpPlayAgain,
+  EMPTY_ELIM,
+  type ElimState,
+} from "./spBust";
 import {
   activateDragon as engineActivateDragon,
   actionBlindSwap,
@@ -21,7 +30,6 @@ import {
   dragonChooseRank as engineDragonChooseRank,
   drawFromDeck,
   drawFromDiscard,
-  handScore,
   newGame,
   setupPeekCard,
   skipPendingAction,
@@ -32,8 +40,56 @@ import {
 } from "../engine/game";
 import { Audio } from "../audio/sounds";
 import { type BotDifficulty, nameForSlot } from "../ai/bots";
+// Accounts layer (Phase 1 — auth only). Type-only import so there's no static
+// dependency cycle with auth.ts (which imports this store); runtime calls into
+// auth.ts use a dynamic import(), matching the mp.ts pattern below.
+import type { Profile } from "./auth";
+import { readLastSeenTokens, writeLastSeenTokens } from "./tokenGrant";
 
-export type Screen = "menu" | "botPicker" | "lobby" | "coin_toss" | "straw_draw" | "game" | "scoring";
+/**
+ * Accounts layer (Phase 4 — XP reward). The end-of-game reward payload, granted
+ * SERVER-SIDE and surfaced here verbatim. Shape is the SHARED CONTRACT — it
+ * matches both the SP `/account/grant-game` HTTP response's `reward` and the MP
+ * `xp:reward` socket event. The client NEVER computes or asserts an amount; it
+ * only renders the numbers the server returns.
+ *
+ *   source        which path granted it ("sp" | "mp"), for copy/telemetry only
+ *   gained        XP awarded by THIS game (the "+N XP" the overlay celebrates)
+ *   total_xp      the account's NEW lifetime XP after the grant
+ *   level         the account's NEW level after the grant
+ *   tokens        the account's NEW token balance after the grant
+ *   xp_into_level / xp_for_next   server's view of the new bar (informational —
+ *                 the overlay recomputes from total_xp via xpToLevel to animate)
+ *   leveled_up    true when this grant crossed at least one level boundary
+ *   tokens_earned tokens awarded by THIS grant (0 unless a milestone was hit)
+ *   old_level / new_level   level before / after the grant
+ */
+export interface RewardPayload {
+  source: "sp" | "mp";
+  gained: number;
+  total_xp: number;
+  level: number;
+  tokens: number;
+  xp_into_level: number;
+  xp_for_next: number;
+  leveled_up: boolean;
+  tokens_earned: number;
+  old_level: number;
+  new_level: number;
+}
+
+export type Screen =
+  | "menu"
+  | "botPicker"
+  | "lobby"
+  | "coin_toss"
+  | "straw_draw"
+  | "game"
+  | "scoring"
+  // ── Accounts layer (Phase 1 — auth screens) ──
+  | "login"
+  | "signup"
+  | "forgot";
 
 export interface ChatMessage {
   from: string;
@@ -95,42 +151,10 @@ export interface MpRoom {
   suddenDeath: { active: boolean; contestants: string[]; mainRoundsCount: number } | null;
 }
 
-/**
- * ElimState — round-bust / kick / glorious-victory tracking.
- *
- * Mirrors the room-level concepts from the MP server (see Room in
- * `server/src/rooms.ts`) so that BOTH modes can read elimination state from a
- * single place. In MP we copy the server's broadcast into here from
- * `applyMpRoom`; in SP we compute it locally from `computeSpBust()` whenever a
- * round ends.
- *
- * Default value across the board is empty / null. Cleared on backToMenu, on
- * fresh init/trainInit, and on switching modes.
- */
-export interface ElimState {
-  bustedThisRound: string[];
-  kickedIds: string[];
-  gloriosVictory: string | null;
-  gloriosVictoryReason: "survivor" | "more_wins" | "final_round" | "sudden_death" | null;
-  roundWins: Record<string, number>;
-  /** Sudden-death tiebreaker state.
-   *  - null when no sudden death has ever been triggered this game.
-   *  - { active: true, contestants, mainRoundsCount } during SD.
-   *  - contestants stays frozen across repeat SD rounds.
-   *  - mainRoundsCount = scores[id].length captured at the moment SD first
-   *    triggers, used to split R-rounds (< this) from F-rounds (≥ this) in
-   *    the UI scoreboards. */
-  suddenDeath: { active: boolean; contestants: string[]; mainRoundsCount: number } | null;
-}
-
-const EMPTY_ELIM: ElimState = {
-  bustedThisRound: [],
-  kickedIds: [],
-  gloriosVictory: null,
-  gloriosVictoryReason: null,
-  roundWins: {},
-  suddenDeath: null,
-};
+// ElimState — round-bust / kick / glorious-victory tracking. Defined in the
+// pure ./spBust module (imported above) and re-exported here so existing
+// consumers (e.g. TrainingPanel) keep importing it from the store unchanged.
+export type { ElimState };
 
 export type ActionTargetingMode =
   | null
@@ -168,12 +192,31 @@ interface StoreState {
   chatUnread: number;
   audioOpen: boolean;
   themeOpen: boolean;
+  /** The combined Settings FAB popover (Help + Sound buttons that glide up).
+   *  Part of the same one-at-a-time FAB mutex as chat/audio/theme. */
+  settingsOpen: boolean;
+  setSettingsOpen: (open: boolean) => void;
   /** Toggle for the in-game Help / Tutorial overlay. Independent of menu's
    *  tutorial — same Tutorial component, surfaced via this flag from a
    *  floating in-game button. */
   helpOpen: boolean;
   setHelpOpen: (open: boolean) => void;
+  /** Toggle for the "Report a bug" modal, opened from the Settings speed-dial.
+   *  A simple self-gating overlay (like helpOpen) — not part of the FAB mutex. */
+  reportBugOpen: boolean;
+  setReportBugOpen: (open: boolean) => void;
+  /** Developer mode. Persisted client flag, switched on when the DEV-BOOST dev
+   *  code is redeemed (see ProfilePanel). It re-enables the in-game Theme/skin
+   *  override FAB — hidden for normal players, who pick cosmetics they actually
+   *  own in their profile — so testing can swap skins without unlocking them.
+   *  Purely local/visual: it never grants ownership or touches the economy. */
+  devMode: boolean;
+  setDevMode: (on: boolean) => void;
   eliminatedFromRoom: boolean;
+  /** True when the room HOST removed you from the lobby. Drives the distinct
+   *  KickedOverlay — deliberately SEPARATE from the bust/eliminated screen so a
+   *  removed player isn't told they "busted". */
+  kickedByHost: boolean;
   /** Number of bots the user has chosen on the main menu while routing to
    *  the difficulty picker. Default 1; updated when they tap a count tile. */
   pendingNumBots: number;
@@ -182,6 +225,59 @@ interface StoreState {
   pendingVariant: GameVariant;
   setPendingVariant: (v: GameVariant) => void;
   setScreen: (s: Screen) => void;
+
+  // ── Accounts layer (Phase 1 — auth only) ──────────────────────────────────
+  // supabase-js owns the actual session (persisted + auto-refreshed in
+  // localStorage); we mirror ONLY the profile here for the UI. Null when
+  // signed out. Game/elim/mp state is completely independent of this.
+  account: { profile: Profile } | null;
+  /** Set (or clear) the signed-in account from a fetched profile. */
+  setAccount: (profile: Profile | null) => void;
+  /** Re-fetch the current user's profile from Supabase and update `account`. */
+  refreshProfile: () => Promise<void>;
+  /** Sign out: clears the Supabase session + local account, returns to menu. */
+  logoutAccount: () => Promise<void>;
+  /** Accounts layer (Phase 3 — profile menu): whether the large Account ·
+   *  Styles · Settings modal is open. Opened from the bottom-left account tab
+   *  on the MENU (and optionally the token counter). NOT mutexed with the
+   *  in-game audio/chat/theme FABs — those live on the game screen, this opens
+   *  from the menu — so it has its own isolated flag. */
+  profilePanelOpen: boolean;
+  setProfilePanelOpen: (open: boolean) => void;
+  /** Accounts layer (Phase 4 — XP reward): the latest server-granted reward to
+   *  celebrate, or null when nothing is pending. Set from the SP grant HTTP
+   *  response and the MP `xp:reward` socket event; the global XpRewardOverlay
+   *  self-gates on it. Cleared on dismiss + on backToMenu. */
+  xpReward: RewardPayload | null;
+  /** Apply a server-granted reward: stash it for the overlay AND fold the new
+   *  totals into `account.profile` so the profile panel / token counter reflect
+   *  the gain. Pass null to dismiss (the overlay only). */
+  setXpReward: (reward: RewardPayload | null) => void;
+  /** Accounts layer — token-purchase celebration (frontend-only). The pending
+   *  "you received N tokens" reveal, or null. Set by `checkTokenGrant()` when the
+   *  balance rises; the global TokenPurchaseOverlay self-gates on it. Cleared on
+   *  Claim / dismiss. The tokens are ALREADY credited — this is celebration only. */
+  tokenGrant: { amount: number } | null;
+  setTokenGrant: (grant: { amount: number } | null) => void;
+  /** Compare the current token balance to the per-device baseline; if it rose,
+   *  fire the reveal (menu only, never over an xpReward) and advance the baseline.
+   *  First run just records the baseline. Frontend-only — no server call here. */
+  checkTokenGrant: () => void;
+  /** Accounts layer (Phase 4): a stable id for the CURRENT single-player match,
+   *  generated when an SP game begins. The SP grant sends it so the server's
+   *  idempotency keys the award to the match (a replay reuses the same key →
+   *  no double-grant). Null outside an SP match; cleared on backToMenu. */
+  spGameKey: string | null;
+  /** Accounts layer (Phase 4 — end-of-game sequencing): the `spGameKey` whose
+   *  end-of-match XP reward flow has fully RESOLVED — the reward overlay was
+   *  dismissed (manually or by auto-dismiss), OR the grant returned nothing
+   *  (guest race / grant failure). While this does NOT equal the current
+   *  `spGameKey`, the SP result overlays (GloriousVictory / GameLostOverlay)
+   *  DEFER, so the XP "experience" plays FIRST and the scoreboard slides in
+   *  AFTER. Keyed by match so it auto-rearms every game: a fresh `spGameKey`
+   *  never matches a stale resolved key, so a brand-new match defers correctly
+   *  without an explicit reset. MP/guests/training never set it. */
+  rewardResolvedKey: string | null;
   /** The bot difficulty profile in use for the current SP game. Drives bot
    *  decision making in [ai/bot.ts](src/ai/bot.ts) and chat lines via
    *  [ai/bots.ts](src/ai/bots.ts). Null in MP / outside an SP match. */
@@ -251,6 +347,23 @@ interface StoreState {
 
 const PLAYER_COLORS = ["#ff5b6e", "#ffd86b", "#67e0a3", "#7aa8ff"];
 
+/**
+ * Accounts layer (Phase 4): a stable, unique key for one SP match. Generated
+ * when an SP game starts and sent on the end-of-game grant so the server can
+ * make the award idempotent (replays of the same match reuse the same key →
+ * the server grants once). `crypto.randomUUID` where available; falls back to a
+ * time+random string on older runtimes.
+ */
+function genGameKey(): string {
+  try {
+    const c = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
+    if (c?.randomUUID) return `sp_${c.randomUUID()}`;
+  } catch {
+    /* fall through to the manual key below */
+  }
+  return `sp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
 function makePlayers(numBots: number, difficulty: BotDifficulty | null) {
   const human = { id: "p_human", name: "You", isBot: false };
   const bots = [];
@@ -314,195 +427,6 @@ function skipKickedTurn(game: GameState, kickedIds: string[]): GameState {
 }
 
 /**
- * A player's running MATCH total — the exact figure the scoreboard shows and
- * that decides the winner: raw round scores PLUS cabo penalties MINUS cabo and
- * snap bonuses. The bust threshold uses this (not the raw round sum) so busting
- * matches the number the player sees: a +5 cabo penalty pushes you toward 60,
- * while a low-cabo win or snap bonus pulls you back. MUST stay identical to the
- * server's matchTotal and to Scoreboard.tsx buildRows().
- */
-function matchTotal(game: GameState, id: string): number {
-  const sum = (arr?: number[]) => (arr ?? []).reduce((a, b) => a + b, 0);
-  return (
-    sum(game.scores[id]) +
-    sum(game.caboPenalty[id]) -
-    sum(game.caboBonus[id]) -
-    sum(game.snapBonus[id])
-  );
-}
-
-/**
- * Round-end bust + glorious-victory resolution for SP. Mirrors the MP server
- * algorithm exactly (see server/src/index.ts:741-838).
- *
- * Returns the next ElimState to commit. The store is responsible for
- * orchestrating the call once `game.phase === "round_over"` lands.
- */
-function computeSpBust(game: GameState, prev: ElimState): ElimState {
-  // Start from prev — we keep kickedIds + roundWins between rounds. The
-  // bustedThisRound / gloriosVictory fields are recomputed each round.
-  const next: ElimState = {
-    bustedThisRound: [],
-    kickedIds: [...prev.kickedIds],
-    gloriosVictory: prev.gloriosVictory,
-    gloriosVictoryReason: prev.gloriosVictoryReason,
-    roundWins: { ...prev.roundWins },
-    suddenDeath: prev.suddenDeath
-      ? {
-          active: prev.suddenDeath.active,
-          contestants: [...prev.suddenDeath.contestants],
-          mainRoundsCount: prev.suddenDeath.mainRoundsCount,
-        }
-      : null,
-  };
-
-  // The engine's declared round winner is passed through unchanged, even if
-  // they happen to be on kickedIds. (Winner reassignment was removed per the
-  // updated spec — the round win stays with whoever the engine declared.)
-  const winnerId = game.winnerId;
-
-  // ── Sudden-death resolution branch ──────────────────────────────────────
-  // If we're in an active sudden-death round, resolve it by lowest-unique
-  // hand among the locked contestants. Tied hands → another SD round.
-  if (prev.suddenDeath?.active) {
-    // Track the engine's declared winner for history.
-    if (winnerId) {
-      next.roundWins[winnerId] = (next.roundWins[winnerId] ?? 0) + 1;
-    }
-
-    const contestantHands = prev.suddenDeath.contestants.map((id) => {
-      const player = game.players.find((p) => p.id === id);
-      return { id, handTotal: player ? handScore(player.hand, game.variant) : Infinity };
-    });
-    const minHand = Math.min(...contestantHands.map((c) => c.handTotal));
-    const atMin = contestantHands.filter((c) => c.handTotal === minHand);
-
-    if (atMin.length === 1) {
-      // Unique winner — declare GV, kick the other contestants.
-      const victorId = atMin[0].id;
-      const losers = prev.suddenDeath.contestants.filter((id) => id !== victorId);
-      for (const id of losers) {
-        if (!next.kickedIds.includes(id)) next.kickedIds.push(id);
-      }
-      next.gloriosVictory = victorId;
-      next.gloriosVictoryReason = "sudden_death";
-      // Keep the SD record so the end-of-game scoreboard can still split
-      // R/F columns, but mark inactive so no further SD logic fires.
-      next.suddenDeath = {
-        active: false,
-        contestants: prev.suddenDeath.contestants,
-        mainRoundsCount: prev.suddenDeath.mainRoundsCount,
-      };
-    } else {
-      // Multiple tied at min — another sudden-death round needed.
-      // Preserve the contestants list (frozen). Don't declare GV yet.
-      next.gloriosVictory = null;
-      next.gloriosVictoryReason = null;
-    }
-    return next;
-  }
-
-  // ── Normal path ─────────────────────────────────────────────────────────
-  // Track round wins (engine's declared winner, even if kicked — per spec).
-  if (winnerId) {
-    next.roundWins[winnerId] = (next.roundWins[winnerId] ?? 0) + 1;
-  }
-
-  // Compute newly busted players. Bust on the FULL match total (the same
-  // figure the scoreboard shows and that decides the winner): round scores +
-  // cabo penalties − cabo/snap bonuses. Penalties push you toward 60; a
-  // low-cabo win or snap bonus pulls you back.
-  next.bustedThisRound = game.players
-    .filter((p) => matchTotal(game, p.id) > 60)
-    .map((p) => p.id);
-
-  if (next.bustedThisRound.length > 0) {
-    const allEliminated = new Set([...next.kickedIds, ...next.bustedThisRound]);
-    // SP "active" = all players in the current game minus eliminated.
-    const survivors = game.players
-      .map((p) => p.id)
-      .filter((pid) => !allEliminated.has(pid));
-
-    if (survivors.length === 1) {
-      for (const id of next.bustedThisRound) {
-        if (!next.kickedIds.includes(id)) next.kickedIds.push(id);
-      }
-      next.gloriosVictory = survivors[0];
-      next.gloriosVictoryReason = "survivor";
-
-    } else if (survivors.length === 0) {
-      // Simultaneous bust — tiebreaker.
-      const contestants = next.bustedThisRound.filter(
-        (pid) => !next.kickedIds.includes(pid),
-      );
-
-      if (contestants.length === 1) {
-        // Only one active buster — they win by default.
-        const gloriousWinnerId = contestants[0];
-        next.bustedThisRound = next.bustedThisRound.filter((id) => id !== gloriousWinnerId);
-        for (const id of next.bustedThisRound) {
-          if (!next.kickedIds.includes(id)) next.kickedIds.push(id);
-        }
-        next.gloriosVictory = gloriousWinnerId;
-        next.gloriosVictoryReason = "survivor";
-      } else if (contestants.length > 1) {
-        const maxWins = Math.max(...contestants.map((pid) => next.roundWins[pid] ?? 0));
-        const topByWins = contestants.filter((pid) => (next.roundWins[pid] ?? 0) === maxWins);
-        if (topByWins.length === 1) {
-          const gloriousWinnerId = topByWins[0];
-          next.bustedThisRound = next.bustedThisRound.filter((id) => id !== gloriousWinnerId);
-          for (const id of next.bustedThisRound) {
-            if (!next.kickedIds.includes(id)) next.kickedIds.push(id);
-          }
-          next.gloriosVictory = gloriousWinnerId;
-          next.gloriosVictoryReason = "more_wins";
-        } else if (winnerId && topByWins.includes(winnerId)) {
-          // Last-round winner is in the tied set → they take it.
-          const gloriousWinnerId = winnerId;
-          next.bustedThisRound = next.bustedThisRound.filter((id) => id !== gloriousWinnerId);
-          for (const id of next.bustedThisRound) {
-            if (!next.kickedIds.includes(id)) next.kickedIds.push(id);
-          }
-          next.gloriosVictory = gloriousWinnerId;
-          next.gloriosVictoryReason = "final_round";
-        } else {
-          // NEW: Sudden Death trigger. The tied-on-wins set plays another
-          // round to break the tie. Kick the players who busted but aren't
-          // in the tied set (they lost the wins tiebreaker outright).
-          const losers = next.bustedThisRound.filter(
-            (id) => !topByWins.includes(id) && !next.kickedIds.includes(id),
-          );
-          for (const id of losers) {
-            if (!next.kickedIds.includes(id)) next.kickedIds.push(id);
-          }
-          // Remove SD contestants from bustedThisRound — they're playing
-          // the tiebreaker, not eliminated. Leaving them in would cause
-          // BustedOverlay to incorrectly show them the "Busted" splash +
-          // "Return to menu" modal at SD trigger round_over.
-          next.bustedThisRound = next.bustedThisRound.filter(
-            (id) => !topByWins.includes(id),
-          );
-          // Set sudden-death state — DO NOT declare GV yet.
-          const anyPlayerId = game.players[0]?.id;
-          const mainRoundsCount = anyPlayerId
-            ? (game.scores[anyPlayerId]?.length ?? 0)
-            : 0;
-          next.suddenDeath = {
-            active: true,
-            contestants: topByWins,
-            mainRoundsCount,
-          };
-        }
-      }
-    }
-    // survivors.length > 1: normal play-again flow — busts are moved into
-    // kickedIds on the playAgain() click, not here.
-  }
-
-  return next;
-}
-
-/**
  * Mirror an MP room's bust/kick fields onto our local `elim`. Called from
  * `applyMpRoom`. This is what lets UI components read `elim` regardless of
  * mode — the MP server is still the source of truth, we just normalise the
@@ -560,14 +484,118 @@ export const useStore = create<StoreState>((set, get) => ({
   chatUnread: 0,
   audioOpen: false,
   themeOpen: false,
+  settingsOpen: false,
   helpOpen: false,
   setHelpOpen(open) { set({ helpOpen: open }); },
+  reportBugOpen: false,
+  setReportBugOpen(open) { set({ reportBugOpen: open }); },
+  devMode: (() => {
+    try { return localStorage.getItem("cobo.devMode") === "1"; }
+    catch { return false; }
+  })(),
+  setDevMode(on) {
+    try {
+      if (on) localStorage.setItem("cobo.devMode", "1");
+      else localStorage.removeItem("cobo.devMode");
+    } catch { /* private mode — flag is in-memory only for this session */ }
+    set({ devMode: on });
+  },
   eliminatedFromRoom: false,
+  kickedByHost: false,
   pendingNumBots: 1,
   setPendingNumBots(n) { set({ pendingNumBots: n }); },
   pendingVariant: "classic",
   setPendingVariant(v) { set({ pendingVariant: v }); },
   setScreen(s) { set({ screen: s }); },
+
+  // ── Accounts layer (Phase 1 — auth only) ──────────────────────────────────
+  account: null,
+  setAccount(profile) {
+    set({ account: profile ? { profile } : null });
+  },
+  async refreshProfile() {
+    const auth = await import("./auth");
+    const profile = await auth.getMyProfile();
+    set({ account: profile ? { profile } : null });
+  },
+  async logoutAccount() {
+    const auth = await import("./auth");
+    await auth.logout(); // clears the Supabase session + calls setAccount(null)
+    set({ account: null, tokenGrant: null, screen: "menu", profilePanelOpen: false });
+  },
+  // Accounts layer (Phase 3 — profile menu shell). Isolated UI flag.
+  profilePanelOpen: false,
+  setProfilePanelOpen(open) { set({ profilePanelOpen: open }); },
+
+  // Accounts layer (Phase 4 — XP reward). Pending reward + stable SP match key.
+  xpReward: null,
+  spGameKey: null,
+  rewardResolvedKey: null,
+  setXpReward(reward) {
+    if (!reward) {
+      // Dismiss (manual, Continue, Escape, or auto-dismiss). Mark THIS match's
+      // reward flow resolved so the deferred SP result overlay (scoreboard) can
+      // now slide in. In MP/guests spGameKey is null — harmless (those overlays
+      // don't defer on it).
+      set({ xpReward: null, rewardResolvedKey: get().spGameKey });
+      return;
+    }
+    // Fold the server-authoritative new totals into the mirrored profile so the
+    // profile panel / token counter reflect the gain (the overlay animates the
+    // bar separately). We only touch the numeric XP/level/token fields and keep
+    // every other profile field as-is. No-op on the profile if signed out.
+    const { account } = get();
+    const nextAccount = account
+      ? {
+          profile: {
+            ...account.profile,
+            total_xp: reward.total_xp,
+            level: reward.level,
+            tokens: reward.tokens,
+          },
+        }
+      : account;
+    // Keep the token-purchase watcher's baseline in lockstep with this KNOWN
+    // grant. A milestone token is already celebrated by THIS XP overlay, so
+    // advancing the baseline stops the menu-side token reveal from re-celebrating
+    // the same token when the player returns to the menu.
+    if (nextAccount) writeLastSeenTokens(nextAccount.profile.id, reward.tokens);
+    set({ xpReward: reward, account: nextAccount });
+  },
+
+  // Accounts layer — token-purchase celebration (frontend-only). Tokens are
+  // already credited server-side; this is purely the reveal + "Claim".
+  tokenGrant: null,
+  setTokenGrant(grant) {
+    set({ tokenGrant: grant });
+  },
+  checkTokenGrant() {
+    const { account, screen, xpReward, tokenGrant } = get();
+    if (!account) return;
+    const id = account.profile.id;
+    const current = Math.max(0, Math.floor(account.profile.tokens ?? 0));
+    const lastSeen = readLastSeenTokens(id);
+    // First time we've seen this account on this device: record the baseline,
+    // never celebrate the pre-existing balance.
+    if (lastSeen === null) {
+      writeLastSeenTokens(id, current);
+      return;
+    }
+    if (current <= lastSeen) {
+      // Spent tokens (e.g. bought a skin) → lower the baseline silently so the
+      // next real increase is measured from the correct floor.
+      if (current < lastSeen) writeLastSeenTokens(id, current);
+      return;
+    }
+    // Balance rose. Only reveal on the MENU, never over an XP-reward cinematic
+    // or an already-open grant. If a guard blocks it we DON'T advance the
+    // baseline — so it pops the next time the player is back on the menu.
+    if (screen !== "menu" || xpReward || tokenGrant) return;
+    const amount = current - lastSeen;
+    writeLastSeenTokens(id, current);
+    set({ tokenGrant: { amount } });
+  },
+
   botDifficulty: null,
   botSpeech: null,
   setBotSpeech(v) { set({ botSpeech: v }); },
@@ -595,6 +623,13 @@ export const useStore = create<StoreState>((set, get) => ({
       setupPeekRevealed: false, targeting: null, toast: null,
       botDifficulty: diff,
       botSpeech: null,
+      // Accounts layer (Phase 4): fresh stable key for THIS SP match. Reused by
+      // the end-of-game grant across replays of the same match so the server's
+      // idempotency holds. Cleared on backToMenu.
+      spGameKey: genGameKey(),
+      // New match → no reward resolved yet, so the end-of-game result overlay
+      // will correctly defer behind this match's XP experience.
+      rewardResolvedKey: null,
     });
   },
 
@@ -611,6 +646,9 @@ export const useStore = create<StoreState>((set, get) => ({
       pendingGame: null, coinToss: null,
       humanId: "p_human",
       setupPeekRevealed: false, targeting: null, toast: null,
+      // Training earns no XP — keep these null so the end-of-game result
+      // overlays never defer here (no stale SP match key can leak in).
+      spGameKey: null, rewardResolvedKey: null,
     });
   },
 
@@ -1382,111 +1420,31 @@ export const useStore = create<StoreState>((set, get) => ({
       );
       return;
     }
-    if (!game) return;
-    if (elim.gloriosVictory) return; // game over, nothing to play
 
-    // Sudden-death path: contestants play another tie-breaker round. Their
-    // busted-but-not-kicked status is preserved (they're still "in" — playing
-    // the tiebreaker). Filter the next round's seat list to ONLY the SD
-    // contestants. Preserve all scoring history.
-    if (elim.suddenDeath?.active) {
-      const contestantSet = new Set(elim.suddenDeath.contestants);
-      const playerInputs = game.players
-        .filter((p) => contestantSet.has(p.id))
-        .map((p) => ({ id: p.id, name: p.name, isBot: p.isBot }));
-      if (playerInputs.length < 2) {
-        // Defensive: SD should never trigger with <2 contestants, but if
-        // somehow we land here, declare the lone remaining player.
-        const survivor = playerInputs[0]?.id ?? null;
-        set({
-          elim: {
-            ...elim,
-            bustedThisRound: [],
-            gloriosVictory: survivor,
-            gloriosVictoryReason: survivor ? "sudden_death" : null,
-            // Keep the SD record (inactive) so end-of-game scoreboards can
-            // still split R/F columns.
-            suddenDeath: elim.suddenDeath
-              ? {
-                  active: false,
-                  contestants: elim.suddenDeath.contestants,
-                  mainRoundsCount: elim.suddenDeath.mainRoundsCount,
-                }
-              : null,
-          },
-        });
-        return;
-      }
-      const next = newGame({
-        players: playerInputs,
-        variant: game.variant,
-        roundNumber: game.roundNumber + 1,
-        scores: game.scores,
-        caboBonus: game.caboBonus,
-        caboPenalty: game.caboPenalty,
-        snapBonus: game.snapBonus,
-        kamikaze: game.kamikaze,
-      });
-      set({
-        game: next,
-        elim: {
-          ...elim,
-          // bustedThisRound resets for the new round; contestants remain
-          // "in" (no migration to kickedIds during a SD transition).
-          bustedThisRound: [],
-        },
-        setupPeekRevealed: false,
-        targeting: null,
-        toast: null,
-      });
+    // PURE seat-selection + finalisation lives in spBust.ts so the whole SP
+    // continuation loop (resolve → seat next round) is unit-testable without
+    // the store. We only own the side-effects here: newGame() and set().
+    const result = computeSpPlayAgain(game, elim);
+    if (result.kind === "noop") return;
+    if (result.kind === "game_over") {
+      set({ elim: result.nextElim });
       return;
     }
-
-    // Finalise busts from the round that just ended: move into permanent
-    // kickedIds. This mirrors the server's play_again handler.
-    const nextKicked = [...elim.kickedIds];
-    for (const id of elim.bustedThisRound) {
-      if (!nextKicked.includes(id)) nextKicked.push(id);
-    }
-    const finalisedElim: ElimState = {
-      ...elim,
-      bustedThisRound: [],
-      kickedIds: nextKicked,
-    };
-
-    // Filter out kicked players from the next round's seat list. The Glorious
-    // Victor's seat persists; kicks are permanent for the rest.
-    const kickedSet = new Set(nextKicked);
-    const activePlayers = game.players.filter((p) => !kickedSet.has(p.id));
-
-    if (activePlayers.length <= 1) {
-      // Only one (or zero) active players remain — declare GV immediately
-      // instead of starting a new round.
-      const survivor = activePlayers[0]?.id ?? null;
-      set({
-        elim: {
-          ...finalisedElim,
-          gloriosVictory: survivor,
-          gloriosVictoryReason: "survivor",
-        },
-      });
-      return;
-    }
-
-    const playerInputs = activePlayers.map((p) => ({ id: p.id, name: p.name, isBot: p.isBot }));
+    // result.kind === "seat" — game is non-null here (computeSpPlayAgain only
+    // returns "seat" after its `if (!game)` noop guard).
     const next = newGame({
-      players: playerInputs,
-      variant: game.variant,
-      roundNumber: game.roundNumber + 1,
-      scores: game.scores,
-      caboBonus: game.caboBonus,
-      caboPenalty: game.caboPenalty,
-      snapBonus: game.snapBonus,
-      kamikaze: game.kamikaze,
+      players: result.players,
+      variant: game!.variant,
+      roundNumber: game!.roundNumber + 1,
+      scores: game!.scores,
+      caboBonus: game!.caboBonus,
+      caboPenalty: game!.caboPenalty,
+      snapBonus: game!.snapBonus,
+      kamikaze: game!.kamikaze,
     });
     set({
       game: next,
-      elim: finalisedElim,
+      elim: result.nextElim,
       setupPeekRevealed: false,
       targeting: null,
       toast: null,
@@ -1510,7 +1468,11 @@ export const useStore = create<StoreState>((set, get) => ({
       targeting: null, toast: null,
       chatMessages: [], chatOpen: false, chatUnread: 0,
       eliminatedFromRoom: false,
+      kickedByHost: false,
       botDifficulty: null, botSpeech: null,
+      // Accounts layer (Phase 4): clear any pending reward + retire the SP match
+      // key so the next match grants under a fresh idempotency key.
+      xpReward: null, spGameKey: null, rewardResolvedKey: null,
     });
   },
 
@@ -1543,6 +1505,7 @@ export const useStore = create<StoreState>((set, get) => ({
       chatUnread: open ? 0 : get().chatUnread,
       audioOpen: open ? false : get().audioOpen,
       themeOpen: open ? false : get().themeOpen,
+      settingsOpen: open ? false : get().settingsOpen,
     });
   },
   setAudioOpen(open) {
@@ -1550,6 +1513,7 @@ export const useStore = create<StoreState>((set, get) => ({
       audioOpen: open,
       chatOpen: open ? false : get().chatOpen,
       themeOpen: open ? false : get().themeOpen,
+      settingsOpen: open ? false : get().settingsOpen,
     });
   },
   setThemeOpen(open) {
@@ -1557,6 +1521,15 @@ export const useStore = create<StoreState>((set, get) => ({
       themeOpen: open,
       chatOpen: open ? false : get().chatOpen,
       audioOpen: open ? false : get().audioOpen,
+      settingsOpen: open ? false : get().settingsOpen,
+    });
+  },
+  setSettingsOpen(open) {
+    set({
+      settingsOpen: open,
+      chatOpen: open ? false : get().chatOpen,
+      audioOpen: open ? false : get().audioOpen,
+      themeOpen: open ? false : get().themeOpen,
     });
   },
 

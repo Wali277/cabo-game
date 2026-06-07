@@ -17,6 +17,12 @@ export function ChatPanel() {
   const open = useStore((s) => s.chatOpen);
   const unread = useStore((s) => s.chatUnread);
   const setChatOpen = useStore((s) => s.setChatOpen);
+  // When the Settings speed-dial is open it springs UP from the gear, into the
+  // column where this toggle lives — hide the toggle so they don't overlap.
+  // (Opening Settings already closes the chat panel via the FAB mutex; this
+  // just hides the button. The unread count is untouched, so it returns intact
+  // when Settings closes.)
+  const settingsOpen = useStore((s) => s.settingsOpen);
 
   const [text, setText] = useState("");
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -98,14 +104,16 @@ export function ChatPanel() {
         )}
       </AnimatePresence>
 
-      <button
-        className={`chat-toggle ${open ? "open" : ""}`}
-        onClick={() => setChatOpen(!open)}
-        aria-label={open ? "Close chat" : "Open chat"}
-      >
-        <span className="chat-toggle-icon">💬</span>
-        {!open && unread > 0 && <span className="chat-unread">{unread}</span>}
-      </button>
+      {!settingsOpen && (
+        <button
+          className={`chat-toggle ${open ? "open" : ""}`}
+          onClick={() => setChatOpen(!open)}
+          aria-label={open ? "Close chat" : "Open chat"}
+        >
+          <span className="chat-toggle-icon">💬</span>
+          {!open && unread > 0 && <span className="chat-unread">{unread}</span>}
+        </button>
+      )}
     </>
   );
 }

@@ -4,11 +4,12 @@ import { Audio } from "../audio/sounds";
 import { useStore } from "../state/store";
 
 /**
- * Bottom-right audio controls widget.
- *  Collapsed: a small floating circular button with a speaker icon.
- *  Expanded: a panel with two sliders (music + SFX) and per-channel mute toggles.
- *  Music starts on first interaction (browsers require a user gesture for AudioContext).
- *  Opening audio auto-closes chat, and vice-versa (mutual exclusion via store).
+ * Bottom-right audio PANEL (sliders for music + SFX + per-channel mute toggles).
+ * It has no button of its own anymore — it's opened from the combined Settings
+ * FAB's "Sound" action on desktop, and from the in-game ⋯ menu on phones (both
+ * call `setAudioOpen(true)`). The panel floats above the bottom-right FAB stack.
+ * Music starts on first interaction (browsers require a user gesture for
+ * AudioContext). Opening audio auto-closes the other popovers (store mutex).
  */
 export function AudioControls() {
   const expanded = useStore((s) => s.audioOpen);
@@ -50,12 +51,6 @@ export function AudioControls() {
       window.removeEventListener("pointerdown", onDown);
     };
   }, [expanded, setAudioOpen]);
-
-  const overallIcon = settings.musicMuted && settings.sfxMuted
-    ? "🔇"
-    : settings.musicMuted || settings.sfxMuted
-    ? "🔉"
-    : "🔊";
 
   return (
     <div className="audio-controls" ref={panelRef}>
@@ -119,20 +114,6 @@ export function AudioControls() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      <motion.button
-        className="audio-fab"
-        onClick={() => {
-          Audio.ensure();
-          Audio.startMusic();
-          setAudioOpen(!expanded);
-        }}
-        whileHover={{ scale: 1.08 }}
-        whileTap={{ scale: 0.92 }}
-        aria-label="Audio settings"
-      >
-        {overallIcon}
-      </motion.button>
     </div>
   );
 }

@@ -11,7 +11,7 @@
     "electron:make-icon": "node scripts/make-icon.mjs",
     "electron:dev": "npm run electron:build-client && npx electron electron/main.js",
     "electron:build": "npm run electron:make-icon && npm run electron:build-client && npx electron-builder --win --x64 --publish never",
-    "electron:build-mac": "npm run electron:make-icon && npm run electron:build-client && npx electron-builder --mac --arm64 --publish never && mkdir -p \"$HOME/Downloads/Cabo Mac\" && cp dist-electron/*.dmg \"$HOME/Downloads/Cabo Mac/\""
+    "electron:build-mac": "npm run electron:make-icon && npm run electron:build-client && npx electron-builder --mac --arm64 --publish never && mkdir -p \"$HOME/Downloads/Lumo Mac\" && cp dist-electron/*.dmg \"$HOME/Downloads/Lumo Mac/\""
   },
   "engines": {
     "node": ">=20"
@@ -23,7 +23,7 @@
   },
   "build": {
     "appId": "com.cobo.game",
-    "productName": "Cobo",
+    "productName": "Lumo",
     "copyright": "Copyright © 2025",
     "directories": {
       "output": "dist-electron",
@@ -39,7 +39,7 @@
       "category": "public.app-category.games"
     },
     "dmg": {
-      "title": "Cobo",
+      "title": "Lumo",
       "icon": "build/icon.png",
       "window": { "width": 540, "height": 380 },
       "contents": [
@@ -59,7 +59,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Cobo"
+      "shortcutName": "Lumo"
     }
   }
 }

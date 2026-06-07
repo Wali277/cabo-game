@@ -19,13 +19,16 @@ export type TableTheme =
   | "northern"
   | "cosmic"
   | "aquarium"
-  | "horizon";
-export const DEFAULT_THEME: TableTheme = "emerald";
+  | "horizon"
+  | "lagoon"
+  | "auroraindigo";
+export const DEFAULT_THEME: TableTheme = "horizon";
 
 const STORAGE_KEY = "cabo:theme";
 const EVENT_NAME = "cabo:theme-change";
 const VALID: ReadonlyArray<TableTheme> = [
   "emerald", "ocean", "crimson", "northern", "cosmic", "aquarium", "horizon",
+  "lagoon", "auroraindigo",
 ];
 
 /** Labels shown in the picker UI. */
@@ -37,6 +40,8 @@ export const THEME_LABELS: Record<TableTheme, string> = {
   cosmic:   "Cosmic Legacy",
   aquarium: "Aquarium",
   horizon:  "Horizon",
+  lagoon:   "Lagoon",
+  auroraindigo: "Aurora Indigo",
 };
 
 /**
@@ -56,6 +61,24 @@ function migrateLegacyId(v: string | null): string | null {
   if (v === "windmill")  return null; // retired in v2.20
   if (v === "neon")      return null; // retired in v2.20
   return v;
+}
+
+/**
+ * Type guard: is `v` one of the currently-valid table themes? Used by the
+ * accounts cosmetic bridge to clamp a profile's `active_wallpaper` (which may
+ * hold a legacy / unknown id) before handing it to `setTheme`.
+ */
+export function isValidTheme(v: string): v is TableTheme {
+  return VALID.includes(v as TableTheme);
+}
+
+/**
+ * Coerce an arbitrary stored/profile value to a valid theme: returns it when
+ * valid, otherwise falls back to `DEFAULT_THEME`. Tolerates null/undefined so
+ * callers can pass `profile.active_wallpaper` directly.
+ */
+export function coerceTheme(v: string | null | undefined): TableTheme {
+  return v != null && isValidTheme(v) ? v : DEFAULT_THEME;
 }
 
 function loadFromStorage(): TableTheme {

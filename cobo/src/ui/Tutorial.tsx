@@ -10,7 +10,7 @@ const SLIDES: Slide[] = [
   {
     title: "Goal",
     body:
-      "Cabo is a memory game. Each round you score points equal to the cards you're holding when the round ends. The LOWEST total wins — so keep your hand low.",
+      "Lumo is a memory game. Each round you score points equal to the cards you're holding when the round ends. The LOWEST total wins — so keep your hand low.",
   },
   {
     title: "Setup",
@@ -20,7 +20,7 @@ const SLIDES: Slide[] = [
   {
     title: "Your turn",
     body:
-      "On your turn you can:\n  • Draw the top card from the deck\n  • Take the top card from the discard pile\n  • Call CABO! to end the round on your terms",
+      "On your turn you can:\n  • Draw the top card from the deck\n  • Take the top card from the discard pile\n  • Call LUMO! to end the round on your terms",
   },
   {
     title: "After you draw",
@@ -43,24 +43,24 @@ const SLIDES: Slide[] = [
       "You can also Snap one of your OWN face-down cards if you believe its rank matches the discard top. Same rules — correct discards the card, wrong adds a penalty card.\n\nOne Snap self per round. Use it to flush a high card you peeked at setup.",
   },
   {
-    title: "Calling CABO",
+    title: "Calling LUMO",
     body:
-      "Skip your draw to call CABO. Every other player gets ONE more turn, then everyone reveals.\n\n  • If your hand IS the lowest AND ≤ 7 points → that round scores zero AND your hand value is SUBTRACTED from your running total.\n  • If your hand is NOT the lowest → you score your hand + a flat 5-point penalty.\n  • Otherwise — normal scoring.\n\nCabo is a bet. Reward when you're right, punishment when you're wrong.",
+      "Skip your draw to call LUMO. Every other player gets ONE more turn, then everyone reveals.\n\n  • If your hand IS the lowest AND ≤ 7 points → that round scores zero AND your hand value is SUBTRACTED from your running total.\n  • If your hand is NOT the lowest → you score your hand + a flat 5-point penalty.\n  • Otherwise — normal scoring.\n\nLumo is a bet. Reward when you're right, punishment when you're wrong.",
   },
   {
     title: "Scoring",
     body:
-      "Ace = 1 · 2–10 = face value · J = 11 · Q = 12 · K = 13 · Joker = 0\n\nJokers are the best cards to hold — they're worth nothing. Kings are the worst — they're worth 13.\n\nThe scoreboard shows three columns: round score, Cabo Bonus (green, subtracted), Cabo Penalty (red, added). The Total combines all three.",
+      "Ace = 1 · 2–10 = face value · J = 11 · Q = 12 · K = 13 · Joker = 0\n\nJokers are the best cards to hold — they're worth nothing. Kings are the worst — they're worth 13.\n\nThe scoreboard shows three columns: round score, Lumo Bonus (green, subtracted), Lumo Penalty (red, added). The Total combines all three.",
   },
   {
     title: "Meet the bots",
     body:
-      "Single-player offers three rivals:\n\n  • Billy Smalls — naive, loose, calls Cabo at random.\n  • General Marcy — composed, textbook play, snaps when she knows.\n  • Bob — adaptive, ruthless, snaps in under half a second.\n\nPick the level that matches the fight you want.",
+      "Single-player offers three rivals:\n\n  • Billy Smalls — naive, loose, calls Lumo at random.\n  • General Marcy — composed, textbook play, snaps when she knows.\n  • Bob — adaptive, ruthless, snaps in under half a second.\n\nPick the level that matches the fight you want.",
   },
   {
     title: "Bust! (Multiplayer)",
     body:
-      "In multiplayer, your scores add up across every round. If your cumulative total exceeds 60 points you are BUSTED — permanently eliminated from the room.\n\nThe last player still standing wins a Glorious Victory. Late in a match, even a small Cabo penalty can push you over. Play accordingly.",
+      "In multiplayer, your scores add up across every round. If your cumulative total exceeds 60 points you are BUSTED — permanently eliminated from the room.\n\nThe last player still standing wins a Glorious Victory. Late in a match, even a small Lumo penalty can push you over. Play accordingly.",
   },
 ];
 

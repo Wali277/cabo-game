@@ -1,5 +1,6 @@
 import { io, type Socket } from "socket.io-client";
 import { useStore } from "./store";
+import type { RewardPayload } from "./store";
 import { logDebug } from "./debugLog";
 
 // In a production web build the Node server serves both the static client and
@@ -25,6 +26,16 @@ function defaultServerUrl(): string {
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || defaultServerUrl();
 const STORAGE_KEY = "cobo.mp.session";
 
+/**
+ * The resolved server origin (same Node process that serves sockets). Shared
+ * with the accounts layer (`state/auth.ts`) so the auth REST API hits the SAME
+ * origin as multiplayer — works behind tunnels / cloud / the Electron file://
+ * build without hardcoding localhost.
+ */
+export function serverUrl(): string {
+  return SERVER_URL;
+}
+
 interface Session {
   code: string;
   playerId: string;
@@ -44,12 +55,29 @@ export function getSocket(): Socket {
     socket.on("chat:message", (msg: { from: string; name: string; text: string; at: number }) => {
       useStore.getState().receiveChatMessage(msg);
     });
+    // Accounts layer (Phase 4 — MP XP reward). The server grants end-of-game XP
+    // server-side and emits the SHARED reward payload here; we hand it straight
+    // to the store, whose XpRewardOverlay celebrates it and folds the new totals
+    // into the profile. The amount is server-authoritative — we never assert it.
+    socket.on("xp:reward", (reward: RewardPayload) => {
+      useStore.getState().setXpReward(reward);
+    });
+    // The room HOST removed us from the lobby. Clear our session so we don't
+    // auto-rejoin, drop the room, and raise the DISTINCT "kicked" flag (its own
+    // screen — never the bust/eliminated overlay).
+    socket.on("room:kicked", () => {
+      clearSession();
+      useStore.setState({ mp: null, kickedByHost: true });
+    });
     socket.on("connect", () => {
       const sess = loadSession();
       if (sess) {
+        // Re-link account identity on reconnect/rejoin (best-effort; absent for
+        // guests). Fetch the access token first, then emit the rejoin.
+        void getAccessTokenSafe().then((accessToken) => {
         socket!.emit(
           "room:rejoin",
-          { code: sess.code, playerId: sess.playerId },
+          { code: sess.code, playerId: sess.playerId, accessToken },
           (resp: { ok: boolean; error?: string }) => {
             if (!resp.ok) {
               clearSession();
@@ -61,6 +89,7 @@ export function getSocket(): Socket {
             }
           },
         );
+        });
       }
     });
     // ── Connection diagnostics ────────────────────────────────────────────
@@ -76,6 +105,22 @@ export function getSocket(): Socket {
     listenersBound = true;
   }
   return socket;
+}
+
+/**
+ * Accounts layer (Phase 4): the Supabase access token, fetched lazily via a
+ * dynamic import so this module has NO static dependency on auth.ts (auth.ts
+ * imports mp.ts for `serverUrl`). Resolves to null for guests / unconfigured
+ * builds / any error — passing an absent token on create/join is fine; the
+ * server simply treats the socket as a guest. NEVER throws.
+ */
+async function getAccessTokenSafe(): Promise<string | null> {
+  try {
+    const auth = await import("./auth");
+    return await auth.getAccessToken();
+  } catch {
+    return null;
+  }
 }
 
 function saveSession(s: Session) {
@@ -122,9 +167,12 @@ function waitConnected(s: Socket, timeoutMs = 8000): Promise<void> {
 export async function createRoom(name: string) {
   const s = getSocket();
   await waitConnected(s);
+  // Pass the Supabase access token (absent for guests) so the server can link
+  // this socket to an account for the end-of-game XP grant. Phase 4.
+  const accessToken = await getAccessTokenSafe();
   return new Promise<{ ok: boolean; code?: string; playerId?: string; error?: string }>(
     (resolve) => {
-      s.emit("room:create", { name }, (resp: any) => {
+      s.emit("room:create", { name, accessToken }, (resp: any) => {
         if (resp.ok) saveSession({ code: resp.code, playerId: resp.playerId, name });
         resolve(resp);
       });
@@ -135,9 +183,10 @@ export async function createRoom(name: string) {
 export async function joinRoom(code: string, name: string) {
   const s = getSocket();
   await waitConnected(s);
+  const accessToken = await getAccessTokenSafe();
   return new Promise<{ ok: boolean; code?: string; playerId?: string; error?: string }>(
     (resolve) => {
-      s.emit("room:join", { code: code.toUpperCase(), name }, (resp: any) => {
+      s.emit("room:join", { code: code.toUpperCase(), name, accessToken }, (resp: any) => {
         if (resp.ok) saveSession({ code: code.toUpperCase(), playerId: resp.playerId, name });
         resolve(resp);
       });
@@ -153,6 +202,15 @@ export async function startGame() {
 export async function setVariantMp(variant: "classic" | "evolved") {
   return new Promise<{ ok: boolean; error?: string }>((resolve) =>
     getSocket().emit("room:set_variant", { variant }, resolve),
+  );
+}
+
+/** Host-only: remove a player from the lobby before the game starts. The server
+ *  verifies the caller is the host; the removed player gets a `room:kicked`
+ *  event (→ the distinct KickedOverlay). Resolves the server's {ok,error}. */
+export async function kickPlayer(targetPlayerId: string) {
+  return new Promise<{ ok: boolean; error?: string }>((resolve) =>
+    getSocket().emit("room:kick", { targetPlayerId }, resolve),
   );
 }
 

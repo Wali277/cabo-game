@@ -5,11 +5,31 @@ import { MenuWallpaper } from "./MenuWallpaper";
 import {
   createRoom as createRoomMp,
   joinRoom as joinRoomMp,
+  kickPlayer,
   sendReady,
   sendUnready,
   setVariantMp,
 } from "../state/mp";
 import { CaboEvolvedInfo } from "./CaboEvolvedInfo";
+
+/** Map socket.io's raw transport-level error strings (e.g. "xhr poll error",
+ *  "websocket error", "transport close", "transport error") to a friendly,
+ *  user-facing message. Server-returned errors ("Room not found", "Room full",
+ *  "Game already started", "You have been eliminated…") and the explicit
+ *  waitConnected timeout already read well — return them unchanged. */
+function friendlyConnectionError(raw: unknown): string {
+  const msg = typeof raw === "string" ? raw : raw instanceof Error ? raw.message : "";
+  const lower = msg.toLowerCase();
+  if (
+    lower.includes("xhr poll") ||
+    lower.includes("websocket error") ||
+    lower.includes("transport close") ||
+    lower.includes("transport error")
+  ) {
+    return "Couldn't reach the server. Check your connection and try again.";
+  }
+  return msg || "Connection failed";
+}
 
 interface Props {
   initialCode?: string;
@@ -20,7 +40,6 @@ export function Lobby({ initialCode }: Props) {
   const [mode, setMode] = useState<"choose" | "join">(
     initialCode ? "join" : "choose",
   );
-  const [name, setName] = useState("");
   const [code, setCode] = useState(initialCode?.toUpperCase() ?? "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -28,29 +47,43 @@ export function Lobby({ initialCode }: Props) {
   const [urlCopied, setUrlCopied] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const [variantBusy, setVariantBusy] = useState(false);
+  // Host's per-row kick confirm: first click arms a player (button → "Remove?"),
+  // a second click within that row confirms. Avoids a native confirm() dialog.
+  const [kickArmed, setKickArmed] = useState<string | null>(null);
   const backToMenu = useStore((s) => s.backToMenu);
   const leaveRoomToLobby = useStore((s) => s.leaveRoomToLobby);
 
+  // Logged-in account holders display under their account username; guests
+  // display under the literal "Guest player" label (no typed-name field for
+  // guests anymore). The server only requires a non-empty display name.
+  const account = useStore((s) => s.account);
+  const accountName = account?.profile.username?.trim() ?? "";
+  const isLoggedIn = accountName.length > 0;
+  /** The display name to play under: the signed-in account's username, or the
+   *  literal "Guest player" label for guests (no typed-name input anymore — guests
+   *  share the label, matching the new bolded display above). */
+  const playerName = isLoggedIn ? accountName : "Guest player";
+
   async function doCreate() {
-    if (!name.trim()) {
+    if (!playerName) {
       setErr("Enter your name first");
       return;
     }
     setBusy(true);
     setErr(null);
     try {
-      const r = await createRoomMp(name.trim());
+      const r = await createRoomMp(playerName);
       if (!r.ok) setErr(r.error ?? "Failed to create room");
       else history.replaceState(null, "", `/room/${r.code}`);
-    } catch (e: any) {
-      setErr(e?.message ?? "Connection failed");
+    } catch (e) {
+      setErr(friendlyConnectionError(e));
     } finally {
       setBusy(false);
     }
   }
 
   async function doJoin() {
-    if (!name.trim()) {
+    if (!playerName) {
       setErr("Enter your name first");
       return;
     }
@@ -61,11 +94,11 @@ export function Lobby({ initialCode }: Props) {
     setBusy(true);
     setErr(null);
     try {
-      const r = await joinRoomMp(code.toUpperCase(), name.trim());
+      const r = await joinRoomMp(code.toUpperCase(), playerName);
       if (!r.ok) setErr(r.error ?? "Failed to join room");
       else history.replaceState(null, "", `/room/${code.toUpperCase()}`);
-    } catch (e: any) {
-      setErr(e?.message ?? "Connection failed");
+    } catch (e) {
+      setErr(friendlyConnectionError(e));
     } finally {
       setBusy(false);
     }
@@ -109,6 +142,19 @@ export function Lobby({ initialCode }: Props) {
       await setVariantMp(v);
       setVariantBusy(false);
     }
+    // Host removes a player. Two-click: first arms, second confirms. The server
+    // re-checks host + pre-start authority; the removed player gets the distinct
+    // "kicked" screen.
+    async function handleKick(id: string) {
+      if (kickArmed !== id) {
+        setKickArmed(id);
+        return;
+      }
+      setKickArmed(null);
+      setErr(null);
+      const res = await kickPlayer(id);
+      if (!res.ok) setErr(res.error ?? "Couldn't remove that player.");
+    }
 
     return (
       <>
@@ -149,6 +195,22 @@ export function Lobby({ initialCode }: Props) {
                   {m.isHost && <span className="badge host">HOST</span>}
                   {mp.readyVotes.includes(m.id) && <span className="badge ready">READY</span>}
                   {!m.connected && <span className="badge off">offline</span>}
+                  {/* Host-only: remove an unwanted player (two-click confirm). */}
+                  {isHost && m.id !== mp.viewerId && (
+                    <button
+                      type="button"
+                      className={`member-kick${kickArmed === m.id ? " armed" : ""}`}
+                      onClick={() => handleKick(m.id)}
+                      aria-label={
+                        kickArmed === m.id
+                          ? `Confirm removing ${m.name}`
+                          : `Remove ${m.name} from the room`
+                      }
+                      title="Remove from room"
+                    >
+                      {kickArmed === m.id ? "Remove?" : "✕"}
+                    </button>
+                  )}
                 </div>
               ))}
               {Array.from({ length: Math.max(0, 4 - mp.members.length) }).map((_, i) => (
@@ -182,21 +244,21 @@ export function Lobby({ initialCode }: Props) {
                       disabled={variantBusy}
                       onClick={() => chooseVariant("evolved")}
                     >
-                      Cabo Evolved
+                      Lumo Evolved
                     </button>
                   </>
                 ) : (
                   <span
                     className={`mode-option active ${mp.variant === "evolved" ? "evolved" : ""}`}
                   >
-                    {mp.variant === "evolved" ? "Cabo Evolved" : "Classic"}
+                    {mp.variant === "evolved" ? "Lumo Evolved" : "Classic"}
                   </span>
                 )}
                 <button
                   className="mode-info-btn"
                   onClick={() => setInfoOpen(true)}
-                  aria-label="How Cabo Evolved works"
-                  title="How Cabo Evolved works"
+                  aria-label="How Lumo Evolved works"
+                  title="How Lumo Evolved works"
                 >
                   &#9432;
                 </button>
@@ -262,7 +324,7 @@ export function Lobby({ initialCode }: Props) {
         animate={{ scale: 1, rotate: -6, opacity: 1 }}
         transition={{ type: "spring", stiffness: 200, damping: 14 }}
       >
-        <span className="title-text">CABO!</span>
+        <span className="title-text">LUMO!</span>
       </motion.h1>
       <p className="subtitle">Play with friends</p>
 
@@ -271,14 +333,9 @@ export function Lobby({ initialCode }: Props) {
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
       >
-        <label className="menu-label">Your name</label>
-        <input
-          className="input"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. Alex"
-          maxLength={16}
-        />
+        <div className="lobby-playing-as">
+          <strong>{isLoggedIn ? accountName : "Guest player"}</strong>
+        </div>
 
         {mode === "choose" && (
           <div className="row gap">

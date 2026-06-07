@@ -80,6 +80,15 @@ const CARDS: WallpaperCard[] = [
   // Innermost
   { id: "R7", side: "right", inset: 15,  top: 68, rotate: -24, size: "md", faceUp: true, rank: "3",  suit: "D", duration: 8,  delay: 2.0, driftScale: 1.1, opacity: 1, inner: true },
   { id: "R8", side: "right", inset: 17,  top: 34, rotate:  10, size: "md", faceUp: true, rank: "Q",  suit: "S", duration: 12, delay: 0.5, driftScale: 0.9, opacity: 0.95, inner: true, pulse: true },
+
+  // ───────── EXTRA FILLER (desktop only — not in MOBILE_CARD_IDS) ─────────
+  // A couple more per side to thicken the piles and fill the mid/outer flanks.
+  // One far-outer card (always safe from the centred menu card) + one inner
+  // card (hidden on narrow screens via `.inner`) on each side.
+  { id: "L9",  side: "left",  inset: -9, top: 50, rotate:  16, size: "lg", faceUp: true, rank: "8", suit: "C", duration: 12, delay: 1.4, driftScale: 1.0, opacity: 0.86 },
+  { id: "L10", side: "left",  inset: 12, top: 54, rotate: -18, size: "md", faceUp: false,                     duration: 13, delay: 0.5, driftScale: 1.1, opacity: 0.95, inner: true, pulse: true },
+  { id: "R9",  side: "right", inset: -9, top: 50, rotate: -16, size: "lg", faceUp: true, rank: "4", suit: "H", duration: 11, delay: 0.8, driftScale: 1.0, opacity: 0.86 },
+  { id: "R10", side: "right", inset: 13, top: 52, rotate:  18, size: "md", faceUp: false,                     duration: 14, delay: 1.7, driftScale: 1.1, opacity: 0.95, inner: true, pulse: true },
 ];
 
 function makeCard(rank: Rank, suit: Suit, id: string): Card {

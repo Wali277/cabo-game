@@ -141,7 +141,7 @@ export function LeftPanel({ className = "" }: LeftPanelProps = {}) {
     switch (game.phase) {
       case "turn_start":
         emoji = "🎴";
-        instruction = "Your turn — draw a card or call CABO!";
+        instruction = "Your turn — draw a card or call LUMO!";
         buttons = (
           <>
             <button
@@ -161,7 +161,7 @@ export function LeftPanel({ className = "" }: LeftPanelProps = {}) {
             </button>
             <div className="left-divider" />
             <button className="btn danger left-btn" onClick={callCaboAction} disabled={!!game.caboCallerId}>
-              🚨 Call CABO!
+              🚨 Call LUMO!
             </button>
           </>
         );
