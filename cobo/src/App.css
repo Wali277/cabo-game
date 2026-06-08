@@ -8253,6 +8253,41 @@ body.mobile-mode .error-boundary-card {
   flex-direction: column;
   gap: 8px;
 }
+/* Balance pill + the Ko-fi "Buy tokens" button share a row; wrap on narrow. */
+.styles-store-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+/* Ko-fi-branded "Buy tokens" pill — opens the Ko-fi token shop item. */
+.styles-store-buy {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border-radius: 999px;
+  border: none;
+  font-family: inherit;
+  font-weight: 800;
+  font-size: 14px;
+  color: #fff;
+  text-decoration: none;
+  background: linear-gradient(180deg, #ff6b67, #ef514d);
+  box-shadow: 0 4px 0 #c23a37, 0 8px 18px rgba(240, 81, 77, 0.35);
+  cursor: pointer;
+  transition: transform 0.14s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.14s;
+}
+.styles-store-buy:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 0 #c23a37, 0 10px 22px rgba(240, 81, 77, 0.45);
+}
+.styles-store-buy:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #c23a37;
+}
 .styles-store-balance {
   display: inline-flex;
   align-items: center;

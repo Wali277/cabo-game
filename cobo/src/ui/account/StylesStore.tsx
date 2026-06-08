@@ -174,17 +174,41 @@ export function StylesStore() {
 }
 
 // ── Token-balance header ──────────────────────────────────────────────────────
+/** Ko-fi "Tokens" shop item — buying it auto-credits the account via the Ko-fi
+ *  webhook. Direct link so players can top up right from the Styles store. */
+const KOFI_TOKENS_URL = "https://ko-fi.com/s/bd28409878";
+
 function StoreHeader({ tokens }: { tokens: number }) {
   return (
     <div className="styles-store-head">
-      <div className="styles-store-balance">
-        <span className="styles-store-balance-coin" aria-hidden="true">
-          🪙
-        </span>
-        <span className="styles-store-balance-value">{tokens}</span>
-        <span className="styles-store-balance-label">
-          {tokens === 1 ? "token" : "tokens"}
-        </span>
+      <div className="styles-store-head-row">
+        <div className="styles-store-balance">
+          <span className="styles-store-balance-coin" aria-hidden="true">
+            🪙
+          </span>
+          <span className="styles-store-balance-value">{tokens}</span>
+          <span className="styles-store-balance-label">
+            {tokens === 1 ? "token" : "tokens"}
+          </span>
+        </div>
+        <a
+          className="styles-store-buy"
+          href={KOFI_TOKENS_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Buy more tokens on Ko-fi (opens in a new tab)"
+          onClick={() => Audio.playSfx("click")}
+        >
+          {/* Ko-fi coffee-cup mark (inherits the button's white text colour). */}
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M9 3.2c.7.6.7 1.4 0 2 .7.6.7 1.4 0 2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            <path d="M13 3.2c.7.6.7 1.4 0 2 .7.6.7 1.4 0 2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            <path d="M4 10h12v3.2A4.8 4.8 0 0 1 11.2 18H8.8A4.8 4.8 0 0 1 4 13.2V10Z" fill="currentColor" />
+            <path d="M16 10.8h1.4a2.6 2.6 0 0 1 0 5.2H15.4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" fill="none" />
+            <path d="M4.4 20h11.2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+          </svg>
+          <span>Buy tokens</span>
+        </a>
       </div>
       <p className="styles-store-intro">
         Spend tokens to unlock skins &amp; wallpapers, then equip your favourites.
