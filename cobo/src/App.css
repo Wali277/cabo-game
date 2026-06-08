@@ -8822,12 +8822,13 @@ body.mobile-mode .menu .a2hs-banner {
 body.mobile-mode:has(.a2hs-banner) .account-tab-guest {
   bottom: calc(env(safe-area-inset-bottom, 0px) + 30px);
 }
-body.mobile-mode:has(.account-tab-profile) .menu .a2hs-banner {
-  left: 14px;
-  right: 14px;
-  max-width: 430px;
-  margin: 0 auto;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 108px);
+/* Signed in: the full-width profile pill takes the bottom strip, and there's no
+   clean room for the taller install banner without it overlapping the menu card
+   (the earlier "raise it" attempt landed the banner over Training Chamber). Hide
+   the banner for signed-in users — they can still Add to Home Screen from the
+   Safari share menu. Guests still get the compact icon + the banner beside it. */
+body.mobile-mode:has(.account-tab-profile) .a2hs-banner {
+  display: none;
 }
 
 body.mobile-mode .token-counter {
