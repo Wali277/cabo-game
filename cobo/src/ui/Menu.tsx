@@ -311,7 +311,7 @@ export function Menu() {
             {installPlatform === "android" ? <MenuDotsGlyph /> : <ShareGlyph />}
           </span>
           <div className="a2hs-text">
-            <strong>{installPrompt ? "Install LUMO" : "Add LUMO to your Home Screen"}</strong>
+            <strong>{installPrompt ? "Install LUMO" : "Add LUMO to Home Screen"}</strong>
             <span>
               {installPrompt
                 ? "Tap Install for full-screen play from your phone."

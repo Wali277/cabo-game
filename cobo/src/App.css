@@ -399,7 +399,7 @@ body.mobile-mode .menu .menu-sound-toggle {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 14px;
+  padding: 9px 14px;
   border-radius: 16px;
   color: #f4ebff;
   background: linear-gradient(135deg, rgba(255, 216, 107, 0.18), rgba(168, 123, 255, 0.16));
@@ -425,8 +425,21 @@ body.mobile-mode .menu .menu-sound-toggle {
   gap: 2px;
   line-height: 1.25;
 }
-.a2hs-text strong { font-size: 14px; font-weight: 800; color: #fff; }
-.a2hs-text span { font-size: 12px; color: rgba(244, 235, 255, 0.82); }
+.a2hs-text strong {
+  font-size: 14px;
+  font-weight: 800;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.a2hs-text span {
+  font-size: 12px;
+  color: rgba(244, 235, 255, 0.82);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .a2hs-install {
   flex: 0 0 auto;
   min-height: 32px;
@@ -8764,6 +8777,13 @@ button.token-counter:active {
   .profile-account { gap: 18px; }
 }
 
+/* Lock the page against iOS Safari rubber-band / toolbar-toggle so the fixed
+   bottom account icon + install banner don't jitter when the user drags the
+   menu. Inner scroll areas (profile, help, chat) keep their own overflow:auto. */
+body.mobile-mode {
+  overscroll-behavior: none;
+}
+
 /* Phone-mode (the explicit mobile layout): keep the account tab + token
    counter clear of the top-bar overflow panels and comfortable to tap.
    The token counter sheds the tall in-game offset since phone-mode hides the
@@ -8822,13 +8842,10 @@ body.mobile-mode .menu .a2hs-banner {
   margin: 0;
   max-width: none;
 }
-/* The install banner is taller than the 60px icon; both are bottom-anchored, so
-   their centers don't line up. When the banner is present, raise the account
-   icon (guest OR signed-in profile) so its center matches the banner's. */
-body.mobile-mode:has(.a2hs-banner) .account-tab-guest,
-body.mobile-mode:has(.a2hs-banner) .account-tab-profile {
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 30px);
-}
+/* The icon and banner are now the SAME height (~58px — the banner text is forced
+   to two nowrap lines below), so bottom-anchoring BOTH at 14px lines them up
+   cleanly on any phone width — no fragile fixed offset that breaks when the
+   subtitle is 1 line (wide screen) vs 2 (narrow). */
 
 body.mobile-mode .token-counter {
   top: auto; /* Phone-mode: snug to the safe-area at bottom-right (mobile hides the FAB stack, so the corner is clear). */
