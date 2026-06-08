@@ -10,6 +10,9 @@ type BeforeInstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 };
 
+/** Which platform's manual "Add to Home Screen" copy to show. */
+type InstallPlatform = "ios" | "android";
+
 /** Small iOS "Share" glyph (box with an up arrow) for the install banner. */
 function ShareGlyph() {
   return (
@@ -17,6 +20,17 @@ function ShareGlyph() {
       <path d="M8.5 1.2 V12" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
       <path d="M5.2 4.3 L8.5 1 L11.8 4.3" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M4.5 7.5 H3.2 A2 2 0 0 0 1.2 9.5 V16.6 A2 2 0 0 0 3.2 18.6 H13.8 A2 2 0 0 0 15.8 16.6 V9.5 A2 2 0 0 0 13.8 7.5 H12.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** Android "more" menu glyph (3 vertical dots) for the install banner. */
+function MenuDotsGlyph() {
+  return (
+    <svg width="6" height="20" viewBox="0 0 6 20" fill="currentColor" aria-hidden="true">
+      <circle cx="3" cy="3" r="2.3" />
+      <circle cx="3" cy="10" r="2.3" />
+      <circle cx="3" cy="17" r="2.3" />
     </svg>
   );
 }
@@ -51,21 +65,28 @@ function isPhoneDevice(): boolean {
   }
 }
 
-/** Whether to show the manual install recommendation: iOS Safari that isn't
- *  already running as an installed PWA. Chromium/Android uses the native
- *  `beforeinstallprompt` event instead, handled in Menu's effect below.
- *  `?a2hs=1` forces the manual banner on in any browser for local preview. */
-function shouldOfferManualInstall(): boolean {
-  if (typeof window === "undefined") return false;
+/** Which manual "Add to Home Screen" instructions to offer, or null to not show
+ *  the banner. iOS Safari AND Android Chrome both lack our one-tap install
+ *  (there is no service worker, so `beforeinstallprompt` never fires on Android),
+ *  so BOTH get a manual banner + tutorial. `?a2hs=ios|android|1` forces it on in
+ *  any browser for local preview. */
+function detectInstallPlatform(): InstallPlatform | null {
+  if (typeof window === "undefined") return null;
   const params = new URLSearchParams(window.location.search);
-  if (params.get("a2hs") === "1") return true;
-  if (installDismissed()) return false;
+  const forced = params.get("a2hs");
+  if (forced === "ios") return "ios";
+  if (forced === "android") return "android";
+  if (installDismissed()) return null;
+  if (isStandaloneDisplay()) return null;
   const ua = navigator.userAgent || "";
   const isIOS =
     /iphone|ipad|ipod/i.test(ua) ||
     // iPadOS 13+ masquerades as macOS, so also treat touch-capable "Macs" as iOS.
     (navigator.platform === "MacIntel" && (navigator as { maxTouchPoints?: number }).maxTouchPoints! > 1);
-  return isIOS && !isStandaloneDisplay();
+  if (isIOS) return "ios";
+  if (/android/i.test(ua)) return "android";
+  if (forced === "1") return "ios"; // legacy ?a2hs=1 → default to the iOS copy
+  return null;
 }
 
 export function Menu() {
@@ -103,22 +124,29 @@ export function Menu() {
     if (!next) Audio.playSfx("click"); // little chirp so unmuting is audible
   };
 
-  const [showInstall, setShowInstall] = useState(shouldOfferManualInstall);
+  const [installPlatform, setInstallPlatform] = useState<InstallPlatform | null>(
+    detectInstallPlatform,
+  );
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  // Show the banner when we have a platform to instruct OR a native prompt.
+  const showInstall = installPlatform !== null || installPrompt !== null;
 
   useEffect(() => {
     const onBeforeInstallPrompt = (event: Event) => {
       // Phones only — never pop our install banner on desktop Chromium, which
       // also fires this event but where "Add to Home Screen" makes no sense.
       if (installDismissed() || isStandaloneDisplay() || !isPhoneDevice()) return;
+      // A native prompt is available (Android Chrome WITH a service worker):
+      // upgrade the banner to a one-tap Install button. Default the platform to
+      // "android" so the manual copy is right if the prompt is ever lost.
       event.preventDefault();
       setInstallPrompt(event as BeforeInstallPromptEvent);
-      setShowInstall(true);
+      setInstallPlatform((p) => p ?? "android");
     };
     const onAppInstalled = () => {
       markInstallDismissed();
       setInstallPrompt(null);
-      setShowInstall(false);
+      setInstallPlatform(null);
     };
     window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
     window.addEventListener("appinstalled", onAppInstalled);
@@ -131,7 +159,7 @@ export function Menu() {
   const dismissInstall = () => {
     markInstallDismissed();
     setInstallPrompt(null);
-    setShowInstall(false);
+    setInstallPlatform(null);
   };
 
   const promptInstall = async () => {
@@ -144,7 +172,7 @@ export function Menu() {
       await promptEvent.userChoice;
     } finally {
       markInstallDismissed();
-      setShowInstall(false);
+      setInstallPlatform(null);
     }
   };
 
@@ -279,13 +307,17 @@ export function Menu() {
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.55, type: "spring", stiffness: 220, damping: 24 }}
         >
-          <span className="a2hs-icon" aria-hidden="true"><ShareGlyph /></span>
+          <span className="a2hs-icon" aria-hidden="true">
+            {installPlatform === "android" ? <MenuDotsGlyph /> : <ShareGlyph />}
+          </span>
           <div className="a2hs-text">
             <strong>{installPrompt ? "Install LUMO" : "Add LUMO to your Home Screen"}</strong>
             <span>
               {installPrompt
                 ? "Tap Install for full-screen play from your phone."
-                : "Tap Share, then “Add to Home Screen” for full-screen play."}
+                : installPlatform === "android"
+                ? "Tap the ⋮ menu, then “Add to Home screen”."
+                : "Tap Share, then “Add to Home Screen”."}
             </span>
           </div>
           {installPrompt && (
