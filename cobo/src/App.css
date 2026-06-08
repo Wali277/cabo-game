@@ -8776,10 +8776,12 @@ body.mobile-mode .account-tab {
   max-width: min(290px, 75vw);
 }
 
-/* Phone: the GUEST account tab collapses to a compact circular avatar ICON
-   button so it no longer collides with the Add-to-Home-Screen banner (both sit
-   at the bottom of the menu). Signed-in users keep the full profile pill. */
-body.mobile-mode .account-tab-guest {
+/* Phone: BOTH the guest "log in" tab AND the signed-in profile collapse to a
+   compact circular avatar ICON button (tap to log in / open the full profile).
+   Keeps the menu bottom clean and lets the install banner sit beside it. The
+   full profile (name · Lv · tokens · XP) is shown in the profile panel on tap. */
+body.mobile-mode .account-tab-guest,
+body.mobile-mode .account-tab-profile {
   min-height: 0;
   width: auto;
   max-width: none;
@@ -8791,12 +8793,16 @@ body.mobile-mode .account-tab-guest {
   overflow: visible;
 }
 body.mobile-mode .account-tab-guest:hover,
-body.mobile-mode .account-tab-guest:active { box-shadow: none; }
-body.mobile-mode .account-tab-guest .account-tab-text { display: none; }
+body.mobile-mode .account-tab-guest:active,
+body.mobile-mode .account-tab-profile:hover,
+body.mobile-mode .account-tab-profile:active { box-shadow: none; }
+body.mobile-mode .account-tab-guest .account-tab-text,
+body.mobile-mode .account-tab-profile .account-tab-text { display: none; }
 /* Keep the SAME teal→coral character gradient as the desktop/web avatar (the
    base .account-tab-avatar background); just size it up + add a ring/lift so the
-   circle reads as a tappable login button — matching the web colours. */
-body.mobile-mode .account-tab-guest .account-tab-avatar {
+   circle reads as a tappable button — matching the web colours. */
+body.mobile-mode .account-tab-guest .account-tab-avatar,
+body.mobile-mode .account-tab-profile .account-tab-avatar {
   width: 58px;
   height: 58px;
   font-size: 32px;
@@ -8807,9 +8813,9 @@ body.mobile-mode .account-tab-guest .account-tab-avatar {
     0 0 0 2.5px oklch(0.30 0.08 270 / 0.85);
 }
 
-/* Add-to-Home-Screen banner: offset to clear the bottom-left account icon so
-   they never overlap. When signed in, the profile pill is wider than a left
-   offset can clear, so raise the (centered) banner above it instead. */
+/* Add-to-Home-Screen banner: offset to clear the bottom-left account icon
+   (guest OR signed-in profile — both are compact icons now) so they never
+   overlap. */
 body.mobile-mode .menu .a2hs-banner {
   left: 84px;
   right: 14px;
@@ -8817,18 +8823,11 @@ body.mobile-mode .menu .a2hs-banner {
   max-width: none;
 }
 /* The install banner is taller than the 60px icon; both are bottom-anchored, so
-   their centers don't line up. When the banner is present, raise the guest icon
-   so its vertical center matches the banner's — they read as one aligned row. */
-body.mobile-mode:has(.a2hs-banner) .account-tab-guest {
+   their centers don't line up. When the banner is present, raise the account
+   icon (guest OR signed-in profile) so its center matches the banner's. */
+body.mobile-mode:has(.a2hs-banner) .account-tab-guest,
+body.mobile-mode:has(.a2hs-banner) .account-tab-profile {
   bottom: calc(env(safe-area-inset-bottom, 0px) + 30px);
-}
-/* Signed in: the full-width profile pill takes the bottom strip, and there's no
-   clean room for the taller install banner without it overlapping the menu card
-   (the earlier "raise it" attempt landed the banner over Training Chamber). Hide
-   the banner for signed-in users — they can still Add to Home Screen from the
-   Safari share menu. Guests still get the compact icon + the banner beside it. */
-body.mobile-mode:has(.account-tab-profile) .a2hs-banner {
-  display: none;
 }
 
 body.mobile-mode .token-counter {
