@@ -57,25 +57,35 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, totalSeats, 
   // so the nowrap top row and the rotated side rails fit without colliding or
   // clipping. Tablet-portrait + desktop are untouched (they keep sm/md/lg).
   const phoneOppCrowded = isPhone && !isHuman && (totalSeats >= 4 || handLen > 4);
+  // Mobile size for the human/POV row, reused by the TOP opponent so it reads at
+  // the same scale as the down player (Step 1). Shrinks as the hand grows.
+  const mobilePovSize: "xs" | "sm" | "md" | "lg" =
+    handLen > 6 ? "sm" : handLen > 4 ? "md" : "lg";
   const cardSize: "xs" | "sm" | "md" | "lg" = isHuman
     ? !isMobile
       ? "lg"
-      : handLen > 6
-      ? "sm"
-      : handLen > 4
-      ? "md"
-      : "lg"
+      : mobilePovSize
     : !isMobile
     ? isSideSeat
       ? "md" // side rails are sized for md — see .hand-row-side-wrap in App.css
       : "lg" // top opponent matches the human's hand size (desktop)
-    // Mobile: all opponents — top AND left/right — use sm (48), so the side
-    // players match the top player's card size. Side players render in the
-    // rotated vertical rail (below), same placement as the top row reads.
-    // Phones shrink to xs (42) when the board is crowded (4 players / >4 cards).
-    : phoneOppCrowded
-    ? "xs"
-    : "sm";
+    // Mobile opponents: the TOP opponent now matches the POV size (Step 1) so the
+    // across-the-table row reads at the same scale as the down player. The
+    // LEFT/RIGHT rotated side rails keep the compact sm/xs for now (a later step).
+    : isSideSeat
+    ? phoneOppCrowded
+      ? "xs"
+      : "sm"
+    : mobilePovSize;
+  // Mobile: opponents render at a UNIFORM WIDTH (from cardSize, matching the POV
+  // row) but keep their ORIGINAL shorter height — the top opponent is wide-but-
+  // short, and the side rails keep their compact footprint. Undefined for the
+  // human / desktop → the default 1.45 aspect (the POV cards stay the tallest).
+  // Only the mobile SIDE rails get a height override (wrap height 66 → rotated
+  // visible width 66 = matches the POV width). The top opponent and the human
+  // keep the default 1.45 aspect (full-height 66×96 cards).
+  const cardHeightPx: number | undefined =
+    isMobile && !isHuman && isSideSeat ? cardPx("lg", tier) : undefined;
   const game = useStore((s) => s.game!);
   const targeting = useStore((s) => s.targeting);
   const humanId = useStore((s) => s.humanId);
@@ -283,7 +293,7 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, totalSeats, 
     // dimensions to the active card size so the row's width is stable.
     if (!c) {
       const ghostW = cardPx(cardSize, tier);
-      const ghostH = Math.round(ghostW * 1.45);
+      const ghostH = cardHeightPx ?? Math.round(ghostW * 1.45);
       return (
         <div
           className="hand-slot hand-slot-empty"
@@ -332,6 +342,7 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, totalSeats, 
           highlight={hl}
           onClick={() => handleClick(idx)}
           size={cardSize}
+          heightPx={cardHeightPx}
           layoutId={c.id}
         />
         {knownDot && <div className="known-dot" title="You've seen this card" />}

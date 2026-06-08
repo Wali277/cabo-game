@@ -24,6 +24,11 @@ interface Props {
   layoutId?: string;
   /** Override the user's chosen skin — used by the skin picker preview tiles. */
   skinOverride?: import("../state/cardskin").CardSkin;
+  /** Explicit pixel width/height — decouples from the size-based 1.45 aspect.
+   *  Used by mobile opponent seats (uniform width, original shorter height).
+   *  Omit → width from `size`, height = round(width * 1.45). */
+  widthPx?: number;
+  heightPx?: number;
 }
 
 const SUIT_GLYPH: Record<string, string> = { S: "♠", H: "♥", D: "♦", C: "♣" };
@@ -110,6 +115,8 @@ function CardViewImpl({
   shake = false,
   layoutId,
   skinOverride,
+  widthPx,
+  heightPx,
 }: Props) {
   const viewMode = useViewMode();
   const { device, orientation } = useDeviceClass();
@@ -122,8 +129,8 @@ function CardViewImpl({
   // from the tier; ALL other mobile behaviour below still branches on the raw
   // `viewMode === "mobile"` flag, so the desktop path is untouched.
   const tier = resolveSizeTier(viewMode, device);
-  const w = SIZE_PX[tier][size];
-  const h = Math.round(w * 1.45);
+  const w = widthPx ?? SIZE_PX[tier][size];
+  const h = heightPx ?? Math.round(w * 1.45);
   const currentSkin = useCardSkin();
   // Lumo Evolved locks every card to its dedicated purple/orange skin. A
   // skinOverride (the picker's preview tiles) still wins, so previews render
@@ -289,6 +296,8 @@ function cardViewPropsEqual(prev: Props, next: Props): boolean {
     prev.shake === next.shake &&
     prev.layoutId === next.layoutId &&
     prev.skinOverride === next.skinOverride &&
+    prev.widthPx === next.widthPx &&
+    prev.heightPx === next.heightPx &&
     (prev.card?.id ?? null) === (next.card?.id ?? null) &&
     (prev.card?.rank ?? null) === (next.card?.rank ?? null) &&
     (prev.card?.suit ?? null) === (next.card?.suit ?? null)
@@ -616,14 +625,18 @@ function CardBack({
         style={{
           background: skin.caboPillBg ?? "#ffd86b",
           color: skin.caboColor ?? "#1c1d2b",
-          padding: "4px 10px",
+          // Padding + letter-spacing SCALE with the card width so the pill never
+          // grows wider than a small side-rail card and clips "LUMO". A fixed
+          // 10px side padding made the pill exceed 42-48px side cards → text cut.
+          padding: `${Math.round(w * 0.055)}px ${Math.round(w * 0.1)}px`,
           borderRadius: 8,
           transform: "rotate(-8deg)",
           boxShadow: "0 3px 0 rgba(0,0,0,0.25), 0 6px 14px rgba(0,0,0,0.3)",
           fontWeight: 900,
-          fontSize: w * 0.28,
-          letterSpacing: 2,
+          fontSize: w * 0.27,
+          letterSpacing: Math.max(1, Math.round(w * 0.03)),
           fontFamily: font,
+          whiteSpace: "nowrap",
         }}
       >
         LUMO

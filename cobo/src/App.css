@@ -5341,6 +5341,15 @@ body.mobile-mode .tslot-right .player-tag {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Side (left/right) MP name pills sit atop a NARROW rail column — cap their
+   width to the rail so a long player name can't bleed over the top player's
+   cards or the centre deck. The name ellipsizes instead. */
+body.mobile-mode .tslot-left .player-tag,
+body.mobile-mode .tslot-right .player-tag {
+  max-width: 78px;
+  font-size: 10px;
+  padding: 2px 7px;
+}
 
 /* Centre deck / discard pile — small but visible */
 body.mobile-mode .tslot-center {
@@ -7176,6 +7185,13 @@ body.mobile-mode .bot-portrait-identifier {
   width: 56px;
   height: 56px;
 }
+/* Side (left/right) bot icons: smaller than the top one so they don't reach up
+   into the top player's cards on the narrow rail. */
+body.mobile-mode .tslot-left .bot-portrait-identifier,
+body.mobile-mode .tslot-right .bot-portrait-identifier {
+  width: 36px;
+  height: 36px;
+}
 body.mobile-mode .bot-speech-bubble {
   font-size: 15px;
   padding: 10px 14px;
@@ -8759,6 +8775,61 @@ body.mobile-mode .account-tab {
      without the username being aggressively ellipsed. */
   max-width: min(290px, 75vw);
 }
+
+/* Phone: the GUEST account tab collapses to a compact circular avatar ICON
+   button so it no longer collides with the Add-to-Home-Screen banner (both sit
+   at the bottom of the menu). Signed-in users keep the full profile pill. */
+body.mobile-mode .account-tab-guest {
+  min-height: 0;
+  width: auto;
+  max-width: none;
+  padding: 0;
+  gap: 0;
+  border: none;
+  background: none;
+  box-shadow: none;
+  overflow: visible;
+}
+body.mobile-mode .account-tab-guest:hover,
+body.mobile-mode .account-tab-guest:active { box-shadow: none; }
+body.mobile-mode .account-tab-guest .account-tab-text { display: none; }
+/* Keep the SAME teal→coral character gradient as the desktop/web avatar (the
+   base .account-tab-avatar background); just size it up + add a ring/lift so the
+   circle reads as a tappable login button — matching the web colours. */
+body.mobile-mode .account-tab-guest .account-tab-avatar {
+  width: 58px;
+  height: 58px;
+  font-size: 32px;
+  box-shadow:
+    inset 0 2px 0 oklch(0.95 0.06 195 / 0.6),
+    inset 0 -2px 0 oklch(0.20 0.06 272 / 0.4),
+    0 5px 14px oklch(0.16 0.05 272 / 0.5),
+    0 0 0 2.5px oklch(0.30 0.08 270 / 0.85);
+}
+
+/* Add-to-Home-Screen banner: offset to clear the bottom-left account icon so
+   they never overlap. When signed in, the profile pill is wider than a left
+   offset can clear, so raise the (centered) banner above it instead. */
+body.mobile-mode .menu .a2hs-banner {
+  left: 84px;
+  right: 14px;
+  margin: 0;
+  max-width: none;
+}
+/* The install banner is taller than the 60px icon; both are bottom-anchored, so
+   their centers don't line up. When the banner is present, raise the guest icon
+   so its vertical center matches the banner's — they read as one aligned row. */
+body.mobile-mode:has(.a2hs-banner) .account-tab-guest {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 30px);
+}
+body.mobile-mode:has(.account-tab-profile) .menu .a2hs-banner {
+  left: 14px;
+  right: 14px;
+  max-width: 430px;
+  margin: 0 auto;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 108px);
+}
+
 body.mobile-mode .token-counter {
   top: auto; /* Phone-mode: snug to the safe-area at bottom-right (mobile hides the FAB stack, so the corner is clear). */
   bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
