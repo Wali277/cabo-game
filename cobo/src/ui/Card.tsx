@@ -3,6 +3,7 @@ import { memo, useMemo } from "react";
 import type React from "react";
 import type { Card as CardT } from "../engine/types";
 import { useViewMode } from "../state/viewmode";
+import { useDeviceClass } from "../state/deviceClass";
 import { useCardSkin, CUSTOM_SKIN_DEFAULTS, type CardSkin } from "../state/cardskin";
 import { useStore } from "../state/store";
 import { SKIN_STYLES, HelmetIcon, RoyalBack, NeonBack, IvoryBack, EclipseBack, VesicaBack, OrbitBack, EvolvedBack, DragonFace } from "./cardSkins";
@@ -53,19 +54,50 @@ function customTint(colors: Record<string, unknown> | null | undefined): {
   };
 }
 
-const SIZE_PX: Record<"desktop" | "mobile", Record<"xs" | "sm" | "md" | "lg", number>> = {
+/**
+ * Card size tiers, keyed by RENDER TIER (not raw ViewMode):
+ *   - "desktop": the original desktop / tablet-landscape sizes. UNCHANGED — any
+ *     `viewMode === "desktop"` render (desktop OR tablet-landscape) resolves
+ *     here and must stay byte-identical.
+ *   - "mobile": the phone tier, tuned for a ~375px phone. UNCHANGED.
+ *   - "tablet": NEW portrait-tablet tier. Phone tier scaled up ~1.5× (lg/sm/md)
+ *     so a 768–1024px portrait tablet fills its width with legible cards instead
+ *     of reusing the phone-tiny sizes. xs scaled ~1.45×. The glyph/overflow
+ *     invariant math in CardFace is proportional to `w`, so it holds at any tier.
+ */
+const SIZE_PX: Record<"desktop" | "mobile" | "tablet", Record<"xs" | "sm" | "md" | "lg", number>> = {
   desktop: { xs: 44, sm: 56, md: 80, lg: 110 },
   // Mobile `xs` is consumed ONLY by the left/right side-player cards, now laid
   // out as a 2-column cluster toward centre. 44px (just shy of the top's sm=48)
   // is the largest that lets BOTH side clusters + the centre deck fit a 375px
   // phone with no overlap. Faces are legible. See PlayerSeat side cluster.
   mobile:  { xs: 42, sm: 48, md: 50, lg: 66 },
+  // Portrait-tablet tier: phone sizes scaled up so the board fills a 768px+
+  // tablet. Tuned so a 4-player Evolved board (top nowrap row of up to 6 cards
+  // at the shrunk size + two side rails + centre deck) still fits portrait
+  // width without overflow. lg≈100 / sm≈74 / md≈78 / xs≈64.
+  tablet:  { xs: 64, sm: 74, md: 78, lg: 100 },
 };
 
-/** Pixel width of a card at a given size + view mode. Exported so seats can
- *  size their empty-slot ghosts to match the real cards. */
-export function cardPx(size: "xs" | "sm" | "md" | "lg", viewMode: "desktop" | "mobile"): number {
-  return SIZE_PX[viewMode][size];
+/** The render tier resolved from ViewMode + device class. `viewMode==="desktop"`
+ *  is ALWAYS the desktop tier (covers real desktop AND tablet-landscape). In
+ *  mobile mode a genuine tablet (portrait) gets the larger "tablet" tier; phones
+ *  (and narrow desktop-preview) keep the "mobile" tier. */
+export type SizeTier = "desktop" | "mobile" | "tablet";
+export function resolveSizeTier(
+  viewMode: "desktop" | "mobile",
+  device: "phone" | "tablet" | "desktop",
+): SizeTier {
+  if (viewMode === "desktop") return "desktop";
+  return device === "tablet" ? "tablet" : "mobile";
+}
+
+/** Pixel width of a card at a given size + render tier. Exported so seats can
+ *  size their empty-slot ghosts to match the real cards. Accepts either a raw
+ *  ViewMode ("desktop"/"mobile" — phone tier) or a resolved SizeTier, so existing
+ *  callers that pass a ViewMode keep the phone tier they had before. */
+export function cardPx(size: "xs" | "sm" | "md" | "lg", tier: SizeTier): number {
+  return SIZE_PX[tier][size];
 }
 
 function CardViewImpl({
@@ -80,7 +112,17 @@ function CardViewImpl({
   skinOverride,
 }: Props) {
   const viewMode = useViewMode();
-  const w = SIZE_PX[viewMode][size];
+  const { device, orientation } = useDeviceClass();
+  // Tablet-landscape resolves to the desktop layout but is touch-first, so the
+  // `whileHover` lift would "stick" after a tap (no mouseleave on touch).
+  // Suppress the hover lift there; tap feedback still comes from the engine.
+  const tabletLandscape = device === "tablet" && orientation === "landscape";
+  // Render tier: desktop/tablet-landscape → "desktop" (unchanged); phone →
+  // "mobile"; tablet-portrait → the larger "tablet" tier. Pixel sizing reads
+  // from the tier; ALL other mobile behaviour below still branches on the raw
+  // `viewMode === "mobile"` flag, so the desktop path is untouched.
+  const tier = resolveSizeTier(viewMode, device);
+  const w = SIZE_PX[tier][size];
   const h = Math.round(w * 1.45);
   const currentSkin = useCardSkin();
   // Lumo Evolved locks every card to its dedicated purple/orange skin. A
@@ -154,7 +196,10 @@ function CardViewImpl({
       onClick={onClick}
       animate={shake ? { x: [0, -6, 6, -4, 4, 0] } : {}}
       whileHover={
-        onClick && viewMode === "desktop" && !suppressCssTransformTransition
+        onClick &&
+        viewMode === "desktop" &&
+        !tabletLandscape &&
+        !suppressCssTransformTransition
           ? { y: -6, scale: 1.04 }
           : {}
       }

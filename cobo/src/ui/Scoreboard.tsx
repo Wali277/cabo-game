@@ -484,7 +484,11 @@ export function RoundEndOverlay() {
 
   const roundCount = Math.max(0, ...allRows.map((r) => r.rounds.length));
   // Columns: name | rounds… | bonus | penalty | total
-  const modalGridCols = `minmax(100px, 1.3fr) repeat(${Math.max(1, roundCount)}, minmax(42px, 1fr)) minmax(46px, 0.9fr) minmax(50px, 0.9fr) minmax(56px, 1.1fr)`;
+  // The per-column minimums are sourced from CSS custom properties (defined on
+  // `.modal-sb`) so a `body.mobile-mode .modal-sb` rule can shrink them on
+  // phones WITHOUT changing this inline desktop default. The desktop values are
+  // the variable fallbacks below, so a desktop body renders byte-identically.
+  const modalGridCols = `minmax(var(--sb-name-min, 100px), 1.3fr) repeat(${Math.max(1, roundCount)}, minmax(var(--sb-round-min, 42px), 1fr)) minmax(var(--sb-bonus-min, 46px), 0.9fr) minmax(var(--sb-penalty-min, 50px), 0.9fr) minmax(var(--sb-total-min, 56px), 1.1fr)`;
 
   const modalRoundMins: number[] = [];
   const modalLowestCounts: number[] = [];

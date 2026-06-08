@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useStore } from "../state/store";
 import { Audio } from "../audio/sounds";
+import { useDeviceClass } from "../state/deviceClass";
 
 /**
  * Two-button cluster near the discard pile. Cinematic-first flow:
@@ -26,8 +27,18 @@ export function SnapControls() {
   const beginSnapOther = useStore((s) => s.beginSnapOther);
   const beginSnapSelf = useStore((s) => s.beginSnapSelf);
 
+  // Tablet-landscape renders the desktop layout but is touch-first, so the
+  // hover-only rules card never surfaces. On that device, drive tooltip
+  // visibility from focus/tap (see clickOther/clickSelf below + the button
+  // onFocus handlers) instead of mouse hover.
+  const { device, orientation } = useDeviceClass();
+  const tabletLandscape = device === "tablet" && orientation === "landscape";
+
   const [hoveringOther, setHoveringOther] = useState(false);
   const [hoveringSelf, setHoveringSelf] = useState(false);
+  // Touch-surfaced (focus/tap) tooltip state, used only on tablet-landscape.
+  const [touchTipOther, setTouchTipOther] = useState(false);
+  const [touchTipSelf, setTouchTipSelf] = useState(false);
 
   if (!game) return null;
   if (game.phase === "setup_peek" || game.phase === "round_over") return null;
@@ -67,9 +78,10 @@ export function SnapControls() {
 
   // Tooltip visibility — show rules / lock-reason on hover, regardless of
   // disable state. Disabled buttons still need their hover state so the
-  // locked-reason tooltip can surface.
-  const showOther = hoveringOther && !snapBusy;
-  const showSelf = hoveringSelf && !snapBusy;
+  // locked-reason tooltip can surface. On tablet-landscape (touch, no hover)
+  // the focus/tap-driven `touchTip*` flags drive it instead.
+  const showOther = (hoveringOther || (tabletLandscape && touchTipOther)) && !snapBusy;
+  const showSelf = (hoveringSelf || (tabletLandscape && touchTipSelf)) && !snapBusy;
   const armingKind: "other" | "self" | null = showOther ? "other" : showSelf ? "self" : null;
 
   // Tooltip body: either the lock-reason (concise) or the full rules card.
@@ -129,6 +141,8 @@ export function SnapControls() {
           whileTap={{ scale: 0.96 }}
           onMouseEnter={() => setHoveringOther(true)}
           onMouseLeave={() => setHoveringOther(false)}
+          onFocus={tabletLandscape ? () => { setTouchTipOther(true); setTouchTipSelf(false); } : undefined}
+          onBlur={tabletLandscape ? () => setTouchTipOther(false) : undefined}
         >
           <span className="snap-btn-icon" aria-hidden>⚡</span>
           <span className="snap-btn-label">Snap rival</span>
@@ -143,6 +157,8 @@ export function SnapControls() {
           whileTap={{ scale: 0.96 }}
           onMouseEnter={() => setHoveringSelf(true)}
           onMouseLeave={() => setHoveringSelf(false)}
+          onFocus={tabletLandscape ? () => { setTouchTipSelf(true); setTouchTipOther(false); } : undefined}
+          onBlur={tabletLandscape ? () => setTouchTipSelf(false) : undefined}
         >
           <span className="snap-btn-icon" aria-hidden>✋</span>
           <span className="snap-btn-label">Snap self</span>

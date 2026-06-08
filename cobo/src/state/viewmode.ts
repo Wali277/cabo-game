@@ -16,7 +16,8 @@
  * screens — e.g. a desktop user previewing the phone layout, or choosing
  * desktop on a tablet.
  */
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
+import { getDeviceClass, getOrientation } from "./deviceClass";
 
 export type ViewMode = "desktop" | "mobile";
 export const DEFAULT_VIEW_MODE: ViewMode = "desktop";
@@ -68,12 +69,28 @@ function readSaved(): ViewMode | null {
 
 /**
  * The effective view mode for the current viewport.
+ *  0. DEVICE-CLASS layer (see deviceClass.ts): genuine touch devices resolve by
+ *     orientation regardless of any saved preference —
+ *       phone (either orientation) → mobile,
+ *       tablet-portrait            → mobile,
+ *       tablet-landscape           → desktop.
+ *     This makes the resolution-table contract hold for real phones/tablets.
  *  1. Narrow viewport → always "mobile" (overrides any saved preference).
  *  2. Otherwise an explicit saved preference wins.
  *  3. First visit on a wider screen: a coarse (touch) pointer implies a
  *     tablet that prefers the phone layout; otherwise desktop.
  */
 function resolveMode(): ViewMode {
+  // Device-class layer first: a genuine phone/tablet (touch-first) is driven by
+  // its physical class + orientation, never trapped by a stale saved pref. A
+  // non-touch device returns "desktop" here, so we fall through to the existing
+  // width/standalone/preference logic below (manual phone toggle still works).
+  const device = getDeviceClass();
+  if (device === "phone") return "mobile";
+  if (device === "tablet") {
+    return getOrientation() === "landscape" ? "desktop" : "mobile";
+  }
+
   if (mediaMatches(NARROW_QUERY)) return "mobile";
   // Installed on a touch device (iPhone/iPad/Android home screen): always use
   // the spacious full-bleed layout, even over a stale "desktop" preference.
@@ -102,30 +119,93 @@ export function setViewMode(m: ViewMode): void {
   window.dispatchEvent(new CustomEvent<ViewMode>(EVENT_NAME, { detail: m }));
 }
 
+/* ── Shared module-level store ────────────────────────────────────────────────
+ * Like deviceClass.ts, `useViewMode()` is called by every `Card` and many other
+ * components, so a full board would otherwise mount O(cards) duplicate
+ * window/matchMedia listeners. Back the hook with a SINGLE module-level
+ * subscription, ref-counted (installed on the first subscriber, removed on the
+ * last). The mode is a primitive string, so its snapshot is trivially stable —
+ * no object caching needed. `resolveMode()` is unchanged. */
+let cachedMode: ViewMode =
+  typeof window === "undefined" ? DEFAULT_VIEW_MODE : resolveMode();
+
+const modeSubscribers = new Set<() => void>();
+let modeListenersInstalled = false;
+let narrowMql: MediaQueryList | null = null;
+let orientationMql: MediaQueryList | null = null;
+
+function recomputeMode(): void {
+  const next = resolveMode();
+  if (next === cachedMode) return; // unchanged → primitive identity stable
+  cachedMode = next;
+  for (const cb of modeSubscribers) cb();
+}
+
+function installModeListeners(): void {
+  if (modeListenersInstalled || typeof window === "undefined") return;
+  modeListenersInstalled = true;
+  window.addEventListener(EVENT_NAME, recomputeMode);
+  try {
+    narrowMql = window.matchMedia(NARROW_QUERY);
+    narrowMql.addEventListener("change", recomputeMode);
+  } catch {
+    /* matchMedia unavailable — fall back to the initial value */
+  }
+  try {
+    // A tablet rotating between portrait/landscape flips the resolved mode
+    // (tablet-portrait → mobile, tablet-landscape → desktop), so re-resolve
+    // on orientation change too.
+    orientationMql = window.matchMedia("(orientation: portrait)");
+    orientationMql.addEventListener("change", recomputeMode);
+  } catch {
+    /* matchMedia unavailable — fall back to the initial value */
+  }
+  // Re-sync in case the viewport differs from the initial guess.
+  recomputeMode();
+}
+
+function removeModeListeners(): void {
+  if (!modeListenersInstalled || typeof window === "undefined") return;
+  modeListenersInstalled = false;
+  window.removeEventListener(EVENT_NAME, recomputeMode);
+  try {
+    narrowMql?.removeEventListener("change", recomputeMode);
+  } catch {
+    /* ignore */
+  }
+  try {
+    orientationMql?.removeEventListener("change", recomputeMode);
+  } catch {
+    /* ignore */
+  }
+  narrowMql = null;
+  orientationMql = null;
+}
+
+function subscribeMode(cb: () => void): () => void {
+  modeSubscribers.add(cb);
+  if (modeSubscribers.size === 1) installModeListeners();
+  return () => {
+    modeSubscribers.delete(cb);
+    if (modeSubscribers.size === 0) removeModeListeners();
+  };
+}
+
+function getModeSnapshot(): ViewMode {
+  return cachedMode;
+}
+
+function getModeServerSnapshot(): ViewMode {
+  return DEFAULT_VIEW_MODE;
+}
+
 /** Subscribe to the effective view mode; re-renders on the explicit toggle
- *  and whenever the viewport crosses the phone breakpoint. */
+ *  and whenever the viewport crosses the phone breakpoint. Backed by a SINGLE
+ *  shared module-level subscription (one set of listeners for the whole app). */
 export function useViewMode(): ViewMode {
-  const [mode, setMode] = useState<ViewMode>(() => resolveMode());
-  useEffect(() => {
-    const update = () => setMode(resolveMode());
-    window.addEventListener(EVENT_NAME, update);
-    let mq: MediaQueryList | null = null;
-    try {
-      mq = window.matchMedia(NARROW_QUERY);
-      mq.addEventListener("change", update);
-    } catch {
-      /* matchMedia unavailable — fall back to the initial value */
-    }
-    // Re-sync after mount in case the viewport differs from the initial guess.
-    update();
-    return () => {
-      window.removeEventListener(EVENT_NAME, update);
-      try {
-        mq?.removeEventListener("change", update);
-      } catch {
-        /* ignore */
-      }
-    };
-  }, []);
-  return mode;
+  return useSyncExternalStore(
+    subscribeMode,
+    getModeSnapshot,
+    getModeServerSnapshot,
+  );
 }

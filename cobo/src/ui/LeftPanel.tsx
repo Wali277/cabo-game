@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
 import { useStore } from "../state/store";
+import { useViewMode } from "../state/viewmode";
 import { actionOf } from "../engine/game";
 import { Audio } from "../audio/sounds";
 
@@ -58,6 +59,9 @@ export function LeftPanel({ className = "" }: LeftPanelProps = {}) {
   const activateDragon = useStore((s) => s.activateDragon);
   const start = useStore((s) => s.start);
 
+  const viewMode = useViewMode();
+  const isMobile = viewMode === "mobile";
+
   const isHumanTurn = game.players[game.currentPlayer].id === humanId;
   const canDraw = isHumanTurn && game.phase === "turn_start";
   const canDrawDiscard = canDraw && game.discard.length > 0;
@@ -71,6 +75,14 @@ export function LeftPanel({ className = "" }: LeftPanelProps = {}) {
   const actionMeta = drawnCard
     ? (game.variant === "evolved" ? ACTION_META_EVOLVED[drawnCard.rank] : ACTION_META[drawnCard.rank]) ?? null
     : null;
+  // The full-width ability trigger button (turn_drawn). On mobile the panel is
+  // narrow and a long Evolved label ("Use Peek & Swap" / "Use Peek + Spy")
+  // wrapped to two lines and inflated the panel down over the side rails. Drop
+  // the "Use " prefix on mobile (the emoji already cues "ability") so the label
+  // stays one line. Desktop keeps the full "Use <label>" wording.
+  const abilityBtnLabel = actionMeta
+    ? `${actionMeta.emoji} ${isMobile ? "" : "Use "}${actionMeta.label}`
+    : "";
 
   let emoji = "";
   let instruction = "";
@@ -220,7 +232,7 @@ export function LeftPanel({ className = "" }: LeftPanelProps = {}) {
                   disabled={game.drawnFrom === "discard"}
                   onClick={() => { Audio.playSfx("action_trigger"); discardAndTrigger(); }}
                 >
-                  {actionMeta.emoji} Use {actionMeta.label}
+                  {abilityBtnLabel}
                 </button>
               </div>
             )}
@@ -267,7 +279,7 @@ export function LeftPanel({ className = "" }: LeftPanelProps = {}) {
                   style={{ borderColor: actionMeta.color, color: actionMeta.color }}
                   onClick={() => { Audio.playSfx("action_trigger"); useStore.getState().triggerAction(); }}
                 >
-                  {actionMeta.emoji} Use {actionMeta.label}
+                  {abilityBtnLabel}
                 </button>
               </div>
             )}

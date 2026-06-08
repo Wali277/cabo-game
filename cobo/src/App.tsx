@@ -23,6 +23,8 @@ import { DragonActivateCinematic } from "./ui/DragonActivateCinematic";
 import { BUSTED_ROOM_KEY } from "./ui/BustedOverlay";
 import { getSocket } from "./state/mp";
 import { useViewMode, isStandalone } from "./state/viewmode";
+import { useDeviceClass } from "./state/deviceClass";
+import { RotateLockOverlay } from "./ui/RotateLockOverlay";
 // Accounts layer (Phase 1 — auth only).
 import { LoginScreen } from "./ui/auth/LoginScreen";
 import { SignupScreen } from "./ui/auth/SignupScreen";
@@ -62,10 +64,38 @@ function App() {
   // Phone-mode toggle (set via the button in the main menu). Adds a single
   // `mobile-mode` class to <body> that drives every layout override in App.css.
   const viewMode = useViewMode();
+  // Device class + orientation (see deviceClass.ts) — drives the additive
+  // tablet-landscape / rotate-lock hooks and data-* attributes. Resolution:
+  //   phone-portrait / phone-landscape / tablet-portrait → mobile-mode
+  //   tablet-landscape                                    → tablet-landscape (NO mobile-mode)
+  //   phone-landscape                                     → + rotate-lock cover
+  //   desktop                                             → none of the above
+  const { device, orientation } = useDeviceClass();
   useEffect(() => {
-    document.body.classList.toggle("mobile-mode", viewMode === "mobile");
-    return () => { document.body.classList.remove("mobile-mode"); };
-  }, [viewMode]);
+    const body = document.body;
+    // `mobile-mode` mirrors the resolved ViewMode exactly (phone either way +
+    // tablet-portrait). This keeps the giant body.mobile-mode block in App.css
+    // governing the phone layout, untouched.
+    body.classList.toggle("mobile-mode", viewMode === "mobile");
+    // Additive, desktop-isolated hooks (new CSS gated on these only):
+    body.classList.toggle(
+      "tablet-landscape",
+      device === "tablet" && orientation === "landscape",
+    );
+    body.classList.toggle(
+      "rotate-lock",
+      device === "phone" && orientation === "landscape",
+    );
+    body.setAttribute("data-device", device);
+    body.setAttribute("data-orientation", orientation);
+    return () => {
+      body.classList.remove("mobile-mode");
+      body.classList.remove("tablet-landscape");
+      body.classList.remove("rotate-lock");
+      body.removeAttribute("data-device");
+      body.removeAttribute("data-orientation");
+    };
+  }, [viewMode, device, orientation]);
 
   // Installed-PWA flag → CSS reclaims the status-bar safe area and uses the
   // extra space. Standalone never changes within a session, so set it once.
@@ -228,6 +258,11 @@ function App() {
       {/* "Report a bug" form — global, self-gates on `reportBugOpen`. Opened
           from the Settings speed-dial 🐛 button. */}
       <ReportBugModal />
+
+      {/* Phone-landscape "rotate your device" cover — self-gates on the device
+          class (phone + landscape only); can never show on tablet/desktop. The
+          game stays mounted underneath. */}
+      <RotateLockOverlay />
     </>
   );
 }

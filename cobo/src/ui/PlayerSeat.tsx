@@ -1,8 +1,9 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { CardView, cardPx } from "./Card";
+import { CardView, cardPx, resolveSizeTier } from "./Card";
 import type { PlayerState } from "../engine/types";
 import { useStore, PLAYER_COLORS } from "../state/store";
 import { useViewMode } from "../state/viewmode";
+import { useDeviceClass } from "../state/deviceClass";
 import { recordSwapHandSource } from "./swapHandMotion";
 import { BOT_PROFILES } from "../ai/bots";
 
@@ -26,9 +27,16 @@ const CARD_SPRING = { type: "spring" as const, stiffness: 140, damping: 22, mass
  *  instead of the spring — springs re-solve per frame and felt jaggy on phones. */
 const CARD_TWEEN_MOBILE = { type: "tween" as const, duration: 0.34, ease: [0.22, 1, 0.36, 1] as const };
 
-export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: Props) {
+export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, totalSeats, tablePos }: Props) {
   const viewMode = useViewMode();
   const isMobile = viewMode === "mobile";
+  const { device } = useDeviceClass();
+  // Render tier for ghost-slot pixel sizing (desktop / phone / tablet-portrait).
+  // Card.tsx resolves the same tier internally for the real cards.
+  const tier = resolveSizeTier(viewMode, device);
+  // Phones get the crowding shrink (Part A); the larger tablet-portrait tier has
+  // ample room, so it keeps the un-shrunk opponent sizes (Card.tsx scales the px).
+  const isPhone = isMobile && device === "phone";
   // Card size hierarchy. Desktop keeps the original lg/md split. Mobile packs
   // a compact spatial table: your hand stays large (lg), the front opponent
   // gets a medium strip (sm), and the slim left/right side rails get the
@@ -43,6 +51,12 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
   // oversized and crowded the centre deck. Top opponent keeps `lg` to match
   // the human's hand; the human keeps `lg` (desktop).
   const isSideSeat = tablePos === "left" || tablePos === "right";
+  // Phone crowding: a 4-player board (two side rails + a wide top row) and/or a
+  // 5–6-card Evolved/penalty hand overflows the narrow phone. Shrink opponents
+  // one tier (sm→xs) in those cases — mirrors the human's existing >4 shrink —
+  // so the nowrap top row and the rotated side rails fit without colliding or
+  // clipping. Tablet-portrait + desktop are untouched (they keep sm/md/lg).
+  const phoneOppCrowded = isPhone && !isHuman && (totalSeats >= 4 || handLen > 4);
   const cardSize: "xs" | "sm" | "md" | "lg" = isHuman
     ? !isMobile
       ? "lg"
@@ -58,6 +72,9 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
     // Mobile: all opponents — top AND left/right — use sm (48), so the side
     // players match the top player's card size. Side players render in the
     // rotated vertical rail (below), same placement as the top row reads.
+    // Phones shrink to xs (42) when the board is crowded (4 players / >4 cards).
+    : phoneOppCrowded
+    ? "xs"
     : "sm";
   const game = useStore((s) => s.game!);
   const targeting = useStore((s) => s.targeting);
@@ -265,7 +282,7 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
     // later be refilled by a wrong-snap penalty card. Match the ghost
     // dimensions to the active card size so the row's width is stable.
     if (!c) {
-      const ghostW = cardPx(cardSize, viewMode);
+      const ghostW = cardPx(cardSize, tier);
       const ghostH = Math.round(ghostW * 1.45);
       return (
         <div
@@ -412,14 +429,21 @@ export function PlayerSeat({ player, seatIndex, isCurrent, isHuman, tablePos }: 
         // CSS picks the side via .pos-left / .pos-right on .side-hands-group.
         // Side player: rotated vertical rail (same placement on mobile and
         // desktop). On mobile the wrapper height grows with the card count so
-        // snap-penalty cards extend the line. Cards are sm (48) — matching the
-        // top player. 4 sm cards × 48 + 4px gaps + 12 padding.
+        // snap-penalty cards extend the line. Per-card extent along the rail is
+        // the card WIDTH at the active size (cardSize: sm normally, xs on
+        // crowded phones, larger on tablet-portrait via the tier). The height is
+        // capped to the centre grid row (100% of the rail column) so a long
+        // Evolved/penalty column can't clip top/bottom or spill onto the deck.
         <div className={`side-hands-group pos-${tablePos}${sideHasOverflow ? " has-back" : ""}`}>
           <div
             className="hand-row-side-wrap"
             style={
               isMobile && isSide
-                ? { height: handLen * cardPx("sm", viewMode) + (handLen - 1) * 4 + 12 }
+                ? {
+                    height:
+                      handLen * cardPx(cardSize, tier) + (handLen - 1) * 4 + 12,
+                    maxHeight: "100%",
+                  }
                 : undefined
             }
           >

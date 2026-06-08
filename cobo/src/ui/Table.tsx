@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 import { useStore } from "../state/store";
 import { useViewMode } from "../state/viewmode";
+import { useDeviceClass } from "../state/deviceClass";
 import { PlayerSeat } from "./PlayerSeat";
 import { Center } from "./Center";
 import { LeftPanel } from "./LeftPanel";
@@ -54,13 +55,17 @@ export function Table() {
   // up as a bottom sheet via the 📊 Scores top-bar button.
   const viewMode = useViewMode();
   const isMobile = viewMode === "mobile";
+  // Device class + orientation feed the fit deps so a tablet rotation (which
+  // flips tablet-landscape → desktop layout and runs fitScale) re-measures the
+  // board for the new viewport. No effect on the enabled gating.
+  const { device: deviceClass, orientation: deviceOrientation } = useDeviceClass();
   // Desktop board auto-fit: uniformly downscale the card board so it always
   // fits the viewport height at 100% zoom. Short laptops/MacBooks were
   // clipping the human's hand off the bottom. Disabled on mobile, which keeps
   // its own dvh/flex layout. See useFitToViewport + getFitScale.
   const { ref: tableGridRef, scale: fitScale } = useFitToViewport(
     !isMobile,
-    [game.players.length, viewMode],
+    [game.players.length, viewMode, deviceClass, deviceOrientation],
   );
   // Mobile: when the human must pick a card on the BOARD (a swap / peek /
   // blind-swap / peek-and-swap target, or an armed snap they're taking),
