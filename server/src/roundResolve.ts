@@ -306,6 +306,7 @@ export function seatSuddenDeathNextRound(room: Room): SeatSdResult {
     caboBonus: room.game.caboBonus,
     caboPenalty: room.game.caboPenalty,
     snapBonus: room.game.snapBonus,
+    kamikaze: room.game.kamikaze,
   });
   room.game.currentPlayer = nextStarterIdx;
   room.lastStarterIdx = nextStarterIdx;

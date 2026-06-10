@@ -25,4 +25,8 @@ credentials.json
 # Stale agent worktrees (a latent secret-leak channel)
 .claude/worktrees/
 
+# Local build/dev artifacts (TS incremental build state, dev-server log)
+*.tsbuildinfo
+.vite-dev.log
+
 .DS_Store

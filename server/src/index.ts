@@ -8,6 +8,7 @@ import helmet from "helmet";
 import { Server } from "socket.io";
 import { Rooms } from "./rooms.js";
 import {
+  ALLOWED_DRAGON_RANKS,
   activateDragon,
   actionBlindSwap,
   actionChoosePeek,
@@ -395,11 +396,21 @@ function applyAction(game: GameState, playerId: string, action: ActionMsg): Game
   // Most actions can only be performed by the current player; snap is open.
   const cur = game.players[game.currentPlayer]?.id;
   const requireCurrent = () => playerId === cur;
+  // Boundary validation — client payloads are raw socket data and fully
+  // untrusted. Indices must be integers inside the relevant hand; player ids
+  // must resolve to a seated player (and differ from the actor where the
+  // rules require a rival). Invalid → null, the existing illegal-action
+  // rejection path. The engine re-guards everything (defense in depth).
+  const handOf = (pid: unknown) =>
+    typeof pid === "string" ? game.players.find((p) => p.id === pid)?.hand : undefined;
+  const validIdx = (i: unknown, hand: ReturnType<typeof handOf>) =>
+    !!hand && Number.isInteger(i) && (i as number) >= 0 && (i as number) < hand.length;
 
   switch (action.type) {
     case "start_play":
       return startPlay(game);
     case "setup_peek_card":
+      if (!validIdx(action.index, handOf(playerId))) return null;
       return setupPeekCard(game, playerId, action.index);
     case "draw_deck":
       if (!requireCurrent()) return null;
@@ -409,6 +420,7 @@ function applyAction(game: GameState, playerId: string, action: ActionMsg): Game
       return drawFromDiscard(game);
     case "swap_drawn":
       if (!requireCurrent()) return null;
+      if (!validIdx(action.handIndex, handOf(playerId))) return null;
       return swapDrawnWithHand(game, action.handIndex);
     case "discard_drawn":
       if (!requireCurrent()) return null;
@@ -427,21 +439,36 @@ function applyAction(game: GameState, playerId: string, action: ActionMsg): Game
       return skipPendingAction(game);
     case "action_peek_own":
       if (!requireCurrent()) return null;
+      if (!validIdx(action.index, handOf(playerId))) return null;
       return actionPeekOwn(game, action.index);
     case "action_peek_other":
       if (!requireCurrent()) return null;
+      if (action.targetPlayerId === playerId) return null;
+      if (!validIdx(action.index, handOf(action.targetPlayerId))) return null;
       return actionPeekOther(game, action.targetPlayerId, action.index);
     case "action_choose_peek":
       if (!requireCurrent()) return null;
+      if (action.choice !== "own" && action.choice !== "other") return null;
       return actionChoosePeek(game, action.choice);
     case "action_blind_swap":
       if (!requireCurrent()) return null;
+      if (action.targetPlayerId === playerId) return null;
+      if (!validIdx(action.ownIndex, handOf(playerId))) return null;
+      if (!validIdx(action.targetIndex, handOf(action.targetPlayerId))) return null;
       return actionBlindSwap(game, action.ownIndex, action.targetPlayerId, action.targetIndex);
     case "action_peek_and_swap_pick":
       if (!requireCurrent()) return null;
+      if (!validIdx(action.index, handOf(action.targetPlayerId))) return null;
       return actionPeekAndSwapPick(game, action.targetPlayerId, action.index);
     case "action_peek_and_swap_decide": {
       if (!requireCurrent()) return null;
+      if (typeof action.doSwap !== "boolean") return null;
+      // ownIndex is optional (omitted on "don't swap"); when present it must
+      // be a real slot index. In-range empty slots stay legal (engine logs
+      // "couldn't swap" for those) — only malformed indices are rejected.
+      if (action.ownIndex !== undefined && !validIdx(action.ownIndex, handOf(playerId))) {
+        return null;
+      }
       const decided = actionPeekAndSwapDecide(game, action.doSwap, action.ownIndex);
       if (!decided) return null;
       // The peek_and_swap reveal is only needed during the decide phase.
@@ -459,14 +486,18 @@ function applyAction(game: GameState, playerId: string, action: ActionMsg): Game
       return actionStartSnapSelf(game, playerId);
     case "action_snap_other":
       // Snap is an open action — any active player may attempt one.
+      if (action.targetPlayerId === playerId) return null;
+      if (!validIdx(action.targetIndex, handOf(action.targetPlayerId))) return null;
       return actionSnapOther(game, playerId, action.targetPlayerId, action.targetIndex);
     case "action_snap_self":
+      if (!validIdx(action.ownIndex, handOf(playerId))) return null;
       return actionSnapSelf(game, playerId, action.ownIndex);
     case "activate_dragon":
       if (!requireCurrent()) return null;
       return activateDragon(game);
     case "dragon_choose_rank":
       if (!requireCurrent()) return null;
+      if (!ALLOWED_DRAGON_RANKS.includes(action.rank)) return null;
       return dragonChooseRank(game, action.rank);
     case "clear_animations":
       return clearAnimations(game);
@@ -475,8 +506,38 @@ function applyAction(game: GameState, playerId: string, action: ActionMsg): Game
   }
 }
 
+/**
+ * Socket.IO does NOT catch listener exceptions — a single throw inside any
+ * handler (e.g. a malformed payload blowing up a destructure) would crash the
+ * process and kill every live game. Wrap every handler: log the failure with
+ * its event name and, when the client passed an ack callback (always the last
+ * argument in our protocol), answer it with a generic failure so the client
+ * isn't left hanging. Never leaks error details to the client.
+ */
+function wrap(event: string, handler: (...args: any[]) => void): (...args: any[]) => void {
+  return (...args: any[]) => {
+    try {
+      handler(...args);
+    } catch (err) {
+      console.error(`[socket] '${event}' handler crashed:`, err instanceof Error ? err.stack : err);
+      const cb = args[args.length - 1];
+      if (typeof cb === "function") {
+        try {
+          cb({ ok: false, error: "server_error" });
+        } catch {
+          /* ack may already have been consumed before the throw — ignore */
+        }
+      }
+    }
+  };
+}
+
 io.on("connection", (socket) => {
   let bound: { roomCode: string; playerId: string } | null = null;
+
+  // All handlers register through this so every one is crash-wrapped — see wrap().
+  const on = (event: string, handler: (...args: any[]) => void) =>
+    socket.on(event, wrap(event, handler));
 
   // Resolve an optional Supabase access token to a userId and stamp it onto the
   // member — WITHOUT blocking the join. We run this fire-and-forget AFTER the
@@ -530,7 +591,7 @@ io.on("connection", (socket) => {
       });
   }
 
-  socket.on("room:create", ({ name, accessToken }, cb) => {
+  on("room:create", ({ name, accessToken }, cb) => {
     // Server-side guard: the UI requires a non-empty name, but a raw socket
     // emit could send "" — reject it so no blank-named member can be created.
     const display = typeof name === "string" ? name.trim().slice(0, 24) : "";
@@ -547,7 +608,7 @@ io.on("connection", (socket) => {
     linkIdentity(room.code, playerId, accessToken);
   });
 
-  socket.on("room:join", ({ code, name, accessToken }, cb) => {
+  on("room:join", ({ code, name, accessToken }, cb) => {
     const room = rooms.get(code);
     if (!room) return cb({ ok: false, error: "Room not found" });
     if (room.members.length >= 4) return cb({ ok: false, error: "Room full" });
@@ -565,7 +626,7 @@ io.on("connection", (socket) => {
     linkIdentity(code, playerId, accessToken);
   });
 
-  socket.on("room:rejoin", ({ code, playerId, accessToken }, cb) => {
+  on("room:rejoin", ({ code, playerId, accessToken }, cb) => {
     const room = rooms.get(code);
     if (!room) return cb({ ok: false, error: "Room not found" });
     const member = room.members.find((m) => m.playerId === playerId);
@@ -586,7 +647,7 @@ io.on("connection", (socket) => {
     linkIdentity(code, playerId, accessToken);
   });
 
-  socket.on("room:start", (_payload, cb) => {
+  on("room:start", (_payload, cb) => {
     if (!bound) return cb({ ok: false, error: "Not in a room" });
     const room = rooms.get(bound.roomCode);
     if (!room) return cb({ ok: false, error: "Room not found" });
@@ -596,7 +657,7 @@ io.on("connection", (socket) => {
     cb({ ok: true });
   });
 
-  socket.on("room:set_variant", ({ variant }: { variant: "classic" | "evolved" }, cb) => {
+  on("room:set_variant", ({ variant }: { variant: "classic" | "evolved" }, cb) => {
     if (!bound) return cb?.({ ok: false, error: "Not in a room" });
     const room = rooms.get(bound.roomCode);
     if (!room) return cb?.({ ok: false, error: "Room not found" });
@@ -619,7 +680,7 @@ io.on("connection", (socket) => {
   // room, and told via a dedicated `room:kicked` event (→ the distinct client
   // KickedOverlay). In-game removal is intentionally NOT supported here (mid-
   // match player removal is the forfeit system's job).
-  socket.on("room:kick", ({ targetPlayerId }: { targetPlayerId: string }, cb) => {
+  on("room:kick", ({ targetPlayerId }: { targetPlayerId: string }, cb) => {
     if (!bound) return cb?.({ ok: false, error: "Not in a room" });
     const room = rooms.get(bound.roomCode);
     if (!room) return cb?.({ ok: false, error: "Room not found" });
@@ -650,7 +711,7 @@ io.on("connection", (socket) => {
     broadcastRoom(bound.roomCode);
   });
 
-  socket.on("room:ready", (_payload, cb) => {
+  on("room:ready", (_payload, cb) => {
     if (!bound) return cb?.({ ok: false });
     const room = rooms.get(bound.roomCode);
     if (!room || room.game) return cb?.({ ok: false, error: "Already started" });
@@ -671,7 +732,7 @@ io.on("connection", (socket) => {
   // Withdraw a ready vote — the room's "cancel". Lets a player call off a
   // pending start (or undo a misclick) without leaving the room. Once anyone
   // is un-ready the all-ready condition no longer holds, so the start is held.
-  socket.on("room:unready", (_payload, cb) => {
+  on("room:unready", (_payload, cb) => {
     if (!bound) return cb?.({ ok: false });
     const room = rooms.get(bound.roomCode);
     if (!room || room.game) return cb?.({ ok: false, error: "Already started" });
@@ -681,7 +742,7 @@ io.on("connection", (socket) => {
     if (room.readyVotes.length !== before) broadcastRoom(bound.roomCode);
   });
 
-  socket.on("room:coin_toss_pick", ({ side }: { side: "heads" | "tails" }, cb) => {
+  on("room:coin_toss_pick", ({ side }: { side: "heads" | "tails" }, cb) => {
     if (!bound) return cb?.({ ok: false });
     const room = rooms.get(bound.roomCode);
     if (!room || !room.coinToss || !room.game) return cb?.({ ok: false, error: "No coin toss" });
@@ -731,7 +792,7 @@ io.on("connection", (socket) => {
     broadcastRoom(bound.roomCode);
   });
 
-  socket.on("room:straw_pick", ({ index }: { index: number }, cb) => {
+  on("room:straw_pick", ({ index }: { index: number }, cb) => {
     if (!bound) return cb?.({ ok: false });
     const room = rooms.get(bound.roomCode);
     if (!room || !room.strawDraw || !room.game) return cb?.({ ok: false, error: "No straw draw" });
@@ -767,7 +828,7 @@ io.on("connection", (socket) => {
   });
 
   // All players click "Continue" after straw reveal — same approval pattern as ready-up.
-  socket.on("room:straw_ready", (_payload, cb) => {
+  on("room:straw_ready", (_payload, cb) => {
     if (!bound) return cb?.({ ok: false });
     const room = rooms.get(bound.roomCode);
     if (!room || !room.strawDraw?.result) return cb?.({ ok: false, error: "No straw result" });
@@ -815,7 +876,7 @@ io.on("connection", (socket) => {
     broadcastRoom(bound.roomCode);
   });
 
-  socket.on("room:play_again", (_payload, cb) => {
+  on("room:play_again", (_payload, cb) => {
     if (!bound) return cb({ ok: false, error: "Not in a room" });
     const room = rooms.get(bound.roomCode);
     if (!room || !room.game) return cb({ ok: false, error: "No game" });
@@ -972,6 +1033,7 @@ io.on("connection", (socket) => {
       caboBonus: room.game.caboBonus,
       caboPenalty: room.game.caboPenalty,
       snapBonus: room.game.snapBonus,
+      kamikaze: room.game.kamikaze,
     });
     room.game.currentPlayer = nextStarterIdx;
     room.lastStarterIdx = nextStarterIdx;
@@ -999,7 +1061,7 @@ io.on("connection", (socket) => {
     broadcastRoom(bound.roomCode);
   });
 
-  socket.on("action", (action: ActionMsg, cb) => {
+  on("action", (action: ActionMsg, cb) => {
     if (!bound) return cb?.({ ok: false, error: "Not in a room" });
     const room = rooms.get(bound.roomCode);
     if (!room || !room.game) return cb?.({ ok: false, error: "No game" });
@@ -1089,7 +1151,7 @@ io.on("connection", (socket) => {
 
   // Chat: ephemeral broadcast — no server-side persistence. Messages exist
   // only in connected clients' memory, and only while the room exists.
-  socket.on("room:chat", ({ text }: { text: string }, cb) => {
+  on("room:chat", ({ text }: { text: string }, cb) => {
     if (!bound) return cb?.({ ok: false });
     const room = rooms.get(bound.roomCode);
     if (!room) return cb?.({ ok: false });
@@ -1105,11 +1167,11 @@ io.on("connection", (socket) => {
   // The client calls this when the local player explicitly leaves the room
   // (back-to-menu, leave-room button). We treat it as an immediate disconnect
   // so the other player gets the "X left" notification right away.
-  socket.on("room:leave", () => {
+  on("room:leave", () => {
     handleDisconnect();
   });
 
-  socket.on("disconnect", () => {
+  on("disconnect", () => {
     handleDisconnect();
   });
 
@@ -1229,6 +1291,19 @@ io.on("connection", (socket) => {
       }
     }, 60_000);
   }
+});
+
+// Last-resort process guards. An uncaughtException leaves the process in an
+// undefined state — log the stack and exit so the host (Render) restarts us
+// clean, rather than limping on with possibly-corrupt room state. Unhandled
+// rejections are log-only: every known async path is already .catch()ed, so
+// this is a diagnostic net, not a crash.
+process.on("uncaughtException", (err) => {
+  console.error("[fatal] uncaughtException:", err instanceof Error ? err.stack : err);
+  process.exit(1);
+});
+process.on("unhandledRejection", (reason) => {
+  console.error("[error] unhandledRejection:", reason instanceof Error ? reason.stack : reason);
 });
 
 const PORT = Number(process.env.PORT) || 8787;

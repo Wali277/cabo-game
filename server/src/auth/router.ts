@@ -37,7 +37,7 @@ import {
 import { sendCode } from "./email.js";
 import * as loginLimit from "./loginRateLimit.js";
 import { verifyAccessToken } from "./verifyToken.js";
-import { XP_CONFIG } from "./config.js";
+import { XP_CONFIG, requireEnv } from "./config.js";
 import { buildReward } from "./reward.js";
 import { findCosmetic } from "./cosmetics.js";
 import { findRedeemCode } from "./redeemCodes.js";
@@ -433,7 +433,10 @@ accountRouter.post("/card-colors", async (req: Request, res: Response) => {
 // ---------------------------------------------------------------------------
 accountRouter.post("/change-password", async (req: Request, res: Response) => {
   try {
-    const userId = await verifyAccessToken(bearerToken(req));
+    // Keep the raw token: after a successful change we revoke every OTHER
+    // session via admin.signOut(token, "others"), which needs this JWT.
+    const accessToken = bearerToken(req);
+    const userId = await verifyAccessToken(accessToken);
     if (!userId) {
       return res.status(401).json({ ok: false, error: "Not authenticated" });
     }
@@ -466,6 +469,19 @@ accountRouter.post("/change-password", async (req: Request, res: Response) => {
     const { error: updErr } = await db.auth.admin.updateUserById(userId, { password: newPassword });
     if (updErr) {
       throw new Error(`change-password: updateUserById: ${updErr.message}`);
+    }
+
+    // Revoke every OTHER session for this user (GoTrue does NOT do this on an
+    // admin password update): a stolen/leftover session elsewhere must not
+    // survive a password change. Scope "others" keeps THIS session — the one
+    // that just proved the current password — signed in (better UX), and also
+    // reaps the short-lived re-auth session minted by signInWithPassword
+    // above. verifyAccessToken re-checks the session against Supabase on every
+    // request, so revoked tokens die immediately server-side. If revocation
+    // fails we still return ok — the password DID change; we log it instead.
+    const { error: revokeErr } = await db.auth.admin.signOut(accessToken, "others");
+    if (revokeErr) {
+      logError("change-password(revoke-sessions)", revokeErr);
     }
     return res.json({ ok: true });
   } catch (err) {
@@ -1012,6 +1028,67 @@ authRouter.post("/reset-password", async (req: Request, res: Response) => {
     });
     if (updErr) {
       throw new Error(`reset-password: updateUserById failed: ${updErr.message}`);
+    }
+
+    // Kill ALL previously-issued sessions: an attacker holding a stolen
+    // session must not survive the victim's password reset. GoTrue does NOT
+    // revoke sessions on an admin password update.
+    //
+    // PRIMARY: the GoTrue admin logout-by-user-id endpoint
+    // (POST /auth/v1/admin/users/{id}/logout, service-role auth). No sign-in
+    // is involved, so it cannot be starved by GoTrue's password-grant rate
+    // limiter — a throwaway sign-in originates from THIS server's IP, and an
+    // attacker spamming /auth/login could 429 it, silently skipping the
+    // revocation while the route still returned ok.
+    //
+    // FALLBACK (older GoTrue without that endpoint, or any non-2xx): mint a
+    // throwaway session with the NEW password, then sign it out with scope
+    // "global" (destroys every session, including the throwaway).
+    //
+    // verifyAccessToken re-checks the session against Supabase on every
+    // request, so revoked tokens die immediately server-side. If BOTH paths
+    // fail we still return ok — the password DID change; we log loudly
+    // instead of failing the reset.
+    let adminLogoutFailure: unknown = null;
+    try {
+      const baseUrl = requireEnv("SUPABASE_URL").replace(/\/+$/, "");
+      const serviceRoleKey = requireEnv("SUPABASE_SERVICE_ROLE_KEY");
+      const resp = await fetch(
+        `${baseUrl}/auth/v1/admin/users/${encodeURIComponent(user.id)}/logout`,
+        {
+          method: "POST",
+          headers: {
+            apikey: serviceRoleKey,
+            Authorization: `Bearer ${serviceRoleKey}`,
+          },
+        },
+      );
+      if (!resp.ok) {
+        throw new Error(`admin logout endpoint returned HTTP ${resp.status}`);
+      }
+    } catch (err) {
+      adminLogoutFailure = err;
+    }
+    if (adminLogoutFailure !== null) {
+      try {
+        const { data: revokeSignIn, error: revokeSignInErr } =
+          await anonAuth().auth.signInWithPassword({
+            email: user.email.toLowerCase(),
+            password: newPassword,
+          });
+        const jwt = revokeSignIn?.session?.access_token;
+        if (revokeSignInErr || !jwt) {
+          throw new Error(revokeSignInErr?.message ?? "sign-in minted no session");
+        }
+        const { error: revokeErr } = await db.auth.admin.signOut(jwt, "global");
+        if (revokeErr) {
+          throw new Error(revokeErr.message);
+        }
+      } catch (revokeFailure) {
+        // BOTH revocation paths failed — log each so the cause is diagnosable.
+        logError("reset-password(revoke-sessions:admin-logout)", adminLogoutFailure);
+        logError("reset-password(revoke-sessions)", revokeFailure);
+      }
     }
 
     return res.json({ ok: true });

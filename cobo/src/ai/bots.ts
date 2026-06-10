@@ -9,7 +9,10 @@ export type ChatMoment =
   | "roundHighHand"
   | "busted"
   | "gloriousVictory"
-  | "juicyDraw";
+  | "juicyDraw"
+  | "snapHit"
+  | "snapMiss"
+  | "gotSnapped";
 
 export interface BotProfile {
   id: BotDifficulty;
@@ -61,6 +64,24 @@ export const BOT_PROFILES: Record<BotDifficulty, BotProfile> = {
         "Mom! I won!",
       ],
       juicyDraw: ["Ooh shiny!", "What's this one do?", "Is this a good one?", "Pretty!"],
+      snapHit: [
+        "I got one! I really got one!",
+        "Wait — that worked?!",
+        "Snap! Did everyone see?!",
+        "Beginner's luck!",
+      ],
+      snapMiss: [
+        "Huh? I was SURE...",
+        "Oopsie.",
+        "These cards keep moving, I swear!",
+        "That wasn't it?",
+      ],
+      gotSnapped: [
+        "Hey! That was mine!",
+        "Wha— where'd it go?",
+        "Was that allowed?!",
+        "I was saving that one...",
+      ],
     },
   },
 
@@ -100,6 +121,24 @@ export const BOT_PROFILES: Record<BotDifficulty, BotProfile> = {
         "Mmm, weaponized.",
         "This'll do nicely.",
         "Intel acquired.",
+      ],
+      snapHit: [
+        "Direct hit.",
+        "Target neutralized.",
+        "Clean strike.",
+        "By the book.",
+      ],
+      snapMiss: [
+        "Misfire. Recalibrating.",
+        "Stale intel.",
+        "Noted. Adjusting fire.",
+        "That position moved.",
+      ],
+      gotSnapped: [
+        "Breach detected.",
+        "Bold move, soldier.",
+        "You'll answer for that.",
+        "Losses logged.",
       ],
     },
   },
@@ -146,6 +185,24 @@ export const BOT_PROFILES: Record<BotDifficulty, BotProfile> = {
         "Maybe stick to checkers.",
       ],
       juicyDraw: ["Mmh. Perfect.", "Thank you, deck.", "Oh, you'll regret this.", "Exactly what I needed."],
+      snapHit: [
+        "Too easy.",
+        "Saw it a mile away.",
+        "You blinked.",
+        "Predictable.",
+      ],
+      snapMiss: [
+        "...someone moved that card.",
+        "Irrelevant.",
+        "A rounding error.",
+        "Don't celebrate.",
+      ],
+      gotSnapped: [
+        "Lucky.",
+        "Enjoy that. It won't repeat.",
+        "Touch my cards again. I dare you.",
+        "That changes nothing.",
+      ],
     },
   },
 };

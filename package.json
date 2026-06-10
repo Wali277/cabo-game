@@ -5,8 +5,10 @@
   "main": "electron/main.js",
   "scripts": {
     "postinstall": "npm install --prefix cobo && npm install --prefix server",
+    "prebuild": "npm run check:engine-sync --prefix server",
     "build": "npm run build --prefix cobo",
     "start": "npm start --prefix server",
+    "test:ai": "cd server && node --import tsx ../tests/botBrain.test.ts && node --import tsx ../tests/botSelfPlay.test.ts && node --import tsx ../tests/botLiveWiring.test.ts",
     "electron:build-client": "cd cobo && npx vite build --mode electron",
     "electron:make-icon": "node scripts/make-icon.mjs",
     "electron:dev": "npm run electron:build-client && npx electron electron/main.js",

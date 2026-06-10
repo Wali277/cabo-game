@@ -209,6 +209,7 @@ function spSeatSuddenDeath(
     caboBonus: game.caboBonus,
     caboPenalty: game.caboPenalty,
     snapBonus: game.snapBonus,
+    kamikaze: game.kamikaze,
   });
   return { game: next, elim: { ...elim, bustedThisRound: [] } };
 }

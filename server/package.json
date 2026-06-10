@@ -9,6 +9,7 @@
     "build:client": "npm --prefix ../cobo run build",
     "serve": "npm run build:client && npm start",
     "share": "node scripts/share.mjs",
+    "check:engine-sync": "node --import tsx scripts/check-engine-sync.ts",
     "check:bust": "node --import tsx scripts/check-bust.ts",
     "check:roundresolve": "node --import tsx scripts/check-roundresolve.ts",
     "check:spbust": "node --import tsx test-spbust.mts",
@@ -22,7 +23,7 @@
     "check:decopurchase": "node --env-file-if-exists=.env --import tsx scripts/check-deco-purchase.ts",
     "check:levelrewards": "node --env-file-if-exists=.env --import tsx scripts/check-level-rewards.ts",
     "render:email": "node --import tsx scripts/render-email.ts",
-    "test:rules": "npm run check:bust && npm run check:roundresolve && npm run check:sdloop && npm run check:spbust"
+    "test:rules": "npm run check:engine-sync && npm run check:bust && npm run check:roundresolve && npm run check:sdloop && npm run check:spbust"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2",

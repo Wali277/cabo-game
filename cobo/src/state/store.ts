@@ -40,6 +40,9 @@ import {
 } from "../engine/game";
 import { Audio } from "../audio/sounds";
 import { type BotDifficulty, nameForSlot } from "../ai/bots";
+// Imported from brain.ts (pure, store-free) — NOT from ai/bot.ts, which imports
+// this store and would create an import cycle.
+import { resetBotKnowledge } from "../ai/brain";
 // Accounts layer (Phase 1 — auth only). Type-only import so there's no static
 // dependency cycle with auth.ts (which imports this store); runtime calls into
 // auth.ts use a dynamic import(), matching the mp.ts pattern below.
@@ -605,6 +608,13 @@ export const useStore = create<StoreState>((set, get) => ({
 
   init(numBots, difficulty, variant = "classic") {
     const diff = difficulty ?? null;
+    // Wipe ALL bot beliefs from any previous game. Table.tsx's round-change
+    // effect never fires for round 1 of a NEW game (its lastRound ref starts
+    // at this game's round number), and card ids (`${rank}${suit}`) + player
+    // ids (p_human, p_bot1..3) are stable across games — without this reset,
+    // the previous game's round-end full-reveal beliefs would re-anchor onto
+    // this game's freshly dealt hands (perfect hidden-card intel in game 2).
+    resetBotKnowledge();
     const game = newGame({ players: makePlayers(numBots, diff), variant });
     // Start with the coin toss screen — the actual game state is held in
     // pendingGame until the toss completes and decides the starting player.
@@ -641,6 +651,10 @@ export const useStore = create<StoreState>((set, get) => ({
     // Skip the coin toss in training mode — human always starts for predictable testing.
     // `variant` lets the chamber drill Classic or Cabo Evolved (Dragon, K=0, 7/8
     // peek-or-spy, 9/10 peek+spy, Kamikaze, Carré) — chosen on the menu.
+    // Same cross-game carryover hole as init(): the round-change effect never
+    // fires for round 1, so wipe stale beliefs here too (training → real game
+    // and real game → training transitions share the card-id space).
+    resetBotKnowledge();
     const game = newGame({ players: makePlayers(1, null), variant });
     set({
       mode: "sp", training: true, mp: null,

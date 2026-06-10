@@ -31,6 +31,13 @@ function pushLog(state: GameState, msg: string) {
   state.log.push(msg);
 }
 
+/** Guard for caller-supplied hand indices (MP clients can forge payloads).
+ *  Rejects ONLY non-integer / out-of-range values — an IN-RANGE empty (null)
+ *  slot is a legal target for some moves and must pass through unchanged. */
+function isValidHandIndex(hand: (Card | null)[], index: number): boolean {
+  return Number.isInteger(index) && index >= 0 && index < hand.length;
+}
+
 export function newGame(opts: NewGameOptions): GameState {
   const variant: GameVariant = opts.variant ?? "classic";
   // Cabo Evolved deals 5 cards per hand; classic deals 4.
@@ -138,7 +145,7 @@ export function setupPeekCard(state: GameState, playerId: string, index: number)
   if (state.phase !== "setup_peek") return state;
   const player = state.players.find((p) => p.id === playerId);
   if (!player) return state;
-  if (index < 0 || index >= player.hand.length) return state;
+  if (!isValidHandIndex(player.hand, index)) return state;
   if (player.knownToSelf[index]) return state; // already peeked
   const peeked = player.knownToSelf.filter(Boolean).length;
   if (peeked >= 2) return state;
@@ -217,6 +224,7 @@ export function swapDrawnWithHand(state: GameState, handIndex: number): GameStat
   // from the discard can be swapped into hand — the only legal move with it —
   // so only block the deck-drawn case here.)
   if (state.drawnCard.rank === "Dragon" && state.drawnFrom === "deck") return state;
+  if (!isValidHandIndex(state.players[state.currentPlayer].hand, handIndex)) return state;
   const s = clone(state);
   const player = s.players[s.currentPlayer];
   const oldCard = player.hand[handIndex];
@@ -345,7 +353,7 @@ export function activateDragon(state: GameState): GameState {
  *  (an "extra card" — not pulled from the deck) into the drawn slot, then
  *  returns to `turn_drawn` so the player keeps it or plays its action normally.
  *  The Dragon can become any rank EXCEPT another Dragon. */
-const ALLOWED_DRAGON_RANKS: Rank[] = [
+export const ALLOWED_DRAGON_RANKS: Rank[] = [
   "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "Joker",
 ];
 
@@ -372,6 +380,7 @@ export function dragonChooseRank(state: GameState, rank: Rank): GameState {
 
 export function actionPeekOwn(state: GameState, index: number): GameState {
   if (state.phase !== "action_peek_own") return state;
+  if (!isValidHandIndex(state.players[state.currentPlayer].hand, index)) return state;
   const card = state.players[state.currentPlayer].hand[index];
   if (!card) return state; // can't peek at an empty slot
   const s = clone(state);
@@ -396,6 +405,7 @@ export function actionPeekOwn(state: GameState, index: number): GameState {
  *  rival's. Transitions into the matching single-peek phase. */
 export function actionChoosePeek(state: GameState, choice: "own" | "other"): GameState {
   if (state.phase !== "action_peek_choose") return state;
+  if (choice !== "own" && choice !== "other") return state;
   const s = clone(state);
   s.phase = choice === "own" ? "action_peek_own" : "action_peek_other";
   return s;
@@ -405,7 +415,8 @@ export function actionPeekOther(state: GameState, targetPlayerId: string, index:
   if (state.phase !== "action_peek_other") return state;
   if (targetPlayerId === state.players[state.currentPlayer].id) return state;
   const target0 = state.players.find((p) => p.id === targetPlayerId);
-  const card = target0?.hand[index];
+  if (!target0 || !isValidHandIndex(target0.hand, index)) return state;
+  const card = target0.hand[index];
   if (!card) return state; // can't peek at an empty slot
   const s = clone(state);
   const cur = s.players[s.currentPlayer];
@@ -427,9 +438,13 @@ export function actionBlindSwap(
   if (targetPlayerId === state.players[state.currentPlayer].id) return state;
   const cur0 = state.players[state.currentPlayer];
   const target0 = state.players.find((p) => p.id === targetPlayerId);
+  if (!target0) return state;
+  if (!isValidHandIndex(cur0.hand, ownIndex) || !isValidHandIndex(target0.hand, targetIndex)) {
+    return state;
+  }
   // Both slots must hold a card. Empty slots (from a prior correct self
   // snap) are not legal swap targets.
-  if (!cur0.hand[ownIndex] || !target0?.hand[targetIndex]) return state;
+  if (!cur0.hand[ownIndex] || !target0.hand[targetIndex]) return state;
   const s = clone(state);
   const cur = s.players[s.currentPlayer];
   const target = s.players.find((p) => p.id === targetPlayerId)!;
@@ -456,7 +471,8 @@ export function actionPeekAndSwapPick(
 ): GameState {
   if (state.phase !== "action_peek_and_swap_pick") return state;
   const target0 = state.players.find((p) => p.id === targetPlayerId);
-  const card = target0?.hand[index];
+  if (!target0 || !isValidHandIndex(target0.hand, index)) return state;
+  const card = target0.hand[index];
   if (!card) return state; // can't peek-and-swap at an empty slot
   const s = clone(state);
   const cur = s.players[s.currentPlayer];
@@ -477,6 +493,15 @@ export function actionPeekAndSwapDecide(
   ownIndex?: number,
 ): GameState {
   if (state.phase !== "action_peek_and_swap_decide" || !state.peekAndSwapPick) return state;
+  // Untrusted ownIndex: reject non-integer / out-of-range outright. An
+  // in-range EMPTY slot still routes through the "couldn't swap" path below.
+  if (
+    doSwap &&
+    ownIndex !== undefined &&
+    !isValidHandIndex(state.players[state.currentPlayer].hand, ownIndex)
+  ) {
+    return state;
+  }
   const s = clone(state);
   const cur = s.players[s.currentPlayer];
   const pick = s.peekAndSwapPick!;
@@ -659,6 +684,7 @@ export function actionSnapOther(
   if (!snapper || !target) return state;
   if (snapper.snapsUsed.other) return state;
   if (state.discard.length === 0) return state;
+  if (!isValidHandIndex(target.hand, targetIndex)) return state;
   const targetCard = target.hand[targetIndex];
   if (!targetCard) return state;
 
@@ -756,6 +782,7 @@ export function actionSnapSelf(
   if (!snapper) return state;
   if (snapper.snapsUsed.self) return state;
   if (state.discard.length === 0) return state;
+  if (!isValidHandIndex(snapper.hand, ownIndex)) return state;
   const ownCard = snapper.hand[ownIndex];
   if (!ownCard) return state;
 

@@ -1,0 +1,76 @@
+# =============================================================================
+# CI — typecheck both packages + run every offline-safe check script.
+#
+# Node 20: derived from the root package.json "engines": { "node": ">=20" }
+# (there is no .nvmrc). npm ci is used because cobo/ and server/ each have
+# their own package-lock.json (the root postinstall/electron deps are NOT
+# installed here — they are only needed for desktop builds, not for checks).
+#
+# Excluded check scripts (need secrets / a live server / a real Supabase DB):
+#   check:reset, check:redeem, check:decopurchase  — Supabase env vars + a
+#     running HTTP server on PORT (they fetch() real endpoints)
+#   check:levelrewards — Supabase service-role env vars (writes a real DB)
+#   check:kick — socket.io integration test against a RUNNING server instance
+# =============================================================================
+name: CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: |
+            cobo/package-lock.json
+            server/package-lock.json
+
+      - name: Install client deps (cobo)
+        working-directory: cobo
+        run: npm ci
+
+      - name: Install server deps
+        working-directory: server
+        run: npm ci
+
+      - name: Typecheck client (cobo)
+        working-directory: cobo
+        run: npx tsc -b
+
+      - name: Typecheck server
+        working-directory: server
+        run: npx tsc --noEmit
+
+      # test:rules = check:engine-sync (all 4 engine files byte-identical)
+      # + check:bust + check:roundresolve + check:sdloop + check:spbust
+      - name: Rules engine tests + drift guard
+        working-directory: server
+        run: npm run test:rules
+
+      # test:ai (ROOT script) = botBrain unit tests + 300-round bot self-play.
+      # Runs from the repo root: the script cd's into server/ and uses server's
+      # tsx to execute tests/*.ts, which import only cobo TS sources (brain.ts
+      # + engine) — no cobo node_modules needed beyond the installs above.
+      - name: AI bot tests (brain unit + self-play)
+        run: npm run test:ai
+
+      - name: Offline check scripts (cosmetics / kofi / sp-sd-loop)
+        working-directory: server
+        run: |
+          npm run check:cosmetics
+          npm run check:kofi
+          npm run check:sp-sd-loop

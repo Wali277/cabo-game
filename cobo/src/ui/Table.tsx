@@ -17,7 +17,7 @@ import { RoundStartCinematic } from "./RoundStartCinematic";
 import { ActionLog } from "./ActionLog";
 import { TrainingPanel } from "./TrainingPanel";
 import { MpNotices } from "./MpNotices";
-import { armBotSnap, botMove, executeBotSnap, findBotSnap, ingestReveals, reactToRoundEnd, resetBotKnowledge } from "../ai/bot";
+import { armBotSnap, botMove, executeBotSnap, findBotSnap, ingestReveals, reactToRoundEnd, reactToSnapOutcome, resetBotKnowledge, suggestBotDelayMs } from "../ai/bot";
 import { clearReveals as clearRevealsEngine } from "../engine/game";
 import { Audio } from "../audio/sounds";
 import { useTheme } from "../state/theme";
@@ -44,6 +44,8 @@ export function Table() {
   const toast = useStore((s) => s.toast);
   const setToast = useStore((s) => s.setToast);
   const consumeAnimations = useStore((s) => s.consumeAnimations);
+  // SP bot persona (null in MP / training) — drives bot pacing + snap timing.
+  const botDifficulty = useStore((s) => s.botDifficulty);
   // Current user-selected table background theme (persisted in localStorage).
   // The `<div className="table-bg" />` below uses its `data-theme` attribute
   // to pick which gradient stack renders behind the table.
@@ -106,10 +108,13 @@ export function Table() {
     }
   }, [game.roundNumber]);
 
-  // Ingest reveals into bot beliefs each render
+  // Ingest reveals into bot beliefs on EVERY engine transition — the belief
+  // reconciliation in brain.ts tracks cards moving between slots by id, so
+  // it must observe every intermediate state (swaps, snaps, discard-draws),
+  // not just reveal/phase/turn changes.
   useEffect(() => {
     ingestReveals(game);
-  }, [game.reveals, game.phase, game.currentPlayer]);
+  }, [game]);
 
   // Auto-play bots — read latest store at timer fire to avoid stale closures.
   // Don't fire while a transient reveal is being shown to the human, so the
@@ -122,7 +127,11 @@ export function Table() {
     if (hasTransientReveal) return;
     const cur = game.players[game.currentPlayer];
     if (!cur.isBot) return;
-    const delay = 950 + Math.floor(Math.random() * 700);
+    // Decision-weighted pacing: hard decisions (Cabo call, Dragon, action
+    // cards) pause longer; obvious ones fire quickly. Training stays fast.
+    const delay = useStore.getState().training
+      ? 600
+      : suggestBotDelayMs(game, botDifficulty ?? "marcy");
     const t = setTimeout(() => {
       const latest = useStore.getState().game;
       if (!latest) return;
@@ -140,7 +149,7 @@ export function Table() {
       useStore.getState().applyBotMove(botMove(latest));
     }, delay);
     return () => clearTimeout(t);
-  }, [game.phase, game.currentPlayer, hasTransientReveal, mode, game.snapPhase]);
+  }, [game.phase, game.currentPlayer, hasTransientReveal, mode, game.snapPhase, botDifficulty]);
 
   // SP-only: bot snap reactions. The trigger is a CHANGE to the discard top
   // (i.e. a fresh card just landed), not every state tick. Watching the full
@@ -153,7 +162,6 @@ export function Table() {
   // (emits snap_armed_*, SnapCinematic shows the SNAP! overlay). Then a
   // second timer (~1.0s later, after the overlay) resolves the snap. This
   // mirrors what a human does: press → cinematic → pick.
-  const botDifficulty = useStore((s) => s.botDifficulty);
   const discardTopId = game.discard[game.discard.length - 1]?.id;
   const ARM_OVERLAY_MS = 1000;
   // resolveTimerRef lives across effect re-runs so the cleanup of the
@@ -332,9 +340,17 @@ export function Table() {
       case "snap_correct":
       case "snap_wrong":
         // SFX fires inside SnapCinematic so it lines up with the splash.
+        // SP: let bot participants react in chat (snapHit / snapMiss /
+        // gotSnapped) — emitBotSpeech's cooldown keeps chains readable.
+        if (mode === "sp") reactToSnapOutcome(latest, game);
         break;
       case "snap_penalty_draw":
         Audio.playSfx("snap_penalty");
+        // A wrong snap pushes snap_wrong + snap_penalty_draw in ONE engine
+        // call, and this effect only sees the LAST animation — so the common
+        // wrong-snap path lands HERE, not on the snap_wrong case above. The
+        // payload carries snapperId; reactToSnapOutcome maps it to snapMiss.
+        if (mode === "sp") reactToSnapOutcome(latest, game);
         break;
     }
     if (msg) setToast(msg);
